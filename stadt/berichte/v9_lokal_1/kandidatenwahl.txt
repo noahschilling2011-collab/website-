@@ -1,0 +1,4 @@
+bester: Hash 28385759bed1db02, Invarianten ok, Gruppen 5/5, Nebenprüfungen 16/26, Defizit Ø 24.803 über 160 Paare
+letzter: Hash 4654c8bc3689895c, Invarianten ok, Gruppen 5/5, Nebenprüfungen 16/26, Defizit Ø 25.173 über 160 Paare
+Paare und Regelarm bei allen Kandidaten gleich (160 Paare).
+Gewählt: bester (ausgaben/lokal_v9/val_bester.json)

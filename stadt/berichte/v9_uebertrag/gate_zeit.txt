@@ -1,0 +1,10 @@
+# Zeit-Gate T, 2026-09-29T01:01:25+00:00,  Intel(R) Xeon(R) Processor @ 2.10GHz, 4 Kerne, node v22.22.2
+# Spalten: Runde, Fassung, Last vorher (1 min), T Seed 1/2/3 in ms, Gate
+1 orig 0.91 3178 2617 2482  Gate Phase 0: BESTANDEN
+1 gepatcht 0.94 2665 2353 2423  Gate Phase 0: BESTANDEN
+2 orig 1.18 2527 2471 2520  Gate Phase 0: BESTANDEN
+2 gepatcht 1.17 2513 2492 2623  Gate Phase 0: BESTANDEN
+3 orig 1.22 2768 2626 2448  Gate Phase 0: BESTANDEN
+3 gepatcht 1.13 2701 2402 2538  Gate Phase 0: BESTANDEN
+# Mittel orig: 2626 ms (9 Werte)
+# Mittel gepatcht: 2523 ms (9 Werte)

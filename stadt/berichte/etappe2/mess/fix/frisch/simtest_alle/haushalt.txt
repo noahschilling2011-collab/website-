@@ -1,0 +1,40 @@
+A Statisch (Abschnitt „Haushalt“, alle Änderungen des Budgets, Lohnsteuer)
+  ok   Abschnitt gefunden (297 Zeilen), kein Zufall
+  ok   liest keine Personen (keine Personenfelder: keine), keine Namen, kein Geschlecht, kein Alter, keinen Einzugstag, keine Eltern
+  ok   28 Stellen ändern das Budget, jede bucht in derselben Zeile; die eine Ausnahme (Betriebe der Stadt, Math.max) bucht Verkauf und laufende Kosten gleich danach
+  ok   Lohnsteuer mit dem Satz des Haushalts (steuerSatz: ein Satz für alle, keine Person); R.STEUER nur noch für „was die Senkung lässt“
+  ok   drei Vorhaben, jedes mit eigenem Schritt: Wohnungen auf Vorrat, Rathaus ausbauen, Parks in Wohnnähe; die Computer der Schulen davor als Bedarf (hhComputer, nicht in der Rangfolge); keins baut Schulen (das Bauamt ab einer ganzen Klasse)
+B Neue Städte (Seeds 1, 2, 3, je 730 Tage stündlich)
+  ok   Seed 1: 17514 Stunden Konten = Budget, 730 Nächte (gestern, Vorhaben, Vorrat, Kurzfassung), 73 Jahresabschlüsse mit Plan und Lohnsteuer nachgerechnet, 73 Jahreszeilen ohne Namen
+  ok   Seed 1: 2701 Schritte, 270 Vorhaben gestartet (nie zwei gleiche in einer Nacht, nie unter die Rücklage, Bau nur mit freiem Bauhof), 3-mal Geld für ein höheres Vorhaben festgehalten; Rathaus 3-mal ausgebaut, alle als Vorhaben; Lohnsteuer 10-mal gesenkt, 0-mal angehoben, 0 % ab Tag 160, an Tag 730 0 %; seit dem Start computer 154240, wohnungen 9600, rathaus 15200, parks 10800 Taler; den Leuten gelassen 2179953 Taler
+  ok   Seed 2: 17514 Stunden Konten = Budget, 730 Nächte (gestern, Vorhaben, Vorrat, Kurzfassung), 73 Jahresabschlüsse mit Plan und Lohnsteuer nachgerechnet, 73 Jahreszeilen ohne Namen
+  ok   Seed 2: 2664 Schritte, 238 Vorhaben gestartet (nie zwei gleiche in einer Nacht, nie unter die Rücklage, Bau nur mit freiem Bauhof), 5-mal Geld für ein höheres Vorhaben festgehalten; Rathaus 3-mal ausgebaut, alle als Vorhaben; Lohnsteuer 10-mal gesenkt, 0-mal angehoben, 0 % ab Tag 170, an Tag 730 0 %; seit dem Start computer 129920, wohnungen 9600, rathaus 15200, parks 10800 Taler; den Leuten gelassen 1959326 Taler
+  ok   Seed 3: 17514 Stunden Konten = Budget, 730 Nächte (gestern, Vorhaben, Vorrat, Kurzfassung), 73 Jahresabschlüsse mit Plan und Lohnsteuer nachgerechnet, 73 Jahreszeilen ohne Namen
+  ok   Seed 3: 2639 Schritte, 272 Vorhaben gestartet (nie zwei gleiche in einer Nacht, nie unter die Rücklage, Bau nur mit freiem Bauhof), 4-mal Geld für ein höheres Vorhaben festgehalten; Rathaus 3-mal ausgebaut, alle als Vorhaben; Lohnsteuer 10-mal gesenkt, 0-mal angehoben, 0 % ab Tag 190, an Tag 730 0 %; seit dem Start computer 139840, wohnungen 2400, rathaus 15200, parks 9900 Taler; den Leuten gelassen 2069337 Taler
+C Rangfolge: Bürgermeister (KI) und Vorrang in der Nacht (erzwungen)
+  ok   Anfrage am letzten Tag des Jahres 0 mit 3 Vorhaben; Antwort gilt fürs Jahr 1: parks, rathaus, wohnungen (ki); Jahreszeile nennt das Bürgermeisteramt
+  ok   Seed 1, Tag 178, 4800 Taler über der Rücklage, Rathaus eine Stufe zurück, 60 Anfragen: Rathaus vorn → Ausbau 4800, Wohnungen 0; Wohnungen vorn → Wohnungen 2400, Rathaus 0 (hält fest)
+  ok   Computer gestrichen (Bedarf vor den Vorhaben): mit Rathaus vorn → Computer 320, Rathaus 0 (hält fest); 320 Taler und 60 Anfragen, Wohnungen vorn → Computer 320, Wohnungen 0
+  ok   Kasse unter der Rücklage: kein Vorhaben
+D Lohnsteuer erzwungen (Jahresabschluss mit gesetzter Kasse)
+  ok   Tag 199 → 200 (Rücklage etwa 63382): Kasse 10 Taler: 5 → 6 %, 10 → 10 % (nicht über 10); 5 Mio.: 5 → 4 %, 0 → 0 % (nicht unter 0), 10 → 9 %
+  ok   Lohnsteuer bei 4 %: 1 Taler auf 100 Taler Lohn (3 Köpfe, erwartet 1); den Leuten gelassen 0 (erwartet 0)
+E Speichern und Laden (mitten am Tag, in der letzten Nacht des Jahres)
+  ok   Seed 1, Tag 155 13 Uhr: 60 Tage weiter bitgleich (Satz 0 %)
+  ok   Seed 2, Tag 159 23 Uhr: 60 Tage weiter bitgleich (Satz 0 %)
+  ok   Seed 3, Tag 309 23 Uhr: 60 Tage weiter bitgleich (Satz 0 %)
+  ok   Aufholen (Tag 50–100 in Tagesschritten): Konten = Budget, 10 Jahre, Satz 7 % (stündlich 6 %)
+F Übernahme älterer Stände, beschädigte Stände
+  ok   Version 8 (stadt.orig.html), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   Version 7 (git ffa1d88), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   Version 6 (git bc7247a), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   Version 5 (git 414ebab), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   Version 4 (git 1c8d40b), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   Version 3 (git 2b821c2), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   Version 2 (git 39c405b), Seed 4, Tag 150: Haushalt ab Tag 150, Zeile vor denen von Schule und Rathaus, 40 Tage Konten = Budget, 5 Jahre, danach gespeichert und geladen gleich
+  ok   14 beschädigte Stände abgelehnt
+G Ausgeschaltet (nur Buchführung)
+  ok   R.HH_VORHABEN = 0, R.HH_STEUER = 0 (Seed 2, 400 Tage): Satz 10 %, keine Vorhaben, keine Zeile, Konten = Budget; das Rathaus baut nach RA6 aus (Stufe 4)
+H Namenstausch (der Haushalt liest keine Namen)
+  ok   Seed 3, 300 Tage: mit umgedrehten Namenslisten gleiche Konten, gleicher Satz (0 %), gleiche Vorhaben
+Alle Prüfungen zum Haushalt bestanden

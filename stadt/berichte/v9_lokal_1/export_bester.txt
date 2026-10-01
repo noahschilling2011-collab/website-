@@ -1,0 +1,1 @@
+exportiert: /tmp/claude-0/-home-user-website-/584133fa-a5fc-563e-807a-2feca85efaf0/scratchpad/ml/v9/training/laeufe/v9_lokal_1/export/policy_v9_lokal_1_bester.json (106887 Byte), Hash 28385759bed1db02, Schema e85eca0c, Schichten [64, 64, 13], Status experimentell

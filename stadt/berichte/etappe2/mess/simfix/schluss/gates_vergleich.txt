@@ -1,0 +1,12 @@
+vorher 1–80: 80 Seeds; bestanden 1: 80, 2: 80, 3: 80, 4: 80, 5: 80, 6: 80, 7: 58 (–22), T: 56, B: 80; rot: Gate T: 1, 2, 3, 4, 6, 7, 10, 16, 20, 23, 24, 25, 31, 39, 40, 42, 45, 50, 52, 56, 61, 67, 72, 77; Abstürze 0
+  Gate 7 gewertet 58, kleinster gewerteter Abstand 19.4; Wegzieher je Stadt Median 18 (5–36), Summe 1454; Abstand über alle Wegzieher 26.2; Faktor 4 max 1.13; kleinstes Budget 1741
+  gegen R.GED = 0 gepaart: einwohner 365: 28 ± 9 (2.2 %); kasse 365: -43749 ± 11330 (-4.3 %); gruendungen 365: -54 ± 9 (-17.0 %); einwohner 730: 16 ± 9 (1.1 %); kasse 730: -135181 ± 21665 (-14.2 %); gruendungen 730: -81 ± 16 (-16.3 %)
+nachher 1–80: 80 Seeds; bestanden 1: 80, 2: 80, 3: 80, 4: 79, 5: 80, 6: 80, 7: 64 (–16), T: 80, B: 80; rot: Gate 4: 19; Abstürze 0
+  Gate 7 gewertet 64, kleinster gewerteter Abstand 16.8; Wegzieher je Stadt Median 18 (7–47), Summe 1563; Abstand über alle Wegzieher 26.1; Faktor 4 max 1.17; kleinstes Budget 1741
+  gegen R.GED = 0 gepaart: einwohner 365: 42 ± 10 (3.3 %); kasse 365: -37232 ± 12190 (-3.6 %); gruendungen 365: -46 ± 8 (-14.4 %); einwohner 730: 20 ± 9 (1.4 %); kasse 730: -140240 ± 25215 (-14.8 %); gruendungen 730: -64 ± 17 (-12.9 %)
+vorher 81–160: 80 Seeds; bestanden 1: 80, 2: 80, 3: 80, 4: 80, 5: 80, 6: 80, 7: 49 (–31), T: 52, B: 80; rot: Gate T: 81, 82, 86, 92, 95, 96, 97, 99, 105, 106, 107, 114, 116, 119, 120, 121, 125, 126, 133, 135, 139, 141, 142, 146, 147, 150, 159, 160; Abstürze 0
+  Gate 7 gewertet 49, kleinster gewerteter Abstand 18.8; Wegzieher je Stadt Median 16 (4–40), Summe 1368; Abstand über alle Wegzieher 25.4; Faktor 4 max 1.1; kleinstes Budget 772
+nachher 81–160: 80 Seeds; bestanden 1: 80, 2: 80, 3: 80, 4: 80, 5: 80, 6: 80, 7: 47 (–33), T: 80, B: 80; rot: keins; Abstürze 0
+  Gate 7 gewertet 47, kleinster gewerteter Abstand 18.4; Wegzieher je Stadt Median 16 (4–35), Summe 1366; Abstand über alle Wegzieher 25.5; Faktor 4 max 1.11; kleinstes Budget 772
+1–80: Tabelle Tag 365/730 gleich vor und nach dem Fix in 0 von 80 Seeds
+81–160: Tabelle Tag 365/730 gleich vor und nach dem Fix in 0 von 80 Seeds

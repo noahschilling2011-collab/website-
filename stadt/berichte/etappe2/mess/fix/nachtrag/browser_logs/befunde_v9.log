@@ -1,0 +1,20 @@
+OK   1280 × 800: Leiste 6 Zeilen, scrollHeight 286 ≤ sichtbar 286 (letzte Zeile endet bei 345, Liste bei 345); Stadtbuch darunter 321 px hoch
+OK   Stadtbuch, erste Wahl: „(“ steht mit dem ersten Namen in einer nicht umbrechenden Spanne (1), keine „(“ allein am Zeilenende; „Tag 0 · BürgermeisterErste Bürgermeisterwahl: Die 10 Erwachsenen der Stadt wählen Julia Ernst zur Bürgermeisterin, mit 5 von 10 Stimmen im zweiten Wahlgang (Jak…“
+OK   Karte des Bürgermeisters: „Amtszeit bis“ 1-mal, Knopf Auch nach der Amtszeit Hauptfigur (gesperrt), Grund „Als Bürgermeisterin ist Julia Hauptfigur, solange das Amt läuft. Mehr als 5 Hauptfiguren erst, wenn die KI im Schnitt unter 5 Sekunden antwo“
+OK   Ziel im Amt: „Ziel: besserer Job (noch 60 Tage; im Amt kein Stellenwechsel, es zählt nur ein höherer Lohn im Rathaus)“
+OK   1280 × 800: Konsole leer
+OK   1366 × 768: Leiste 6 Zeilen, scrollHeight 287 ≤ sichtbar 287 (letzte Zeile endet bei 346, Liste bei 346); Stadtbuch darunter 287 px hoch
+OK   1366 × 768: Konsole leer
+OK   Tastatur: Tab bis „100×“, Enter → 100×, Leertaste → 0 (Pause), Leertaste → 100×, Fokus bleibt auf „100×“
+OK   Maus: Klick auf 5×, Leertaste → 0 (Pause), Leertaste → 5×
+OK   KI-Frist je Bild: Sim.hauptListe in 3001 ms 2-mal aufgerufen (nur bei neuen Stunden in der Leiste), hauptListeZahl 6 = Länge 6
+OK   Konsole: leer
+OK   Rathaus-Karte → haushalt-dialog per Tastatur, Escape: Fokus auf „Fenster „Haushalt“ ›“ in der Karte (Karte offen: true)
+OK   Rathaus-Karte → regierung-dialog per Tastatur, Escape: Fokus auf „Fenster „Stadtregierung“ ›“ in der Karte (Karte offen: true)
+OK   Fenster „Haushalt“ (Satz 0 %): Spielregel in der Einleitung, Karte „Erst ausgeben“ Spielregel, „Dann die Lohnsteuer senken“ wirkt mit Noahs Bedingung, Abschreibungen und Einkommensteuer richtig, keine „-0“, „es fehlt“ klein, Satz bei 0 %
+OK   Fenster „Stadtregierung“: Zur Vollständigkeit (Spielregel), Lohnsteuer-Karte, R10 genau, Wahl 18 bis 64, Bürgermeister mit § 44a KomWG und § 49 SächsGemO, „vorwiegend“
+OK   Tagebuch nach „freinehmen“ (Jakob Braun): „Tag 400, 7 Uhr · nimmt frei „Heute ruhe ich mich aus.““
+OK   Konsole: leer
+OK   Meldung nach dem Übernehmen (208 Zeichen): „Deine Stadt ist übernommen: Tag 420, 2.186 Einwohner. Neu: Rathaus mit Bürgermeister, Schulen, Haushalt, mehr Tech-Firmen; Bewohner mit Erfahrung und Plänen. Mehr im Stadtbuch und im Fenster „Stadtregierung“.“
+OK   „Während du weg warst“ bis Tag 460 nennt die erste Wahl (Tag 442: Erste Bürgermeisterwahl: Die 1718 Erwachsenen der Stadt wählen Mehmet Arnold zum Bürgermeister, mit ): „t die Verwaltung im Rathaus nach den Regeln der Stadtregierung; Amtszeit bis Tag 513. Tag 456 · Gründung Stefan Lehmann gründet eine Tech-Firma an der Bergstraße: Otter Computer. Er will Computer bauen und tüftelt gern (Fleiß 34, Ehrgeiz 95), steckt 2.300 Taler hinein und hat 194 Tage dafür gespart. Der Bauhof baut 12 Arbeitstage, dann gibt es 4 Stellen. Die Firma verkauft in die Welt (Weltmarkt).“
+OK   Konsole: leer

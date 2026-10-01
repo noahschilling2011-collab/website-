@@ -1,0 +1,24 @@
+tools/gate_auswertung.mjs (Schritt 5) gegen das Messwerkzeug der Etappe 2 (werkzeug/gate_auswertung.mjs + kal_lese.mjs), 2026-10-01 01:23:23 UTC
+  schritt4/gates_1_80/gate_*.txt --tabelle: alt ec59682617153432 neu ec59682617153432 gleich
+  schritt4/gates_1_80/gate_*.txt --tabelle --g7min 0: alt e715b2575f4d751a neu e715b2575f4d751a gleich
+  schritt4/gates_1_80/gate_*.txt : alt 0cb569bc510f8292 neu 0cb569bc510f8292 gleich
+  verblassen/bestaetigung_h180/gate_*.txt --tabelle: alt a3d9d88e9158b309 neu a3d9d88e9158b309 gleich
+  verblassen/bestaetigung_h180/gate_*.txt --tabelle --g7min 0: alt 25d4d4324e3eec13 neu 25d4d4324e3eec13 gleich
+  verblassen/bestaetigung_h180/gate_*.txt : alt a1d7b9be28510854 neu a1d7b9be28510854 gleich
+  verblassen/kand/gate_h180/gate_*.txt --tabelle: alt 234c76d64e868a28 neu 234c76d64e868a28 gleich
+  verblassen/kand/gate_h180/gate_*.txt --tabelle --g7min 0: alt ef7818d7180d6512 neu ef7818d7180d6512 gleich
+  verblassen/kand/gate_h180/gate_*.txt : alt f249a76b29d18d08 neu f249a76b29d18d08 gleich
+  verblassen/kand/gate_ged0/gate_*.txt --tabelle: alt ee287b70fdac05c0 neu ee287b70fdac05c0 gleich
+  verblassen/kand/gate_ged0/gate_*.txt --tabelle --g7min 0: alt 3c5e9ae79548ac74 neu 3c5e9ae79548ac74 gleich
+  verblassen/kand/gate_ged0/gate_*.txt : alt 9606ed8cad7108d2 neu 9606ed8cad7108d2 gleich
+  nachkal/bestaetigung/gate_*.txt --tabelle: alt 8c5c8ca38f51dfd6 neu 8c5c8ca38f51dfd6 gleich
+  nachkal/bestaetigung/gate_*.txt --tabelle --g7min 0: alt ca4a617f15e5c9b0 neu ca4a617f15e5c9b0 gleich
+  nachkal/bestaetigung/gate_*.txt : alt 3b3878f8b8bb7bb0 neu 3b3878f8b8bb7bb0 gleich
+  kalibrierung/gate_k1_u.txt kalibrierung/gate_k1_g.txt --tabelle: alt e116dbdd82f26ddc neu e116dbdd82f26ddc gleich
+  kalibrierung/gate_k1_u.txt kalibrierung/gate_k1_g.txt --tabelle --g7min 0: alt 1a9706af78470b7b neu 1a9706af78470b7b gleich
+  kalibrierung/gate_k1_u.txt kalibrierung/gate_k1_g.txt : alt c5007f68542b9188 neu c5007f68542b9188 gleich
+  kalibrierung/gate_k4_u.txt kalibrierung/gate_k4_g.txt --tabelle: alt d4d52414658269d4 neu d4d52414658269d4 gleich
+  kalibrierung/gate_k4_u.txt kalibrierung/gate_k4_g.txt --tabelle --g7min 0: alt 4830506c735ceecf neu 4830506c735ceecf gleich
+  kalibrierung/gate_k4_u.txt kalibrierung/gate_k4_g.txt : alt 37e2243076d80836 neu 37e2243076d80836 gleich
+21 Vergleiche, 0 verschieden
+Ausgabe für schritt4/gates_1_80 mit --tabelle = gespeicherte auswertung.txt (Byte für Byte)

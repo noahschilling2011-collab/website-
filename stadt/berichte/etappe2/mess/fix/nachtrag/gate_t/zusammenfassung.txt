@@ -1,0 +1,7 @@
+neu: E/stadt (stadt.html aad98691cb689361)
+vorher: E/sicherung_fix (stadt.html ac899293429df032)
+basis: E/tmp/gate_t.RR6jd7/stadt (stadt.html 0b453bf1bb62878a)
+T neu    1401, 1415, 1300, 1257 ms, Median 1350.5; unter 5000 ms: 4 von 4
+T vorher 1369, 1613, 1360, 1418 ms, Median 1393.5
+T basis  3660, 3785, 3528, 3329 ms, Median 3594
+neu/basis 0.376, vorher/basis 0.388, neu/vorher 0.969 (Mediane)

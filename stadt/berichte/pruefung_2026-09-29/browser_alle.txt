@@ -1,0 +1,110 @@
+Start 2026-09-29T07:59:34Z
+ 07:59:34 up 1 day,  3:00,  0 user,  load average: 1.73, 2.15, 2.46
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: /home/user/website-; Ausgabe: <stadt>/tests/ausgabe
+Seitenserver: python3 -m http.server 9066 (PID 2446), Wurzel <stadt>
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+=== basis (Teststand erzeugen)
+stadt.html: Dialog true, Version 9, Tag 420 8 Uhr, 2186 Einwohner
+Dauer 20 s, Ausgabe <stadt>/tests/ausgabe/basis/
+=== p3test
+exit 0, OK 12 (Soll 12), FEHL 0, 19 s → grün
+=== p5neu
+exit 0, OK 10 (Soll 10), FEHL 0, 27 s → grün
+=== p6migration
+exit 0, OK 39 (Soll 39), FEHL 0, 234 s → grün
+=== p7figuren
+exit 0, OK 6 (Soll 6), FEHL 0, 8 s → grün
+=== p8tech
+exit 0, OK 15 (Soll 15), FEHL 0, 21 s → grün
+=== raute_klick
+exit 0, OK 8 (Soll 8), FEHL 0, 12 s → grün
+=== ereignis
+exit 0, OK 21 (Soll 21), FEHL 0, 20 s → grün
+=== t1_xss
+exit 0, OK 5 (Soll 5), FEHL 0, 19 s → grün
+=== p4test
+exit 0, OK 29 (Soll 29), FEHL 0, 44 s → grün
+=== s2karten
+exit 0, OK 22 (Soll 22), FEHL 0, 55 s → grün
+=== kita
+exit 0, OK 22 (Soll 22), FEHL 0, 33 s → grün
+=== befunde_s2
+exit 0, OK 27 (Soll 27), FEHL 0, 63 s → grün
+=== erweiterung
+exit 0, OK 20 (Soll 20), FEHL 0, 32 s → grün
+=== sicherheit
+exit 0, OK 12 (Soll 12), FEHL 0, 14 s → grün
+=== militaer
+exit 0, OK 16 (Soll 16), FEHL 0, 43 s → grün
+=== autos
+exit 0, OK 9 (Soll 9), FEHL 0, 18 s → grün
+=== autos_bild
+exit 0, OK 20 (Soll 20), FEHL 0, 114 s → grün
+=== rathaus
+exit 0, OK 15 (Soll 15), FEHL 0, 45 s → grün
+=== schule
+exit 0, OK 8 (Soll 8), FEHL 0, 40 s → grün
+=== haushalt
+exit 0, OK 18 (Soll 18), FEHL 0, 33 s → grün
+=== wachstum
+exit 0, OK 29 (Soll 29), FEHL 0, 256 s → grün
+=== techfrueh
+exit 0, OK 17 (Soll 17), FEHL 0, 39 s → grün
+=== befunde_v9
+exit 0, OK 20 (Soll 20), FEHL 0, 32 s → grün
+=== otest/befunde
+exit 0, OK 21 (Soll 21), FEHL 0, 61 s → grün
+=== otest/handy
+exit 0, OK 11 (Soll 11), FEHL 0, 24 s → grün
+=== otest/breit
+exit 0, OK 12 (Soll 12), FEHL 0, 48 s → grün
+=== otest/tastatur
+exit 0, OK 4 (Soll 4), FEHL 0, 11 s → grün
+=== otest/breiten
+exit 0, OK 20 (Soll 20), FEHL 0, 51 s → grün
+=== otest/hilfehoehe
+exit 0, OK 1 (Soll 1), FEHL 0, 5 s → grün
+Seitenserver PID 2446 beendet
+=== browser_ki
+exit 0, OK 30 (Soll 30), FEHL 0, 36 s → grün
+
+Zusammenfassung (2026-09-29 08:24, PORT 9066, 24 min):
+p3test             grün exit 0   OK  12 /  12  FEHL 0     19 s
+p5neu              grün exit 0   OK  10 /  10  FEHL 0     27 s
+p6migration        grün exit 0   OK  39 /  39  FEHL 0    234 s
+p7figuren          grün exit 0   OK   6 /   6  FEHL 0      8 s
+p8tech             grün exit 0   OK  15 /  15  FEHL 0     21 s
+raute_klick        grün exit 0   OK   8 /   8  FEHL 0     12 s
+ereignis           grün exit 0   OK  21 /  21  FEHL 0     20 s
+t1_xss             grün exit 0   OK   5 /   5  FEHL 0     19 s
+p4test             grün exit 0   OK  29 /  29  FEHL 0     44 s
+s2karten           grün exit 0   OK  22 /  22  FEHL 0     55 s
+kita               grün exit 0   OK  22 /  22  FEHL 0     33 s
+befunde_s2         grün exit 0   OK  27 /  27  FEHL 0     63 s
+erweiterung        grün exit 0   OK  20 /  20  FEHL 0     32 s
+sicherheit         grün exit 0   OK  12 /  12  FEHL 0     14 s
+militaer           grün exit 0   OK  16 /  16  FEHL 0     43 s
+autos              grün exit 0   OK   9 /   9  FEHL 0     18 s
+autos_bild         grün exit 0   OK  20 /  20  FEHL 0    114 s
+rathaus            grün exit 0   OK  15 /  15  FEHL 0     45 s
+schule             grün exit 0   OK   8 /   8  FEHL 0     40 s
+haushalt           grün exit 0   OK  18 /  18  FEHL 0     33 s
+wachstum           grün exit 0   OK  29 /  29  FEHL 0    256 s
+techfrueh          grün exit 0   OK  17 /  17  FEHL 0     39 s
+befunde_v9         grün exit 0   OK  20 /  20  FEHL 0     32 s
+otest/befunde      grün exit 0   OK  21 /  21  FEHL 0     61 s
+otest/handy        grün exit 0   OK  11 /  11  FEHL 0     24 s
+otest/breit        grün exit 0   OK  12 /  12  FEHL 0     48 s
+otest/tastatur     grün exit 0   OK   4 /   4  FEHL 0     11 s
+otest/breiten      grün exit 0   OK  20 /  20  FEHL 0     51 s
+otest/hilfehoehe   grün exit 0   OK   1 /   1  FEHL 0      5 s
+browser_ki         grün exit 0   OK  30 /  30  FEHL 0     36 s
+ALLES GRÜN
+
+real	24m37.737s
+user	1m11.666s
+sys	0m19.346s
+exit 0
+Ende 2026-09-29T08:24:12Z
+ 08:24:12 up 1 day,  3:25,  0 user,  load average: 3.26, 3.60, 3.56

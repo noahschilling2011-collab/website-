@@ -1,0 +1,35 @@
+Variante neu, sim aa03039229cca193, Stärke 1.5, Rücklage 1, 730 Tage
+Seed 1: 1322030 Entscheidungen, 1039692 mit Erfahrung, Einwohner 1569, gelernt {"gelernt":[530,494,3297,230],"schlecht":[384,468,543,1],"planEnde":[0,10733,7556,0,478,0,458,0]}
+  ok   echte Wahl = Probe „mit“: 1322030 gleich, 0 anders
+  ok   Fingerabdruck mit Haken und Beobachter e53e40f882f41418, ohne Haken e53e40f882f41418, nur Beobachter e53e40f882f41418, rein e53e40f882f41418
+  ok   ohne Erfahrung und Plan anders: 19208 (1.453 %), davon direkt 18079 (94.1 %), indirekt 1129
+  ok   nur Erfahrung anders: 12574 (direkt 11689); ein Byte gelöscht 11644-mal, danach wie ohne Erfahrung 11624 (99.83 %)
+       nur Plan anders: 5355 (direkt 5172)
+  ok   Parameter probe 2|4 = Löschen + probe 4: 1322030 gleich, 0 anders; probe 2 = Löschen allein: 1322030 gleich, 0 anders (erwartet nur bei doppelter Rücklage)
+  ok   Beobachter: 18079 Meldungen (direkte Unterschiede 18079; im Lauf nur mit Beobachter 18079), fehlend 0, zu viel 0, andere Aktionen 0, Gründe {"erfahrung":11233,"plan":3992,"erfahrung und plan":2840,"zufall":14}
+  Paare (ohne → mit) beides: {"job_wechseln → nichts":6895,"laden_gruenden → nichts":4711,"kuendigen → nichts":3177,"laden_gruenden → freunde_treffen":581,"job_wechseln → freunde_treffen":575,"kuendigen → freunde_treffen":510,"job_wechseln → freinehmen":503,"freunde_treffen → nichts":471}
+  Paare nur Erfahrung: {"job_wechseln → nichts":6903,"kuendigen → nichts":2319,"job_wechseln → freunde_treffen":577,"job_wechseln → freinehmen":505,"freunde_treffen → nichts":395,"laden_gruenden → nichts":389,"kuendigen → freunde_treffen":387,"nichts → job_wechseln":255}
+  Kündigungen: {"rente":988,"eltern":429,"sonst":76}, danach wieder Arbeit gesucht {"eltern":{"j1":338,"j30":399},"sonst":{"j1":65,"j30":71}}
+Seed 2: 1214199 Entscheidungen, 954656 mit Erfahrung, Einwohner 1492, gelernt {"gelernt":[372,499,2851,244],"schlecht":[230,449,269,0],"planEnde":[0,9549,6964,0,523,0,445,0]}
+  ok   echte Wahl = Probe „mit“: 1214199 gleich, 0 anders
+  ok   Fingerabdruck mit Haken und Beobachter ca6556de12601bdf, ohne Haken ca6556de12601bdf, nur Beobachter ca6556de12601bdf, rein ca6556de12601bdf
+  ok   ohne Erfahrung und Plan anders: 11819 (0.973 %), davon direkt 10993 (93 %), indirekt 826
+  ok   nur Erfahrung anders: 8459 (direkt 7863); ein Byte gelöscht 7829-mal, danach wie ohne Erfahrung 7815 (99.82 %)
+       nur Plan anders: 2534 (direkt 2339)
+  ok   Parameter probe 2|4 = Löschen + probe 4: 1214199 gleich, 0 anders; probe 2 = Löschen allein: 1214199 gleich, 0 anders (erwartet nur bei doppelter Rücklage)
+  ok   Beobachter: 10993 Meldungen (direkte Unterschiede 10993; im Lauf nur mit Beobachter 10993), fehlend 0, zu viel 0, andere Aktionen 0, Gründe {"erfahrung":7757,"plan":2090,"erfahrung und plan":1141,"zufall":5}
+  Paare (ohne → mit) beides: {"job_wechseln → nichts":4129,"kuendigen → nichts":3050,"laden_gruenden → nichts":1729,"kuendigen → freunde_treffen":488,"job_wechseln → freinehmen":319,"freunde_treffen → nichts":313,"job_wechseln → freunde_treffen":300,"kuendigen → freinehmen":276}
+  Paare nur Erfahrung: {"job_wechseln → nichts":4137,"kuendigen → nichts":2081,"kuendigen → freunde_treffen":388,"job_wechseln → freinehmen":321,"job_wechseln → freunde_treffen":302,"nichts → job_wechseln":244,"freunde_treffen → nichts":231,"kuendigen → freinehmen":180}
+  Kündigungen: {"rente":897,"eltern":398,"sonst":108}, danach wieder Arbeit gesucht {"eltern":{"j1":280,"j30":349},"sonst":{"j1":96,"j30":103}}
+Seed 3: 1290809 Entscheidungen, 1030702 mit Erfahrung, Einwohner 1453, gelernt {"gelernt":[306,496,2925,258],"schlecht":[155,460,305,0],"planEnde":[0,9734,7565,0,517,0,464,0]}
+  ok   echte Wahl = Probe „mit“: 1290809 gleich, 0 anders
+  ok   Fingerabdruck mit Haken und Beobachter b24ad9d342776ee0, ohne Haken b24ad9d342776ee0, nur Beobachter b24ad9d342776ee0, rein b24ad9d342776ee0
+  ok   ohne Erfahrung und Plan anders: 10810 (0.837 %), davon direkt 9790 (90.6 %), indirekt 1020
+  ok   nur Erfahrung anders: 8660 (direkt 7872); ein Byte gelöscht 7831-mal, danach wie ohne Erfahrung 7821 (99.87 %)
+       nur Plan anders: 1917 (direkt 1711)
+  ok   Parameter probe 2|4 = Löschen + probe 4: 1290809 gleich, 0 anders; probe 2 = Löschen allein: 1290809 gleich, 0 anders (erwartet nur bei doppelter Rücklage)
+  ok   Beobachter: 9790 Meldungen (direkte Unterschiede 9790; im Lauf nur mit Beobachter 9790), fehlend 0, zu viel 0, andere Aktionen 0, Gründe {"erfahrung":7833,"plan":1691,"erfahrung und plan":259,"zufall":7}
+  Paare (ohne → mit) beides: {"job_wechseln → nichts":3976,"kuendigen → nichts":2941,"laden_gruenden → nichts":824,"kuendigen → freunde_treffen":542,"freunde_treffen → nichts":411,"job_wechseln → freunde_treffen":366,"job_wechseln → freinehmen":286,"freinehmen → nichts":257}
+  Paare nur Erfahrung: {"job_wechseln → nichts":3996,"kuendigen → nichts":2217,"kuendigen → freunde_treffen":435,"job_wechseln → freunde_treffen":366,"freunde_treffen → nichts":339,"job_wechseln → freinehmen":290,"nichts → job_wechseln":240,"freinehmen → nichts":182}
+  Kündigungen: {"rente":921,"eltern":410,"sonst":98}, danach wieder Arbeit gesucht {"eltern":{"j1":301,"j30":366},"sonst":{"j1":81,"j30":96}}
+alle Kriterien erfüllt

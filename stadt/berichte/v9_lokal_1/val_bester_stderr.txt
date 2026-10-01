@@ -1,0 +1,6 @@
+ohne_arbeit: 32 Paare (37 Versuche, 5 doppelt, 0 ohne Kandidat)
+mit_kind: 32 Paare (32 Versuche, 0 doppelt, 0 ohne Kandidat)
+wenig_kontakt: 32 Paare (32 Versuche, 0 doppelt, 0 ohne Kandidat)
+gruendungsnah: 32 Paare (33 Versuche, 1 doppelt, 0 ohne Kandidat)
+rentennah: 32 Paare (33 Versuche, 1 doppelt, 0 ohne Kandidat)
+[messe] exit 0, Wandzeit 120.3 s, CPU 116.8 s, max RSS 171 MiB

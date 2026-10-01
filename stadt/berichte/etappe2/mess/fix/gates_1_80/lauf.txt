@@ -1,0 +1,2 @@
+SP/ml/e2bau/frisch_fix (stadt.html e8dc1bc1894d52f5,   ERF_HALB: 180,   GED: 1, GED_STAERKE: 1.5,), Seeds 1–80, 2 Prozesse, Start 03:14:23 uptime:: 2.20, 2.43, 2.19 fremde>20%: 0
+Ende 03:15:38

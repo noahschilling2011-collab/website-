@@ -1,0 +1,35 @@
+Zusammenfassung (2026-10-01 05:11, PORT 9098, 29 min):
+p3test             grün exit 0   OK  12 /  12  FEHL 0     18 s
+p5neu              grün exit 0   OK  10 /  10  FEHL 0     25 s
+p6migration        grün exit 0   OK  44 /  44  FEHL 0    312 s
+p7figuren          grün exit 0   OK   6 /   6  FEHL 0      8 s
+p8tech             grün exit 0   OK  15 /  15  FEHL 0     24 s
+raute_klick        grün exit 0   OK  11 /  11  FEHL 0     13 s
+ereignis           grün exit 0   OK  21 /  21  FEHL 0     21 s
+t1_xss             grün exit 0   OK   5 /   5  FEHL 0     21 s
+p4test             grün exit 0   OK  29 /  29  FEHL 0     51 s
+s2karten           grün exit 0   OK  22 /  22  FEHL 0     56 s
+kita               grün exit 0   OK  22 /  22  FEHL 0     35 s
+befunde_s2         grün exit 0   OK  27 /  27  FEHL 0     68 s
+erweiterung        grün exit 0   OK  20 /  20  FEHL 0     34 s
+sicherheit         grün exit 0   OK  12 /  12  FEHL 0     16 s
+militaer           grün exit 0   OK  16 /  16  FEHL 0     47 s
+autos              grün exit 0   OK   9 /   9  FEHL 0     19 s
+autos_bild         grün exit 0   OK  20 /  20  FEHL 0    117 s
+rathaus            grün exit 0   OK  15 /  15  FEHL 0     47 s
+schule             grün exit 0   OK   8 /   8  FEHL 0     40 s
+haushalt           grün exit 0   OK  18 /  18  FEHL 0     33 s
+wachstum           grün exit 0   OK  29 /  29  FEHL 0    251 s
+techfrueh          grün exit 0   OK  17 /  17  FEHL 0     45 s
+befunde_v9         grün exit 0   OK  20 /  20  FEHL 0     33 s
+otest/befunde      grün exit 0   OK  21 /  21  FEHL 0     64 s
+otest/handy        grün exit 0   OK  11 /  11  FEHL 0     28 s
+otest/breit        grün exit 0   OK  12 /  12  FEHL 0     52 s
+otest/tastatur     grün exit 0   OK   4 /   4  FEHL 0     11 s
+otest/breiten      grün exit 0   OK  20 /  20  FEHL 0     55 s
+otest/hilfehoehe   grün exit 0   OK   1 /   1  FEHL 0      5 s
+p10speicher        grün exit 0   OK  11 /  11  FEHL 0     69 s
+gedaechtnis        grün exit 0   OK  17 /  17  FEHL 0     73 s
+browser_ki         grün exit 0   OK  32 /  32  FEHL 0     41 s
+ALLES GRÜN
+exit 0

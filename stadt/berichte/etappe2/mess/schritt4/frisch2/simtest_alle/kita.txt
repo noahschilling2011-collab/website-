@@ -1,0 +1,44 @@
+Seed 1
+  ok   (a) 19722 Kindnächte mit Platz: nur unter 6 Jahren, höchstens 12 Felder (0 Fehler)
+  ok   (a) je Kita: Einheiten = belegt ≤ max(möglich, belegt gestern − 8), möglich ≤ min(40, 8 × Personal), Personal und Stellen ≤ 5, Lohn 95–120 (bis 9 Kitas offen, 9 gebaut; 0 Kita-Nächte mit mehr belegt als möglich; 0 Fehler)
+  ok   (a) dasselbe am Ende der Nacht, nach den Stellenaufgaben (1-mal hatte eine Kita danach weniger Personal; 0 Fehler)
+  ok   (b) Betreuungsgehalt nur mit Kind unter 3 ohne Platz: 1173 Haushaltstage (0 Fehler)
+  ok   (c) nach jeder Nacht: 1686 Haushaltsnächte mit Kind ohne Platz, alle mit jemandem zu Hause, nur Besitzern, gemeinnützig oder im Dienst des Bundes (4, gezählt 4) oder ohne Kita mit Plätzen (offen, mit Personal) in der Nähe (350, gezählt 350); 26-mal gab ein Elternteil die Stelle auf; 0 Kindnächte in Obhut (0 Fehler)
+  ok   (d) 286-mal gebunden um 7 oder 18 Uhr, nie job_suchen oder laden_gruenden erlaubt (0 Fehler)
+  ok   (e) Vorrang: 379 wartende Kinder der Stufe 1 geprüft, keins hinter einem neuen Platz der Stufe 2 (0 Fehler; bis 15 Kinder warteten)
+  ok   Stadtbuch: höchstens eine Zeile „Kita“ je Nacht (0 im Buch, 0 Fehler)
+  ok   Speichern/Laden mit Kita-Plätzen: 20 Tage weiter bitgleich
+  ok   (g) Jan Köhler ohne Stelle: Nacht 1 Platz weg, Betreuungsgehalt nein; Nacht 2 Betreuungsgehalt ja (an Jan Köhler)
+  ok   (f1) Kita 5 und Kitas in der Nähe ohne ihre 23 Leute: 3 Kinder hatten dort Platz, jetzt keins mehr; 0 mit jemandem zu Hause, 3 ohne Kita-Angebot in der Nähe (gezählt 54); wegen dieser Kinder gab niemand die Stelle auf (0 Fehler)
+  ok   (f2) Kita 122: 23 Einheiten belegt, alle Fachkräfte bis auf eine weg → Nacht 1: 15 belegt bei 8 möglich (8 Einheiten verloren, 0 Kinder neu), 3 Stellen; Nacht 2: 16 belegt
+  ok   (h) Ali Wolf hat nur den eigenen Betrieb, Emilia Koch (4 Jahre) hat keinen Platz, die Kitas in der Nähe sind voll: Betrieb bleibt, gezählt 3 (Tag 400, nach 1 Versuch)
+Seed 2
+  ok   (a) 17326 Kindnächte mit Platz: nur unter 6 Jahren, höchstens 12 Felder (0 Fehler)
+  ok   (a) je Kita: Einheiten = belegt ≤ max(möglich, belegt gestern − 8), möglich ≤ min(40, 8 × Personal), Personal und Stellen ≤ 5, Lohn 95–120 (bis 8 Kitas offen, 9 gebaut; 0 Kita-Nächte mit mehr belegt als möglich; 0 Fehler)
+  ok   (a) dasselbe am Ende der Nacht, nach den Stellenaufgaben (0-mal hatte eine Kita danach weniger Personal; 0 Fehler)
+  ok   (b) Betreuungsgehalt nur mit Kind unter 3 ohne Platz: 913 Haushaltstage (0 Fehler)
+  ok   (c) nach jeder Nacht: 1133 Haushaltsnächte mit Kind ohne Platz, alle mit jemandem zu Hause, nur Besitzern, gemeinnützig oder im Dienst des Bundes (1, gezählt 1) oder ohne Kita mit Plätzen (offen, mit Personal) in der Nähe (72, gezählt 72); 36-mal gab ein Elternteil die Stelle auf; 0 Kindnächte in Obhut (0 Fehler)
+  ok   (d) 290-mal gebunden um 7 oder 18 Uhr, nie job_suchen oder laden_gruenden erlaubt (0 Fehler)
+  ok   (e) Vorrang: 109 wartende Kinder der Stufe 1 geprüft, keins hinter einem neuen Platz der Stufe 2 (0 Fehler; bis 5 Kinder warteten)
+  ok   Stadtbuch: höchstens eine Zeile „Kita“ je Nacht (0 im Buch, 0 Fehler)
+  ok   Speichern/Laden mit Kita-Plätzen: 20 Tage weiter bitgleich
+  ok   (g) David Zimmermann ohne Stelle: Nacht 1 Platz weg, Betreuungsgehalt nein; Nacht 2 Betreuungsgehalt ja (an David Zimmermann)
+  ok   (f1) Kita 5 und Kitas in der Nähe ohne ihre 26 Leute: 2 Kinder hatten dort Platz, jetzt keins mehr; 0 mit jemandem zu Hause, 2 ohne Kita-Angebot in der Nähe (gezählt 55); wegen dieser Kinder gab niemand die Stelle auf (0 Fehler)
+  ok   (f2) Kita 118: 31 Einheiten belegt, alle Fachkräfte bis auf eine weg → Nacht 1: 23 belegt bei 8 möglich (7 Einheiten verloren, 0 Kinder neu), 4 Stellen; Nacht 2: 22 belegt
+  ok   (h) Lina Roth hat nur den eigenen Betrieb, Nina Weber (5 Jahre) hat keinen Platz, die Kitas in der Nähe sind voll: Betrieb bleibt, gezählt 1 (Tag 400, nach 1 Versuch)
+Seed 3
+  ok   (a) 19089 Kindnächte mit Platz: nur unter 6 Jahren, höchstens 12 Felder (0 Fehler)
+  ok   (a) je Kita: Einheiten = belegt ≤ max(möglich, belegt gestern − 8), möglich ≤ min(40, 8 × Personal), Personal und Stellen ≤ 5, Lohn 95–120 (bis 8 Kitas offen, 9 gebaut; 2 Kita-Nächte mit mehr belegt als möglich; 0 Fehler)
+  ok   (a) dasselbe am Ende der Nacht, nach den Stellenaufgaben (1-mal hatte eine Kita danach weniger Personal; 0 Fehler)
+  ok   (b) Betreuungsgehalt nur mit Kind unter 3 ohne Platz: 1150 Haushaltstage (0 Fehler)
+  ok   (c) nach jeder Nacht: 1459 Haushaltsnächte mit Kind ohne Platz, alle mit jemandem zu Hause, nur Besitzern, gemeinnützig oder im Dienst des Bundes (0, gezählt 0) oder ohne Kita mit Plätzen (offen, mit Personal) in der Nähe (130, gezählt 130); 18-mal gab ein Elternteil die Stelle auf; 0 Kindnächte in Obhut (0 Fehler)
+  ok   (d) 110-mal gebunden um 7 oder 18 Uhr, nie job_suchen oder laden_gruenden erlaubt (0 Fehler)
+  ok   (e) Vorrang: 148 wartende Kinder der Stufe 1 geprüft, keins hinter einem neuen Platz der Stufe 2 (0 Fehler; bis 10 Kinder warteten)
+  ok   Stadtbuch: höchstens eine Zeile „Kita“ je Nacht (2 im Buch, 0 Fehler)
+  ok   Speichern/Laden mit Kita-Plätzen: 20 Tage weiter bitgleich
+  ok   (g) Laura Pohl ohne Stelle: Nacht 1 Platz weg, Betreuungsgehalt nein; Nacht 2 Betreuungsgehalt ja (an Laura Pohl)
+  ok   (f1) Kita 5 und Kitas in der Nähe ohne ihre 28 Leute: 10 Kinder hatten dort Platz, jetzt keins mehr; 3 mit jemandem zu Hause, 7 ohne Kita-Angebot in der Nähe (gezählt 67); wegen dieser Kinder gab niemand die Stelle auf (0 Fehler)
+  ok   (f2) Kita 58: 19 Einheiten belegt, alle Fachkräfte bis auf eine weg → Nacht 1: 11 belegt bei 8 möglich (7 Einheiten verloren, 0 Kinder neu), 3 Stellen; Nacht 2: 14 belegt
+  ok   (h) Hanna Kühn hat nur den eigenen Betrieb, Charlotte Şahin (5 Jahre) hat keinen Platz, die Kitas in der Nähe sind voll: Betrieb bleibt, gezählt 1 (Tag 400, nach 1 Versuch)
+  ok   ohne Platz nur mit Besitzern, gemeinnützig oder im Dienst des Bundes: Test zählt 5, die Stadt 5 Haushaltsnächte (Seeds zusammen, bis Tag 400)
+Alle Kita-Prüfungen bestanden

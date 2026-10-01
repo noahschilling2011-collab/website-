@@ -1,0 +1,67 @@
+b03d97ad340c09016e471c80f797205413a5980ada95d1fd59a2f126e497cd69  stadt/stadt.html
+ 21:40:21 up 13:49,  0 user,  load average: 0.69, 0.54, 0.70
+stadt/stadt.html sim 386c5ec814feb302; Stand mess/schritt3b/gross_t750.json: Tag 750, 7159 Einwohner; 240 Stunden stündlich, 60 Tage in Tagesschritten, 12 Runden
+Runde 1 std ohne: 744 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 1 std mit: 373 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 1 tag ohne: 1369 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 1 tag mit: 1248 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 1 tag seite: 1154 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 2 std mit: 300 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 2 std ohne: 256 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 2 tag seite: 1090 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 2 tag mit: 1141 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 2 tag ohne: 1108 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 3 std ohne: 233 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 3 std mit: 247 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 3 tag ohne: 1239 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 3 tag mit: 1236 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 3 tag seite: 1123 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 4 std mit: 248 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 4 std ohne: 298 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 4 tag seite: 1182 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 4 tag mit: 1178 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 4 tag ohne: 1080 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 5 std ohne: 224 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 5 std mit: 260 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 5 tag ohne: 1076 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 5 tag mit: 1268 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 5 tag seite: 1211 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 6 std mit: 247 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 6 std ohne: 264 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 6 tag seite: 1229 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 6 tag mit: 1100 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 6 tag ohne: 1188 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 7 std ohne: 294 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 7 std mit: 249 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 7 tag ohne: 1262 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 7 tag mit: 1348 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 7 tag seite: 1187 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 8 std mit: 233 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 8 std ohne: 215 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 8 tag seite: 1147 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 8 tag mit: 1124 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 8 tag ohne: 1130 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 9 std ohne: 250 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 9 std mit: 256 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 9 tag ohne: 1210 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 9 tag mit: 1100 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 9 tag seite: 1079 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 10 std mit: 242 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 10 std ohne: 248 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 10 tag seite: 1061 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 10 tag mit: 1067 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 10 tag ohne: 1012 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 11 std ohne: 238 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 11 std mit: 237 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 11 tag ohne: 1107 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 11 tag mit: 1194 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 11 tag seite: 1119 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 12 std mit: 246 ms, Meldungen 1109, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 12 std ohne: 231 ms, Meldungen 0, Tag 760 0 Uhr, 7134 Einwohner, Abdruck 04fa71b44d63a2a1
+Runde 12 tag seite: 1179 ms, Meldungen 130, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 12 tag mit: 1080 ms, Meldungen 7065, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+Runde 12 tag ohne: 1064 ms, Meldungen 0, Tag 810 0 Uhr, 7294 Einwohner, Abdruck 1eb7afebb4f2d79d
+stündlich: Median ohne 249 ms, mit 247 ms, mit/ohne 0.993; Meldungen 1109 (110.9 je Tag); Abdruck mit = ohne: ja; einzeln ohne 744/256/233/298/224/264/294/215/250/248/238/231, mit 373/300/247/248/260/247/249/233/256/242/237/246
+Tagesschritte: Median ohne 1119 ms, mit 1159 ms, mit/ohne 1.036, wie die Seite 1151 ms, seite/ohne 1.028 (Meldungen 130; Abdruck = ohne: ja); Meldungen 7065 (117.8 je Tag); Abdruck mit = ohne: ja; einzeln ohne 1369/1108/1239/1080/1076/1188/1262/1130/1210/1012/1107/1064, mit 1248/1141/1236/1178/1268/1100/1348/1124/1100/1067/1194/1080, seite 1154/1090/1123/1182/1211/1229/1187/1147/1079/1061/1119/1179
+exit 0
+ 21:41:11 up 13:50,  0 user,  load average: 0.89, 0.62, 0.72

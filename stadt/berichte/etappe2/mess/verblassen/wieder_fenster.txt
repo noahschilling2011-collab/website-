@@ -1,0 +1,6 @@
+ged0    Pleite bis Tag 730: 5150; in 365 Tagen 902 = 17.5 % (Sparsame 431/2588 = 16.7 %, Verschwender 471/2562 = 18.4 %); in 730 Tagen 902 = 17.5 % (Sparsame 431/2588 = 16.7 %, Verschwender 471/2562 = 18.4 %)
+h0      Pleite bis Tag 730: 3999; in 365 Tagen 97 = 2.4 % (Sparsame 24/2102 = 1.1 %, Verschwender 73/1897 = 3.8 %); in 730 Tagen 97 = 2.4 % (Sparsame 24/2102 = 1.1 %, Verschwender 73/1897 = 3.8 %)
+h180    Pleite bis Tag 730: 4172; in 365 Tagen 243 = 5.8 % (Sparsame 69/2210 = 3.1 %, Verschwender 174/1962 = 8.9 %); in 730 Tagen 243 = 5.8 % (Sparsame 69/2210 = 3.1 %, Verschwender 174/1962 = 8.9 %)
+h360    Pleite bis Tag 730: 3929; in 365 Tagen 110 = 2.8 % (Sparsame 22/2082 = 1.1 %, Verschwender 88/1847 = 4.8 %); in 730 Tagen 110 = 2.8 % (Sparsame 22/2082 = 1.1 %, Verschwender 88/1847 = 4.8 %)
+h540    Pleite bis Tag 730: 4395; in 365 Tagen 150 = 3.4 % (Sparsame 36/2304 = 1.6 %, Verschwender 114/2091 = 5.5 %); in 730 Tagen 150 = 3.4 % (Sparsame 36/2304 = 1.6 %, Verschwender 114/2091 = 5.5 %)
+sofort  Pleite bis Tag 730: 4968; in 365 Tagen 377 = 7.6 % (Sparsame 132/2648 = 5.0 %, Verschwender 245/2320 = 10.6 %); in 730 Tagen 377 = 7.6 % (Sparsame 132/2648 = 5.0 %, Verschwender 245/2320 = 10.6 %)

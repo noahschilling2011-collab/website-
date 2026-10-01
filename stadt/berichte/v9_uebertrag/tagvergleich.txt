@@ -1,0 +1,15 @@
+a stadt.orig.html (sim c115148e4c582c37, Version 9), b stadt.html (sim 3b1a95e0e5ae9ea5, Version 9), Policy in b: aus
+ok   stunde, Seed 1: 120 von 120 Tagen bitgleich (Tag 120, 160 Einwohner, Fingerabdruck 4b753aa3daf790a2)
+ok   stunde, Seed 2: 120 von 120 Tagen bitgleich (Tag 120, 170 Einwohner, Fingerabdruck 7d854fe92ef707ec)
+ok   stunde, Seed 3: 120 von 120 Tagen bitgleich (Tag 120, 200 Einwohner, Fingerabdruck e6616e78e8d7f281)
+ok   stunde, Seed 4: 120 von 120 Tagen bitgleich (Tag 120, 178 Einwohner, Fingerabdruck 683df30aa2cf65d1)
+ok   stunde, Seed 5: 120 von 120 Tagen bitgleich (Tag 120, 166 Einwohner, Fingerabdruck 922dcdfdaa20b87a)
+ok   stunde, Seed 6: 120 von 120 Tagen bitgleich (Tag 120, 170 Einwohner, Fingerabdruck 7b523a5a9af2310f)
+ok   tagSchritt, Seed 1: 60 von 60 Tagen bitgleich (Tag 60, 67 Einwohner, Fingerabdruck 4be8d06dbb42f1c0)
+ok   tagSchritt, Seed 2: 60 von 60 Tagen bitgleich (Tag 60, 62 Einwohner, Fingerabdruck f32ac1d0b61c4f71)
+ok   tagSchritt, Seed 3: 60 von 60 Tagen bitgleich (Tag 60, 86 Einwohner, Fingerabdruck 2920a7e768f9ea42)
+ok   tagSchritt, Seed 4: 60 von 60 Tagen bitgleich (Tag 60, 39 Einwohner, Fingerabdruck 9c4272574c744944)
+ok   tagSchritt, Seed 5: 60 von 60 Tagen bitgleich (Tag 60, 47 Einwohner, Fingerabdruck ddebc4abd3ca2845)
+ok   tagSchritt, Seed 6: 60 von 60 Tagen bitgleich (Tag 60, 53 Einwohner, Fingerabdruck affe374482fad32f)
+je Tag: ausgaben/regression/tage.tsv (1080 Zeilen)
+Tag für Tag bitgleich

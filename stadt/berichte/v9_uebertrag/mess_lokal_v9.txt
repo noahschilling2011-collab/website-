@@ -1,0 +1,14 @@
+# 2026-09-29T01:04:43+00:00 Last 1.37 1.91 2.48
+Normalisierung aus 128 Regel-Episoden auf Trainingsseeds …
+Regelarm auf den Validierungsepisoden (Vergleichswert) …
+  Regeln: Defizit Ø 42.59, Rückgabe Ø 15.57
+Training lokal: Ziel 400000 Schritte, höchstens 5.0 min, Lauf mess_lokal_v9
+  Validierung bei 8192 Schritten: Defizit Ø 42.46, Rückgabe Ø 13.72  (bester)
+  Validierung bei 16384 Schritten: Defizit Ø 36.36, Rückgabe Ø 16.34  (bester)
+  Validierung bei 24576 Schritten: Defizit Ø 38.13, Rückgabe Ø 15.06
+  Validierung bei 31529 Schritten: Defizit Ø 40.91, Rückgabe Ø 15.32
+Fertig: abgebrochen: Zeitlimit 5.0 min erreicht, 31529 Schritte in 300 s, Parameteränderung (L2) 9.2733, Lauf /tmp/claude-0/-home-user-website-/584133fa-a5fc-563e-807a-2feca85efaf0/scratchpad/ml/v9/training/laeufe/mess_lokal_v9
+
+real	6m46.783s
+user	6m57.385s
+sys	0m5.508s

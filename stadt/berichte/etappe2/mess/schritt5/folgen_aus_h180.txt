@@ -1,0 +1,34 @@
+folgen_auswertung.mjs (Messwerkzeug der Etappe 2) auf den gespeicherten Rohdaten der Phase Verblassen: aus = R.GED, OPFER_FREI, HAFT_EROEFFNUNG = 0 (Tag für Tag wie 6c1741e), neu r1 = H = 180 (Standard), Seeds 1–20, 730 Tage; ausgewertet 2026-10-01 01:23:26 UTC
+Seeds 1–20 (20), 730 Tage; Spalten: aus | neu r1
+Gründungen (ausgeführt)                  10454 | 8608
+Personen mit Pleite                      5148 | 4171
+  danach wieder gegründet                734 (14.3 %) | 126 (3.0 %)
+Personen mit ≥ 2 Pleiten                 430 | 64
+Kündigung = Renteneintritt               17171 | 17533
+Kündigung für die Elternzeit             39231 | 8000
+  binnen 1 Tag wieder Arbeit gesucht     35108 (89.5 %) | 5721 (71.5 %)
+  binnen 30 Tagen                        37403 (95.3 %) | 7109 (88.9 %)
+sonstige Kündigung                       10703 | 2059
+  binnen 1 Tag wieder Arbeit gesucht     9980 (93.2 %) | 1624 (78.9 %)
+  binnen 30 Tagen                        10500 (98.1 %) | 1950 (94.7 %)
+Personen mit ≥ 2 sonstigen Kündigungen   1079 | 271
+Wechsel                                  153152 | 125214
+  Stelle binnen 30 Tagen weg             14102 (9.2 %) | 10654 (8.5 %)
+Zusammengezogen                          16678 | 16261
+  binnen 60 Tagen getrennt               334 (2.0 %) | 88 (0.5 %)
+Median Tage Pleite → Wiedergründung      192 | 261
+Abstand gruenden (ehrgeiz)               +19.5 (17.3 … 22.7, n 10454) | +19.8 (17.2 … 22.0, n 8608)
+Abstand kuendigenSonst (fleiss)          -35.6 (-39.1 … -30.4, n 10703) | -32.8 (-36.2 … -28.6, n 2059)
+Abstand kuendigenEltern (fleiss)         -26.3 (-28.1 … -24.0, n 39231) | -20.3 (-23.9 … -18.0, n 8000)
+Abstand wegziehen (heimat)               -26.3 (-30.4 … -22.8, n 951) | -26.7 (-31.1 … -19.0, n 488)
+Abstand partner (gesellig)               +10.5 (8.8 … 11.6, n 16807) | +10.4 (8.9 … 11.7, n 16366)
+Abstand jobSuchen (fleiss)               -18.3 (-20.6 … -15.7, n 80623) | -6.9 (-8.3 … -5.8, n 40316)
+Abstand wechsel (ehrgeiz)                +4.6 (2.8 … 5.6, n 153152) | +4.1 (3.1 … 5.7, n 125214)
+Einwohner 365                            aus Mittel 1242; neu r1 +31 ± 17 (2.5 %; höher 13 / niedriger 7)
+Kasse 365                                aus Mittel 1007375; neu r1 -60761 ± 12768 (-6.0 %; höher 1 / niedriger 19)
+Gründungen bis Tag 365                   aus Mittel 313; neu r1 -55 ± 13 (-17.6 %; höher 2 / niedriger 17)
+Pleiten bis Tag 365                      aus Mittel 153; neu r1 -38 ± 8 (-24.6 %; höher 3 / niedriger 17)
+Einwohner 730                            aus Mittel 1480; neu r1 -7 ± 19 (-0.5 %; höher 9 / niedriger 11)
+Kasse 730                                aus Mittel 990121; neu r1 -225576 ± 38758 (-22.8 %; höher 2 / niedriger 18)
+Gründungen bis Tag 730                   aus Mittel 523; neu r1 -92 ± 35 (-17.7 %; höher 5 / niedriger 15)
+Pleiten bis Tag 730                      aus Mittel 279; neu r1 -67 ± 33 (-24.1 %; höher 5 / niedriger 15)

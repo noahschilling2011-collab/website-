@@ -1,0 +1,34 @@
+# 2026-09-29T01:04:20+00:00, Last 1.08 1.89 2.49, allein
+Seed 10000 nr 0: 243 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 23.4, Summe zufriedenheit 22.97, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -1.50
+Seed 10001 nr 1: 257 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 36.6, Summe zufriedenheit 19.03, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -0.60
+Seed 10002 nr 2: 296 Einw., 63 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 41.6, Summe zufriedenheit 17.53, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -1.80
+Seed 10003 nr 3: 443 Einw., 61 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 52.7, Summe zufriedenheit 14.18, notstand 0.00, umkehr -4.25, wegzug 0.00, treffen 0.00
+Seed 10000 nr 4: 243 Einw., 62 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 27.2, Summe zufriedenheit 21.85, notstand 0.00, umkehr -1.25, wegzug 0.00, treffen -1.20
+Seed 10001 nr 5: 257 Einw., 59 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 50.7, Summe zufriedenheit 14.79, notstand 0.00, umkehr -0.50, wegzug 0.00, treffen -3.30
+Seed 10002 nr 6: 296 Einw., 64 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 44.8, Summe zufriedenheit 16.56, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -0.90
+Seed 10003 nr 7: 443 Einw., 61 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 39.3, Summe zufriedenheit 18.21, notstand 0.00, umkehr -0.75, wegzug 0.00, treffen -1.20
+Seed 10000 nr 8: 243 Einw., 60 Entscheidungen (1 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 36.3, Summe zufriedenheit 19.12, notstand 0.00, umkehr -3.75, wegzug 0.00, treffen 0.00
+Seed 10001 nr 9: 257 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 37.7, Summe zufriedenheit 18.68, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen 0.00
+Seed 10002 nr 10: 296 Einw., 62 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 57.2, Summe zufriedenheit 12.83, notstand 0.00, umkehr -4.00, wegzug 0.00, treffen 0.00
+Seed 10003 nr 11: 443 Einw., 58 Entscheidungen (1 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 68.6, Summe zufriedenheit 9.42, notstand -0.85, umkehr -0.50, wegzug 0.00, treffen -0.60
+Schnappschuss Ø 1.3 ms, Wiederherstellen Ø 2.2 ms (Seed 10000, 243 Einwohner)
+sim 3b1a95e0e5ae9ea5, Arm zufall: 730 Schritte, 8640 Spielstunden in 2.20 s → 332 Schritte/s, 3930 Spielstunden/s; Ausgangslagen gerechnet in 1.7 s; Enden {"zeitlimit":12}; Belohnung Ø 14.80
+
+# Regelarm
+Seed 10000 nr 0: 243 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 41.6, Summe zufriedenheit 17.53, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen 0.00
+Seed 10001 nr 1: 257 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 39.6, Summe zufriedenheit 18.12, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -0.90
+Seed 10002 nr 2: 296 Einw., 62 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 17.6, Summe zufriedenheit 24.71, notstand 0.00, umkehr -0.25, wegzug 0.00, treffen -1.50
+Seed 10003 nr 3: 443 Einw., 61 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 39.2, Summe zufriedenheit 18.23, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen 0.00
+Seed 10000 nr 4: 243 Einw., 61 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 47.6, Summe zufriedenheit 15.72, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -1.20
+Seed 10001 nr 5: 257 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 14.5, Summe zufriedenheit 25.66, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -0.60
+Seed 10002 nr 6: 296 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 45.7, Summe zufriedenheit 16.28, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen 0.00
+Seed 10003 nr 7: 443 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 26.2, Summe zufriedenheit 22.13, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen 0.00
+Seed 10000 nr 8: 243 Einw., 62 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 18.6, Summe zufriedenheit 24.41, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -2.40
+Seed 10001 nr 9: 257 Einw., 62 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 55.6, Summe zufriedenheit 13.33, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen -1.80
+Seed 10002 nr 10: 296 Einw., 60 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 51.0, Summe zufriedenheit 14.69, notstand 0.00, umkehr 0.00, wegzug 0.00, treffen 0.00
+Seed 10003 nr 11: 443 Einw., 51 Entscheidungen (0 ohne Wahl), 720 h, Ende zeitlimit, Defizit Ø 69.0, Summe zufriedenheit 9.30, notstand -3.71, umkehr -1.25, wegzug 0.00, treffen 0.00
+Schnappschuss Ø 1.1 ms, Wiederherstellen Ø 2.5 ms (Seed 10000, 243 Einwohner)
+sim 3b1a95e0e5ae9ea5, Arm regel: 719 Schritte, 8640 Spielstunden in 2.46 s → 292 Schritte/s, 3505 Spielstunden/s; Ausgangslagen gerechnet in 1.7 s; Enden {"zeitlimit":12}; Belohnung Ø 17.16
+
+# Protokoll Python ⇄ Node (training/durchsatz.py), Last 1.39 1.94 2.50
+1081 Schritte, 13033 Spielstunden in 4.78 s → 226 Schritte/s, 2726 Spielstunden/s über das Protokoll (ohne Lernen)

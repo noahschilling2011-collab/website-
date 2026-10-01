@@ -1,0 +1,17 @@
+start 01:18:25 uptime:: 0.49, 0.45, 1.63 sha ac899293429df032
+ged0 exit 0 01:19:49
+neu exit 0 01:19:52
+h0 start 01:20:30 uptime:: 0.81, 0.72, 1.59
+h0 exit 0 01:22:01
+wieder_h0 (ERF_HALB=0 gesetzt) gegen gespeichertes wieder_h0.json: 20 von 20 Seeds gleich
+Befehle (im Ordner stadt/, 01.10.2026): node tools/wiedergruendung.mjs --seeds 1-20 --tage 1460 [--setze GED=0 | --setze ERF_HALB=0] > …json (neu und ged0 als 2 Prozesse, h0 allein)
+wieder_neu.json (sim 386c5ec814feb302, gesetzt {}, GED 1, ERF_HALB 180) gegen gespeichertes mess/verblassen/kand/wieder_h180.json (sim ce0a67943cf9dc52, GED 1, ERF_HALB 180): 20 von 20 Seeds gleich (Personen mit Pleite, Gründungen, Stand an Tag 730/1460)
+wieder_ged0.json (sim 386c5ec814feb302, gesetzt {"GED":0}, GED 0, ERF_HALB 180) gegen gespeichertes mess/verblassen/kand/wieder_ged0.json (sim c01a4899227e6856, GED 0, ERF_HALB 0): 20 von 20 Seeds gleich (Personen mit Pleite, Gründungen, Stand an Tag 730/1460)
+wieder_h0.json (sim 386c5ec814feb302, gesetzt {"ERF_HALB":0}, GED 1, ERF_HALB 0) gegen gespeichertes mess/verblassen/kand/wieder_h0.json (sim 8a6edacb927463e3, GED 1, ERF_HALB 0): 20 von 20 Seeds gleich (Personen mit Pleite, Gründungen, Stand an Tag 730/1460)
+Auswertung der neuen Läufe (node tools/wiedergruendung_auswertung.mjs ged0=… h180=… h0=…):
+ged0     sim 386c5ec814feb302 GED 0 ERF_HALB 180, 20 Seeds × 1460 Tage: W(730) 734/5150 = 14.3 %; W(1460) 1059/6245 = 17.0 % (Median 188 Tage); Ziel ≥ 8.5 %: erreicht
+         Sparsame (≥ 50): 500/3135 = 15.9 %, Wartezeit Ø 210.5 (Median 190); Verschwender (< 50): 559/3110 = 18.0 %, Ø 206.7 (Median 185); Differenz 3.9 Tage → Sparsame später
+h180     sim 386c5ec814feb302 GED 1 ERF_HALB 180, 20 Seeds × 1460 Tage: W(730) 127/4172 = 3.0 %; W(1460) 292/5328 = 5.5 % (Median 276 Tage); Ziel ≥ 8.5 %: nicht erreicht
+         Sparsame (≥ 50): 85/2780 = 3.1 %, Wartezeit Ø 290.7 (Median 308); Verschwender (< 50): 207/2548 = 8.1 %, Ø 264.0 (Median 270); Differenz 26.6 Tage → Sparsame später
+h0       sim 386c5ec814feb302 GED 1 ERF_HALB 0, 20 Seeds × 1460 Tage: W(730) 56/3999 = 1.4 %; W(1460) 110/4743 = 2.3 % (Median 287 Tage); Ziel ≥ 8.5 %: nicht erreicht
+         Sparsame (≥ 50): 27/2494 = 1.1 %, Wartezeit Ø 313.7 (Median 324); Verschwender (< 50): 83/2249 = 3.7 %, Ø 270.3 (Median 276); Differenz 43.5 Tage → Sparsame später

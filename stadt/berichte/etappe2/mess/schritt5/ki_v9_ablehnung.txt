@@ -1,0 +1,10 @@
+Schritt 5, 2026-10-01 01:32:14 UTC, stadt.html ac899293429df032: Policy aus Etappe 1 in den Werkzeugen
+$ node tools/ki_liste.mjs --nur-pruefen
+  abgelehnt  policy_v9_lokal_1.json: Policy ungültig: trainiert auf Stadt-Version 9, diese Stadt ist Version 10 (neu trainieren)
+exit 0
+$ node tools/ki_fallen.mjs --policy ki/policy_v9_lokal_1.json   (bricht beim Laden der Policy ab; erste Zeilen)
+stadt.html#sim:7769
+  const fehl = (w) => { throw new Error('Policy ungültig: ' + w); };
+                              ^
+Error: Policy ungültig: trainiert auf Stadt-Version 9, diese Stadt ist Version 10 (neu trainieren)
+exit 1

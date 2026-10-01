@@ -1,0 +1,6 @@
+6c1741e (Version 9) Seed 1, Tag 200 → 290: (a) 0 Uhr, aufholen(): bitgleich (828 / 828 Einw.); (b) 13 Uhr, stündlich: bitgleich (795 / 795 Einw.); (c) 13 Uhr, aufholen(): VERSCHIEDEN (803 / 794 Einw.)
+6c1741e (Version 9) Seed 2, Tag 200 → 290: (a) 0 Uhr, aufholen(): bitgleich (1006 / 1006 Einw.); (b) 13 Uhr, stündlich: bitgleich (986 / 986 Einw.); (c) 13 Uhr, aufholen(): VERSCHIEDEN (940 / 989 Einw.)
+6c1741e (Version 9) Seed 3, Tag 200 → 290: (a) 0 Uhr, aufholen(): bitgleich (1084 / 1084 Einw.); (b) 13 Uhr, stündlich: bitgleich (1079 / 1079 Einw.); (c) 13 Uhr, aufholen(): VERSCHIEDEN (1040 / 1065 Einw.)
+neu (Version 10) Seed 1, Tag 200 → 290: (a) 0 Uhr, aufholen(): bitgleich (1057 / 1057 Einw.); (b) 13 Uhr, stündlich: bitgleich (986 / 986 Einw.); (c) 13 Uhr, aufholen(): VERSCHIEDEN (1034 / 1035 Einw.)
+neu (Version 10) Seed 2, Tag 200 → 290: (a) 0 Uhr, aufholen(): bitgleich (991 / 991 Einw.); (b) 13 Uhr, stündlich: bitgleich (1038 / 1038 Einw.); (c) 13 Uhr, aufholen(): VERSCHIEDEN (960 / 1003 Einw.)
+neu (Version 10) Seed 3, Tag 200 → 290: (a) 0 Uhr, aufholen(): bitgleich (1171 / 1171 Einw.); (b) 13 Uhr, stündlich: bitgleich (1205 / 1205 Einw.); (c) 13 Uhr, aufholen(): VERSCHIEDEN (1222 / 1141 Einw.)

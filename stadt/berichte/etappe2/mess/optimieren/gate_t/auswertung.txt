@@ -1,0 +1,14 @@
+neu: T je Runde 1491, 1449, 1440, 1413, 1600, 1785, 1589, 1420; CPU je Runde 5836, 6125, 5902, 5760, 6438, 7080, 6566, 5935
+  T: Median 1470 ms (1413–1785, n = 8); T unter 5000 in 8 von 8; CPU simtest (730 Tage + Auswertung): Median 6030 ms (5760–7080, n = 8)
+  Gate Phase 0 bestanden in 8 von 8; andere Gates rot: 0
+sich: T je Runde 5850, 5321, 5659, 5589, 6086, 5742, 5536, 5622; CPU je Runde 21716, 21835, 22807, 21870, 22521, 22485, 22068, 22093
+  T: Median 5640.5 ms (5321–6086, n = 8); T unter 5000 in 0 von 8; CPU simtest (730 Tage + Auswertung): Median 22080.5 ms (21716–22807, n = 8)
+  Gate Phase 0 bestanden in 0 von 8; andere Gates rot: 0
+basis: T je Runde 4281, 4448, 4445, 4958, 4442, 4523, 4321, 4839; CPU je Runde 18589, 19745, 19286, 20690, 19576, 19651, 19629, 19930
+  T: Median 4446.5 ms (4281–4958, n = 8); T unter 5000 in 8 von 8; CPU simtest (730 Tage + Auswertung): Median 19640 ms (18589–20690, n = 8)
+  Gate Phase 0 bestanden in 8 von 8; andere Gates rot: 0
+Verhältnis der Mediane T: neu/sich 0.261 (-73.9 %), neu/basis 0.331, sich/basis 1.269
+Verhältnis der Mediane CPU (simtest): neu/sich 0.273, neu/basis 0.307
+opt_zeit (365 Tage, vm): neu Wand: Median 1458.5 ms (1360–1733, n = 8), CPU: Median 3676 ms (3398–4184, n = 8)
+                         sich Wand: Median 5727.5 ms (5473–6243, n = 8), CPU: Median 8788.5 ms (8486–9599, n = 8)
+  neu/sich Wand 0.255, CPU 0.418; Fingerabdrücke Tag 365: 28e8b2d3b130a118

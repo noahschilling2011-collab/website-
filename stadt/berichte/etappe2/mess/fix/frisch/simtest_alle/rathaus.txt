@@ -1,0 +1,91 @@
+A Statisch (Abschnitt „Rathaus“ im sim-Block)
+  ok   Abschnitt gefunden, kein Zufall
+  ok   Personenfelder nur zur Anzeige: frei (erlaubt: frei)
+  ok   Regeln lesen keine Namen, kein Geschlecht, kein Alter, keinen Einzugstag, keine Eltern, keine einzelnen Personen (keine Treffer)
+  ok   Budget ändert der Abschnitt nur in rathausBezahlen (1 Stelle; dort bucht der Haushalt)
+B Neue Städte (Seeds 1, 2, 3, je 730 Tage stündlich), Prüfung nach jeder Nacht
+  ok   Seed 1, Tag 0: Rathaus (Gebäude 4) auf 7 × 3 Feldern nördlich der Hauptstraße, Tor an der Mitte, 1 Stelle(n) der Verwaltung, Zeile „Das Rathaus steht in der Mitte an der Hauptstraße, mit dem R…“
+  ok   Seed 1: jede Nacht in Ordnung; Löhne nachgerechnet an 682 von 682 Tagen gleich; Ausbaustufe 4 (Großstadt), Ausbau fertig an Tag 63, 114, 258 (29, 7, 12 Tage nach der Stufe), 8 Stellen + Amt, 9 besetzt, Lohn 97–119, kleinstes Budget 2986, 3 Zeilen zum Rathaus nach Tag 0 (ohne Namen), höchstens 1 mehr Leute als Plätze
+  ok   Seed 1: 3 Ausbauten, Bau 15200 Taler aus dem Budget, Löhne 493258, laufende Kosten 21900 (30 je Tag)
+  ok   Seed 2, Tag 0: Rathaus (Gebäude 4) auf 7 × 3 Feldern nördlich der Hauptstraße, Tor an der Mitte, 1 Stelle(n) der Verwaltung, Zeile „Das Rathaus steht in der Mitte an der Hauptstraße, mit dem R…“
+  ok   Seed 2: jede Nacht in Ordnung; Löhne nachgerechnet an 675 von 675 Tagen gleich; Ausbaustufe 4 (Großstadt), Ausbau fertig an Tag 72, 133, 285 (9, 7, 11 Tage nach der Stufe), 7 Stellen + Amt, 8 besetzt, Lohn 97–120, kleinstes Budget 3653, 3 Zeilen zum Rathaus nach Tag 0 (ohne Namen), höchstens 0 mehr Leute als Plätze
+  ok   Seed 2: 3 Ausbauten, Bau 15200 Taler aus dem Budget, Löhne 460363, laufende Kosten 21900 (30 je Tag)
+  ok   Seed 3, Tag 0: Rathaus (Gebäude 4) auf 7 × 3 Feldern nördlich der Hauptstraße, Tor an der Mitte, 1 Stelle(n) der Verwaltung, Zeile „Das Rathaus steht in der Mitte an der Hauptstraße, mit dem R…“
+  ok   Seed 3: jede Nacht in Ordnung; Löhne nachgerechnet an 669 von 669 Tagen gleich; Ausbaustufe 4 (Großstadt), Ausbau fertig an Tag 77, 98, 253 (38, 7, 10 Tage nach der Stufe), 7 Stellen + Amt, 8 besetzt, Lohn 97–120, kleinstes Budget 2741, 3 Zeilen zum Rathaus nach Tag 0 (ohne Namen), höchstens 0 mehr Leute als Plätze
+  ok   Seed 3: 3 Ausbauten, Bau 15200 Taler aus dem Budget, Löhne 482176, laufende Kosten 21900 (30 je Tag)
+C Speichern und Laden mitten im Ausbau; Aufholen
+  ok   Seed 2, Tag 66 13 Uhr (Ausbau auf Stufe 2, 16 Arbeitstage offen): direkt nach dem Laden gleich
+  ok   30 Tage weiter bitgleich (Ausbaustufe 2)
+  ok   Aufholen (Seed 3, 90 Tage in Tagesschritten): Ausbaustufe 2 (stündlich 2), Stellen 2 / 2, Amt besetzt
+D Übernahme älterer Stände (nur Brache und höchstens ein Park werden genommen)
+ Version 8 (stadt.orig.html)
+  ok   Seed 1, Tag 150 (116 Einw., Kleinstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 6 Felder von der Mitte, Ausbaustufe 2, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 147358 → 141758
+  ok     60 Tage weiter: Rathaus offen nach 8 Tagen, gewählt nach 8 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 2, Tag 300 (759 Einw., Stadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 22 Felder von der Mitte, Ausbaustufe 3, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 846036 → 835636
+  ok     60 Tage weiter: Rathaus offen nach 13 Tagen, gewählt nach 13 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 3, Tag 400 (977 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 18 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 1699829 → 1682229
+  ok     60 Tage weiter: Rathaus offen nach 24 Tagen, gewählt nach 24 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (13 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 19713 → 17313
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 3 von 3 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 2, Tag 700 (1246 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 26 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 2948220 → 2930620
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 8 von 8 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 7, Tag 700 (1164 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 18 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 2965911 → 2948311
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+ Version 7 (git ffa1d88)
+  ok   Seed 1, Tag 150 (105 Einw., Kleinstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 18 Felder von der Mitte, Ausbaustufe 2, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 159006 → 153406
+  ok     60 Tage weiter: Rathaus offen nach 8 Tagen, gewählt nach 8 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 2, Tag 300 (465 Einw., Stadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 14 Felder von der Mitte, Ausbaustufe 3, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 653444 → 643044
+  ok     60 Tage weiter: Rathaus offen nach 14 Tagen, gewählt nach 14 (in der ersten Nacht mit offenem Rathaus), 5 von 5 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 3, Tag 400 (1026 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 14 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 1500328 → 1482728
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (13 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 19500 → 17100
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 1 von 2 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 2, Tag 700 (1158 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 18 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 2902526 → 2884926
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 8 von 8 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 7, Tag 700 (1173 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 22 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 2935393 → 2917793
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+ Version 6 (git bc7247a)
+  ok   Seed 1, Tag 150 (112 Einw., Kleinstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 10 Felder von der Mitte, Ausbaustufe 2, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 151340 → 145740
+  ok     60 Tage weiter: Rathaus offen nach 8 Tagen, gewählt nach 8 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 2, Tag 300 (621 Einw., Stadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 6 Felder von der Mitte, Ausbaustufe 3, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 720182 → 709782
+  ok     60 Tage weiter: Rathaus offen nach 14 Tagen, gewählt nach 14 (in der ersten Nacht mit offenem Rathaus), 6 von 6 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 3, Tag 400 (1036 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 18 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 1613042 → 1595442
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (13 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 19609 → 17209
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 3 von 3 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 2, Tag 700 (1124 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 14 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 2704147 → 2686547
+  ok     60 Tage weiter: Rathaus offen nach 24 Tagen, gewählt nach 24 (in der ersten Nacht mit offenem Rathaus), 7 von 7 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 7, Tag 700 (1137 Einw., Großstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 22 Felder von der Mitte, Ausbaustufe 4, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 2861452 → 2843852
+  ok     60 Tage weiter: Rathaus offen nach 23 Tagen, gewählt nach 23 (in der ersten Nacht mit offenem Rathaus), 8 von 8 Plätzen besetzt; gespeichert und geladen bitgleich
+ Version 5 (git 414ebab)
+  ok   Seed 1, Tag 150 (118 Einw., Kleinstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 6 Felder von der Mitte, Ausbaustufe 2, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 160236 → 154636
+  ok     60 Tage weiter: Rathaus offen nach 8 Tagen, gewählt nach 8 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (15 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 25055 → 22655
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 3 von 3 Plätzen besetzt; gespeichert und geladen bitgleich
+ Version 4 (git 1c8d40b)
+  ok   Seed 1, Tag 150 (123 Einw., Kleinstadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 6 Felder von der Mitte, Ausbaustufe 2, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 174857 → 169257
+  ok     60 Tage weiter: Rathaus offen nach 8 Tagen, gewählt nach 8 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (12 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 26228 → 23828
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 3 von 3 Plätzen besetzt; gespeichert und geladen bitgleich
+ Version 3 (git 2b821c2)
+  ok   Seed 1, Tag 150 (204 Einw., Stadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 6 Felder von der Mitte, Ausbaustufe 3, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 251905 → 241505
+  ok     60 Tage weiter: Rathaus offen nach 14 Tagen, gewählt nach 14 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (27 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 21053 → 18653
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 3 von 3 Plätzen besetzt; gespeichert und geladen bitgleich
+ Version 2 (git 39c405b)
+  ok   Seed 1, Tag 150 (221 Einw., Stadt): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 7 × 3 Felder, 10 Felder von der Mitte, Ausbaustufe 3, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 222401 → 212001
+  ok     60 Tage weiter: Rathaus offen nach 21 Tagen, gewählt nach 21 (in der ersten Nacht mit offenem Rathaus), 4 von 4 Plätzen besetzt; gespeichert und geladen bitgleich
+  ok   Seed 4, Tag 30 (21 Einw., Dorf): ohne Übernehmen abgelehnt; 0 Gebäude und 0 Felder anders, Rathaus 3 × 7 Felder, 10 Felder von der Mitte, Ausbaustufe 1, 0 vorher bebaute Felder, 0 Park genommen; noch kein Bürgermeister; Budget 17107 → 14707
+  ok     60 Tage weiter: Rathaus offen nach 4 Tagen, gewählt nach 4 (in der ersten Nacht mit offenem Rathaus), 3 von 3 Plätzen besetzt; gespeichert und geladen bitgleich
+  Abstand des Rathauses zur Mitte bei Übernahmen: 6 bis 26 Felder (26 Stände)
+E Park weicht dem Rathaus (erzwungen: Stand der Version 8, Park mitten auf dem nächsten freien Gelände)
+  ok   Park (Gebäude 59) wird das Rathaus am Tor, sein Feld gehört zum Gelände, aus der Parkliste; „Ein neuer Stadtteil entsteht im Südosten: Eichholz. Das erste Gebäude dort: das Rathaus an der Lindenstraße. | Die Stadt baut ihr Rathaus an der Lindenstraße: d…“
+  ok   40 Tage weiter (Rathaus Rathaus an der Lindenstraße, Amt besetzt), gespeichert und geladen bitgleich
+F Beschädigte Stände
+  ok   Rathaus fehlt: Spielstand beschädigt: Rathaus; Nummer zu groß: Spielstand beschädigt: Rathaus (Zustand); Nummer eines Wohnhauses: Spielstand beschädigt: Rathaus (Gebäude); Stellen negativ: Spielstand beschädigt: Rathaus (Zustand); gestern kein Objekt: Spielstand beschädigt: Rathaus (Zustand); Summe fehlt: Spielstand beschädigt: Rathaus (Summen); Summe Parks fehlt: Spielstand beschädigt: Rathaus (Summen); Ausbau ohne Baustelle: Spielstand beschädigt: Rathaus (Gebäude); Stufe 7: Spielstand beschädigt: Rathaus (Gebäude); zweites Rathaus: Spielstand beschädigt: Rathaus (Gebäude); Start in der Zukunft: Spielstand beschädigt: Rathaus (Zustand); Stand der Version 9 ohne Summen des Rathauses: Spielstand beschädigt: Rathaus
+G Namen tauschen (Seed 2, 365 Tage): die Stadt läuft gleich, bis auf Namen und Texte
+  ok   „Nina Kühn“ heißt dort „Ella Meyer“; gleich (Tag 365, 1219 Einwohner, Rathaus 7 besetzt, b7206a9296671230)
+H Ohne Rathaus (R.RATHAUS = 0): Tag für Tag wie Version 8 (stadt.orig.html)
+  ok   Seed 1: 365 Tage verglichen (Personen, Gebäude, Felder, Budget, Zufall, Summen, Hauptfiguren, Stadtbuch), jeden Tag gleich
+  ok   Seed 2: 365 Tage verglichen (Personen, Gebäude, Felder, Budget, Zufall, Summen, Hauptfiguren, Stadtbuch), jeden Tag gleich
+Alle Prüfungen zum Rathaus bestanden

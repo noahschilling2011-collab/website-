@@ -1,0 +1,30 @@
+== 1. Strg+C (SIGINT an die Gruppe) nach 2 Validierungen
+beendet nach 3 s; Node-Prozesse übrig: 0
+  Validierung bei 5120 Schritten: Defizit Ø 64.30, Rückgabe Ø 6.83  (bester)
+  Validierung bei 6144 Schritten: Defizit Ø 63.98, Rückgabe Ø 7.47  (bester)
+SIGINT: Das Training hört nach dem laufenden Schritt auf und schreibt letzter.zip und das Manifest (noch einmal: harter Abbruch, Stand vom letzten Rollout).
+Fertig: abgebrochen: von Hand gestoppt (SIGINT), 6267 Schritte in 24 s, Parameteränderung (L2) 4.3695, Lauf …/laeufe/smoke_probe
+status abgebrochen: von Hand gestoppt (SIGINT) | schritte 6267 | fortsetzungen [(2048, 4096, True), (4096, 6267, True)]
+letzter: manifest 6267 6201289a229e4014 | datei 6267 6201289a229e4014 | PASST
+bester: manifest 6144 5fb9104c7e70c985 | datei 6144 5fb9104c7e70c985 | PASST | val 63.98
+_zustand bester 6144 abbruch von Hand gestoppt (SIGINT)
+== 2. kill -9 nach 2 weiteren Validierungen
+Node-Prozesse übrig: 0
+  Validierung bei 7291 Schritten: Defizit Ø 63.85, Rückgabe Ø 5.62  (bester)
+  Validierung bei 8315 Schritten: Defizit Ø 59.50, Rückgabe Ø 6.77  (bester)
+status läuft | schritte 8571 | fortsetzungen [(2048, 4096, True), (4096, 6267, True), (6267, 8571, False)]
+letzter: manifest 8571 640514d6c69d7390 | datei 8571 640514d6c69d7390 | PASST
+bester: manifest 8315 6285938b468c00b6 | datei 8315 6285938b468c00b6 | PASST | val 59.50
+_zustand bester 8315 abbruch None
+== 3. fortsetzen --zusatz 2048
+  Validierung bei 9339 Schritten: Defizit Ø 65.39, Rückgabe Ø 2.62
+  Validierung bei 10363 Schritten: Defizit Ø 69.05, Rückgabe Ø 1.76
+  Validierung bei 10619 Schritten: Defizit Ø 58.14, Rückgabe Ø 5.91  (bester)
+Fertig: fertig, 10619 Schritte in 21 s, Parameteränderung (L2) 5.9087, Lauf …/laeufe/smoke_probe
+status fertig | schritte 10619 | fortsetzungen [(2048, 4096, True), (4096, 6267, True), (6267, 8571, False), (8571, 10619, True)]
+letzter: manifest 10619 cc5c45c11415b840 | datei 10619 cc5c45c11415b840 | PASST
+bester: manifest 10619 7991a0548d9aa60a | datei 10619 7991a0548d9aa60a | PASST | val 58.14
+_zustand bester 10619 abbruch None
+== 4. Export bester: Schritte aus dem Checkpoint
+exportiert: …/ausgabe/policy_nach_abbruch.json (107126 Byte), Hash 9605226e090b2bde, Schema e85eca0c, Schichten [64, 64, 13], Status experimentell
+herkunft.trainingsSchritte 10619 Validierung Defizit 58.14

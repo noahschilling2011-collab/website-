@@ -1,0 +1,31 @@
+Gesamt 8406 ms (Abtastzeit)
+Neue Funktionen (Etappe 2) zusammen, inklusive Aufgerufenem: 145 ms = 1.72 %
+  ruecklageFehlt       inkl    96.8 ms  selbst    16.4 ms
+  planSchrittVon       inkl    68.8 ms  selbst     7.2 ms
+  planZiel             inkl    63.7 ms  selbst    19.8 ms
+  memBehalten          inkl    12.4 ms  selbst    10.9 ms
+  planAbbruch          inkl     6.0 ms  selbst     5.2 ms
+  erfHandlung          inkl     5.3 ms  selbst     2.3 ms
+  erfTag               inkl     5.0 ms  selbst     3.4 ms
+  erfPunkte            inkl     3.6 ms  selbst     3.6 ms
+  erfLernen            inkl     3.6 ms  selbst     3.6 ms
+  erfLage              inkl     3.2 ms  selbst     3.2 ms
+  memWert              inkl     2.7 ms  selbst     2.7 ms
+  memFakt              inkl     1.6 ms  selbst     1.0 ms
+  erfW                 inkl     1.3 ms  selbst     1.3 ms
+  planEnde             inkl     1.0 ms  selbst     1.0 ms
+  erfGruendenSchlecht  inkl     0.9 ms  selbst     0.2 ms
+  pleiteWarteBis       inkl     0.9 ms  selbst     0.9 ms
+  erfFolge             inkl     0.9 ms  selbst     0.8 ms
+  ruecklageGilt        inkl     0.6 ms  selbst     0.6 ms
+  erfN                 inkl     0.6 ms  selbst     0.6 ms
+Zum Vergleich (inklusive):
+  stunde               inkl  7480.8 ms  selbst   881.9 ms
+  tagesabschluss       inkl  4097.2 ms  selbst   233.9 ms
+  entscheide           inkl  1916.9 ms  selbst   413.4 ms
+  ausfuehren           inkl   774.6 ms  selbst    72.3 ms
+  menschenTag          inkl   566.4 ms  selbst   172.0 ms
+  zielPruefen          inkl   170.7 ms  selbst    36.0 ms
+  zielWaehlen          inkl    50.7 ms  selbst    22.2 ms
+  erinnere             inkl    44.0 ms  selbst    29.3 ms
+  zufall               inkl   428.8 ms  selbst   428.8 ms

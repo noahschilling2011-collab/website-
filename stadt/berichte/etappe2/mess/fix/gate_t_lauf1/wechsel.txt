@@ -1,0 +1,55 @@
+neu: SP/ml/e2bau/stadt (stadt.html e8dc1bc1894d52f5)
+vorher: SP/ml/e2bau/sicherung_fix (stadt.html ac899293429df032)
+basis: SP/ml/e2bau/tmp/gate_t.zoMrRj/stadt (stadt.html 0b453bf1bb62878a)
+Runde 1 neu: 03:03:22 Last: 3.12, 2.48, 2.15 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1294 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 vorher: 03:03:25 Last: 3.03, 2.47, 2.14 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1180 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 1 basis: 03:03:28 Last: 3.03, 2.47, 2.14 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3262 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 basis: 03:03:40 Last: 2.58, 2.40, 2.13 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3469 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 vorher: 03:03:52 Last: 2.34, 2.35, 2.11 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1256 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 neu: 03:03:55 Last: 2.23, 2.33, 2.11 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1173 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 vorher: 03:03:58 Last: 2.23, 2.33, 2.11 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1243 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 basis: 03:04:01 Last: 2.45, 2.37, 2.12 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3190 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 3 neu: 03:04:13 Last: 2.23, 2.33, 2.11 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1266 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 neu: 03:04:16 Last: 2.21, 2.32, 2.11 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1318 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 basis: 03:04:20 Last: 2.11, 2.30, 2.10 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 3520 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 vorher: 03:04:32 Last: 1.94, 2.25, 2.09 fremde>20%: 0
+  exit 0
+  ✓ T  365 Tage in 1217 ms (< 5000)
+Gate Phase 0: BESTANDEN
+T neu    1294, 1173, 1266, 1318 ms, Median 1280; unter 5000 ms: 4 von 4
+T vorher 1180, 1256, 1243, 1217 ms, Median 1230
+T basis  3262, 3469, 3190, 3520 ms, Median 3365.5
+neu/basis 0.380, vorher/basis 0.365, neu/vorher 1.041 (Mediane)

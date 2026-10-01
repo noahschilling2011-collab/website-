@@ -1,0 +1,79 @@
+Teil D, Stufen 1, 1.5, 2, 3, 4; Gate 7 nach Entscheidung 8 (G7_MIN_N = 15)
+R.GED = 0 (Bezug), Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 79, 5 80, 6 80, 7 78, T 71, B 80; rot 4: 79; Budget min 1710
+   Gate 7: gewertet 78 (bestanden 78, rot 0), nicht gewertet 2 (n < 15; davon n < 10: 1); Wegzieher je Stadt Median 30 (9–62), Summe 2543; kleinster gewerteter Abstand 17.6; über alle Wegzieher gewichtet 25.1
+      nicht gewertet: 23 (n 13), 57 (n 9)
+Gate T Basis 6c1741e (4 Runden): 4359, 4253, 4234, 4190 ms, Median 4243.5 ms
+
+== Stufe 1 ==
+Z1 0.733 / 0.937 / 0.620 % (Mittel 0.763 %); Z2 Mittel 12.06
+N1 Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 71, T 47, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 17.4 → erfüllt
+   Gate 7: gewertet 71 (bestanden 71, rot 0), nicht gewertet 9 (n < 15; davon n < 10: 3); Wegzieher je Stadt Median 23.5 (9–46), Summe 1900; kleinster gewerteter Abstand 15; über alle Wegzieher gewichtet 25.2
+      nicht gewertet: 5 (n 9), 7 (n 9), 19 (n 12), 32 (n 13), 40 (n 10), 44 (n 13), 45 (n 12), 54 (n 11), 68 (n 9)
+N2 Gate T: Runden 1441, 1361, 1410, 1399 ms, Median 1404.5 ms → erfüllt (< 5000); gegen Stufe 1 +0.0 %, gegen 6c1741e -66.9 %
+N3 kleinstes Budget 1741 → erfüllt
+N4 7 von 7 Abständen mit gleichem Vorzeichen → erfüllt
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +20 ± 9 (+1.6 %, ↑53/↓26); kasse365 -41317 ± 11732 (-4.0 %, ↑25/↓55); gruendungen365 -36 ± 8 (-11.3 %, ↑23/↓57); einwohner730 +15 ± 9 (+1.0 %, ↑45/↓35); kasse730 -129103 ± 24057 (-13.6 %, ↑24/↓56); gruendungen730 -40 ± 18 (-8.0 %, ↑34/↓46)
+Bestätigung Seeds 81–160 (80, mess/kalibrierung/bestaetigung): 1 80, 2 80, 3 80, 4 79, 5 80, 6 80, 7 72, T 55, B 80; rot: 4 → 154; Abstürze 0; F4 max 1.17; Budget min 772 → BESTANDEN
+   Gate 7: gewertet 72 (bestanden 72, rot 0), nicht gewertet 8 (n < 15; davon n < 10: 3); Wegzieher je Stadt Median 24.5 (7–52), Summe 1975; kleinster gewerteter Abstand 17.3; über alle Wegzieher gewichtet 25.1
+      nicht gewertet: 87 (n 11), 110 (n 11), 112 (n 8), 119 (n 7), 121 (n 9), 126 (n 14), 137 (n 11), 147 (n 14)
+
+== Stufe 1.5 ==
+Z1 0.838 / 1.015 / 0.825 % (Mittel 0.893 %); Z2 Mittel 14.27
+N1 Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 58, T 56, B 80; rot: –; Abstürze 0; F4 max 1.13; Budget min 1741; G6 min 16.5 → erfüllt
+   Gate 7: gewertet 58 (bestanden 58, rot 0), nicht gewertet 22 (n < 15; davon n < 10: 5); Wegzieher je Stadt Median 18 (5–36), Summe 1454; kleinster gewerteter Abstand 19.4; über alle Wegzieher gewichtet 26.2
+      nicht gewertet: 3 (n 11), 10 (n 9), 22 (n 9), 23 (n 12), 24 (n 14), 25 (n 12), 27 (n 13), 33 (n 14), 34 (n 14), 41 (n 10), 45 (n 12), 49 (n 7), 51 (n 11), 52 (n 12), 56 (n 9), 57 (n 14), 59 (n 13), 60 (n 13), 70 (n 10), 72 (n 11), 74 (n 12), 77 (n 5)
+N2 Gate T: Runden 1591, 1499, 1597, 1674 ms, Median 1594 ms → erfüllt (< 5000); gegen Stufe 1 +13.5 %, gegen 6c1741e -62.4 %
+N3 kleinstes Budget 1741 → erfüllt
+N4 7 von 7 Abständen mit gleichem Vorzeichen → erfüllt
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +28 ± 9 (+2.2 %, ↑50/↓30); kasse365 -43749 ± 11330 (-4.3 %, ↑30/↓50); gruendungen365 -54 ± 9 (-17.0 %, ↑22/↓58); einwohner730 +16 ± 9 (+1.1 %, ↑45/↓33); kasse730 -135181 ± 21665 (-14.2 %, ↑19/↓61); gruendungen730 -81 ± 16 (-16.3 %, ↑23/↓57)
+Bestätigung Seeds 81–160 (80, mess/kalibrierung/bestaetigung): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 49, T 52, B 80; rot: –; Abstürze 0; F4 max 1.1; Budget min 772 → BESTANDEN
+   Gate 7: gewertet 49 (bestanden 49, rot 0), nicht gewertet 31 (n < 15; davon n < 10: 10); Wegzieher je Stadt Median 16 (4–40), Summe 1368; kleinster gewerteter Abstand 18.8; über alle Wegzieher gewichtet 25.4
+      nicht gewertet: 83 (n 12), 85 (n 14), 88 (n 13), 89 (n 13), 91 (n 14), 93 (n 13), 99 (n 12), 100 (n 13), 103 (n 5), 104 (n 13), 105 (n 9), 107 (n 11), 108 (n 11), 110 (n 10), 111 (n 9), 112 (n 8), 115 (n 14), 121 (n 9), 125 (n 12), 127 (n 11), 135 (n 9), 136 (n 13), 137 (n 4), 139 (n 13), 142 (n 14), 143 (n 7), 144 (n 11), 148 (n 9), 154 (n 11), 157 (n 8), 159 (n 10)
+
+== Stufe 2 ==
+Z1 1.014 / 1.099 / 1.838 % (Mittel 1.317 %); Z2 Mittel 21.38
+N1 Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 29, T 52, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 17.3 → erfüllt
+   Gate 7: gewertet 29 (bestanden 29, rot 0), nicht gewertet 51 (n < 15; davon n < 10: 17); Wegzieher je Stadt Median 13 (3–27), Summe 1076; kleinster gewerteter Abstand 21.7; über alle Wegzieher gewichtet 26.7
+      nicht gewertet: 1 (n 14), 2 (n 12), 4 (n 8), 5 (n 10), 7 (n 10), 10 (n 7), 11 (n 8), 12 (n 14), 19 (n 14), 21 (n 8), 22 (n 13), 23 (n 12), 24 (n 10), 26 (n 7), 27 (n 12), 30 (n 6), 31 (n 11), 32 (n 14), 34 (n 13), 35 (n 6), 36 (n 11), 37 (n 11), 38 (n 8), 39 (n 10), 40 (n 9), 41 (n 14), 43 (n 11), 44 (n 14), 45 (n 12), 46 (n 12), 47 (n 13), 49 (n 9), 50 (n 12), 51 (n 10), 53 (n 13), 54 (n 13), 55 (n 14), 60 (n 8), 61 (n 8), 63 (n 12), 65 (n 11), 66 (n 9), 67 (n 11), 68 (n 9), 70 (n 13), 72 (n 13), 74 (n 11), 75 (n 5), 76 (n 14), 77 (n 5), 80 (n 3)
+N2 Gate T: Runden 1566, 1547, 1556, 1777 ms, Median 1561 ms → erfüllt (< 5000); gegen Stufe 1 +11.1 %, gegen 6c1741e -63.2 %
+N3 kleinstes Budget 1741 → erfüllt
+N4 7 von 7 Abständen mit gleichem Vorzeichen → erfüllt
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +43 ± 9 (+3.4 %, ↑55/↓25); kasse365 -24861 ± 11783 (-2.4 %, ↑32/↓48); gruendungen365 -72 ± 8 (-22.6 %, ↑13/↓67); einwohner730 +15 ± 8 (+1.0 %, ↑44/↓35); kasse730 -170817 ± 23805 (-18.0 %, ↑17/↓63); gruendungen730 -91 ± 17 (-18.4 %, ↑20/↓60)
+Bestätigung Seeds 81–160 (80, mess/kalibrierung/bestaetigung): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 34, T 44, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 772 → BESTANDEN
+   Gate 7: gewertet 34 (bestanden 34, rot 0), nicht gewertet 46 (n < 15; davon n < 10: 17); Wegzieher je Stadt Median 14 (4–41), Summe 1132; kleinster gewerteter Abstand 17.3; über alle Wegzieher gewichtet 25.3
+      nicht gewertet: 85 (n 9), 86 (n 9), 88 (n 14), 90 (n 8), 91 (n 13), 93 (n 6), 94 (n 13), 95 (n 5), 96 (n 14), 97 (n 14), 99 (n 12), 101 (n 13), 102 (n 8), 103 (n 9), 104 (n 12), 105 (n 6), 107 (n 4), 108 (n 10), 110 (n 8), 111 (n 9), 113 (n 10), 115 (n 7), 119 (n 12), 121 (n 5), 122 (n 13), 123 (n 12), 127 (n 11), 128 (n 11), 129 (n 12), 135 (n 10), 137 (n 9), 139 (n 10), 141 (n 14), 142 (n 10), 143 (n 14), 144 (n 7), 148 (n 14), 149 (n 12), 152 (n 14), 153 (n 12), 154 (n 14), 155 (n 14), 157 (n 6), 158 (n 10), 159 (n 14), 160 (n 8)
+
+== Stufe 3 ==
+Z1 1.957 / 1.881 / 2.425 % (Mittel 2.088 %); Z2 Mittel 33.82
+N1 Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 24, T 60, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 16.6 → erfüllt
+   Gate 7: gewertet 24 (bestanden 24, rot 0), nicht gewertet 56 (n < 15; davon n < 10: 21); Wegzieher je Stadt Median 12 (3–27), Summe 1008; kleinster gewerteter Abstand 18.4; über alle Wegzieher gewichtet 26.4
+      nicht gewertet: 1 (n 11), 2 (n 9), 4 (n 10), 6 (n 6), 7 (n 11), 8 (n 12), 10 (n 8), 11 (n 8), 12 (n 12), 14 (n 12), 20 (n 14), 21 (n 11), 23 (n 11), 25 (n 11), 26 (n 9), 27 (n 13), 28 (n 10), 30 (n 6), 32 (n 13), 34 (n 10), 35 (n 3), 36 (n 14), 37 (n 8), 38 (n 11), 40 (n 10), 42 (n 9), 44 (n 12), 45 (n 14), 47 (n 5), 48 (n 14), 49 (n 12), 50 (n 5), 51 (n 8), 52 (n 5), 53 (n 14), 54 (n 9), 55 (n 12), 56 (n 12), 57 (n 8), 58 (n 10), 59 (n 11), 60 (n 9), 61 (n 7), 62 (n 13), 63 (n 11), 64 (n 13), 65 (n 7), 69 (n 10), 70 (n 9), 72 (n 13), 73 (n 11), 74 (n 9), 75 (n 12), 76 (n 11), 77 (n 12), 80 (n 7)
+N2 Gate T: Runden 1570, 1639, 1522, 1538 ms, Median 1554 ms → erfüllt (< 5000); gegen Stufe 1 +10.6 %, gegen 6c1741e -63.4 %
+N3 kleinstes Budget 1741 → erfüllt
+N4 7 von 7 Abständen mit gleichem Vorzeichen → erfüllt
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +39 ± 10 (+3.1 %, ↑55/↓23); kasse365 -47833 ± 11421 (-4.7 %, ↑27/↓53); gruendungen365 -76 ± 7 (-23.9 %, ↑9/↓70); einwohner730 +43 ± 9 (+2.9 %, ↑59/↓21); kasse730 -152826 ± 21509 (-16.1 %, ↑19/↓61); gruendungen730 -96 ± 16 (-19.3 %, ↑19/↓61)
+
+== Stufe 4 ==
+Z1 2.454 / 2.140 / 3.275 % (Mittel 2.623 %); Z2 Mittel 44.46
+N1 Seeds 1–80 (80): 1 80, 2 80, 3 80, 4 80, 5 80, 6 80, 7 26, T 68, B 80; rot: –; Abstürze 0; F4 max 1.14; Budget min 1741; G6 min 16.2 → erfüllt
+   Gate 7: gewertet 26 (bestanden 26, rot 0), nicht gewertet 54 (n < 15; davon n < 10: 25); Wegzieher je Stadt Median 12 (5–34), Summe 1025; kleinster gewerteter Abstand 18.8; über alle Wegzieher gewichtet 25.1
+      nicht gewertet: 1 (n 14), 2 (n 14), 3 (n 9), 4 (n 14), 5 (n 12), 7 (n 14), 9 (n 11), 10 (n 6), 11 (n 13), 13 (n 12), 15 (n 12), 16 (n 11), 19 (n 13), 20 (n 13), 21 (n 12), 22 (n 5), 23 (n 8), 24 (n 10), 25 (n 9), 26 (n 9), 30 (n 10), 34 (n 10), 35 (n 6), 36 (n 10), 37 (n 11), 38 (n 8), 40 (n 5), 41 (n 9), 43 (n 11), 44 (n 9), 45 (n 7), 46 (n 11), 47 (n 5), 48 (n 8), 50 (n 13), 51 (n 8), 52 (n 11), 53 (n 5), 54 (n 6), 55 (n 13), 56 (n 5), 57 (n 7), 59 (n 11), 61 (n 11), 65 (n 8), 66 (n 13), 67 (n 7), 68 (n 12), 71 (n 9), 72 (n 12), 73 (n 10), 74 (n 7), 77 (n 8), 80 (n 9)
+N2 Gate T: Runden 1443, 1524, 1503, 1641 ms, Median 1513.5 ms → erfüllt (< 5000); gegen Stufe 1 +7.8 %, gegen 6c1741e -64.3 %
+N3 kleinstes Budget 1741 → erfüllt
+N4 7 von 7 Abständen mit gleichem Vorzeichen → erfüllt
+Wirtschaft gegen R.GED = 0 (Seeds 1–80, gepaart): einwohner365 +43 ± 9 (+3.4 %, ↑53/↓27); kasse365 -35709 ± 10643 (-3.5 %, ↑31/↓49); gruendungen365 -68 ± 8 (-21.5 %, ↑12/↓68); einwohner730 +61 ± 10 (+4.2 %, ↑62/↓17); kasse730 -127891 ± 20014 (-13.5 %, ↑18/↓62); gruendungen730 -67 ± 16 (-13.5 %, ↑22/↓58)
+Bestätigung Seeds 81–160 (80, mess/nachkal/bestaetigung): 1 80, 2 80, 3 80, 4 79, 5 80, 6 80, 7 25, T 80, B 80; rot: 4 → 137; Abstürze 0; F4 max 1.16; Budget min 772 → BESTANDEN
+   Gate 7: gewertet 25 (bestanden 25, rot 0), nicht gewertet 55 (n < 15; davon n < 10: 20); Wegzieher je Stadt Median 12 (4–28), Summe 1033; kleinster gewerteter Abstand 17.9; über alle Wegzieher gewichtet 26.4
+      nicht gewertet: 81 (n 12), 82 (n 8), 84 (n 13), 85 (n 14), 86 (n 12), 87 (n 11), 88 (n 10), 90 (n 7), 91 (n 11), 92 (n 11), 94 (n 7), 95 (n 6), 96 (n 13), 98 (n 7), 99 (n 11), 101 (n 9), 103 (n 10), 105 (n 8), 106 (n 11), 107 (n 8), 108 (n 13), 109 (n 8), 110 (n 12), 111 (n 12), 113 (n 9), 115 (n 13), 116 (n 14), 119 (n 6), 120 (n 11), 121 (n 4), 122 (n 12), 123 (n 7), 125 (n 11), 127 (n 9), 131 (n 12), 133 (n 10), 134 (n 6), 135 (n 11), 136 (n 9), 137 (n 10), 139 (n 13), 142 (n 5), 144 (n 6), 145 (n 11), 147 (n 13), 148 (n 7), 149 (n 12), 150 (n 12), 151 (n 11), 154 (n 14), 156 (n 12), 157 (n 14), 158 (n 13), 159 (n 14), 160 (n 7)
+
+Je Stufe: Kandidat (Z1 > Stufe 1) / N1 / N2 / N3 / N4
+  1: nein / ja / ja / ja / ja
+  1.5: ja / ja / ja / ja / ja
+  2: ja / ja / ja / ja / ja
+  3: ja / ja / ja / ja / ja
+  4: ja / ja / ja / ja / ja
+
+Auswahl D.4: bestanden auf 1–80 (stärkste zuerst): 4, 3, 2, 1.5
+  Bestätigung 1 von höchstens 2: Stufe 4 auf 81–160 bestanden
+
+ERGEBNIS D.4: Stufe 4

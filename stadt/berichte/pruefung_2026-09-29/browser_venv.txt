@@ -1,0 +1,19 @@
+Start 2026-09-29T08:24:49Z
+python3: SP/ml/venv/bin/python3 Python 3.11.15
+ModuleNotFoundError: No module named 'PIL'
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: /home/user/website-; Ausgabe: <stadt>/ausgabe/browser_venv
+Seitenserver: python3 -m http.server 9066 (PID 7656), Wurzel <stadt>
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+=== otest/breit
+exit 0, OK 12 (Soll 12), FEHL 0, 46 s → grün
+Seitenserver PID 7656 beendet
+=== browser_ki
+exit 0, OK 30 (Soll 30), FEHL 0, 35 s → grün
+
+Zusammenfassung (2026-09-29 08:26, PORT 9066, 1 min):
+otest/breit        grün exit 0   OK  12 /  12  FEHL 0     46 s
+browser_ki         grün exit 0   OK  30 /  30  FEHL 0     35 s
+ALLES GRÜN
+exit 0
+Ende 2026-09-29T08:26:11Z

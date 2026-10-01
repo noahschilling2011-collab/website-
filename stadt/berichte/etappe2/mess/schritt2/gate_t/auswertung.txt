@@ -1,0 +1,5 @@
+neu: T je Runde 1486, 1629, 1400, 1529, 1620, 1456 ms; Median 1507.5 (1400–1629), unter 5000 in 6 von 6; Gates bestanden 6 von 6
+vorher: T je Runde 1475, 1857, 1472, 1534, 1491, 1577 ms; Median 1512.5 (1472–1857), unter 5000 in 6 von 6; Gates bestanden 6 von 6
+basis: T je Runde 4236, 4281, 4245, 4294, 4327, 4341 ms; Median 4287.5 (4236–4341), unter 5000 in 6 von 6; Gates bestanden 6 von 6
+Verhältnis der Mediane: neu/vorher 0.997, neu/basis 0.352, vorher/basis 0.353
+gepaart je Runde neu/vorher: 1.007, 0.877, 0.951, 0.997, 1.087, 0.923; Median 0.974

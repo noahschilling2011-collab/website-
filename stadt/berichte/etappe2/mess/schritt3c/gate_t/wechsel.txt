@@ -1,0 +1,46 @@
+neu: SP/ml/e2bau/stadt (stadt.html 655daec72066), basis: SP/ml/e2bau/sicherung_schritt0 (0b453bf1bb62), Seeds 1
+Runde 1 neu: 22:19:37 uptime:: 2.33, 0.82, 0.30 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 1215 ms (< 5000)
+Gate 7 nicht gewertet (weniger als 15 Wegzieher bis Tag 365, Entscheidung 8): 1 von 1 Seeds (1)
+Gate Phase 0: BESTANDEN
+Runde 1 basis: 22:19:40 uptime:: 2.33, 0.82, 0.30 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 3372 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 basis: 22:19:52 uptime:: 2.11, 0.84, 0.31 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 3325 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 2 neu: 22:20:04 uptime:: 2.09, 0.88, 0.33 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 1201 ms (< 5000)
+Gate 7 nicht gewertet (weniger als 15 Wegzieher bis Tag 365, Entscheidung 8): 1 von 1 Seeds (1)
+Gate Phase 0: BESTANDEN
+Runde 3 neu: 22:20:07 uptime:: 2.00, 0.89, 0.34 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 1301 ms (< 5000)
+Gate 7 nicht gewertet (weniger als 15 Wegzieher bis Tag 365, Entscheidung 8): 1 von 1 Seeds (1)
+Gate Phase 0: BESTANDEN
+Runde 3 basis: 22:20:10 uptime:: 2.00, 0.89, 0.34 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 3331 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 basis: 22:20:22 uptime:: 1.91, 0.92, 0.36 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 3296 ms (< 5000)
+Gate Phase 0: BESTANDEN
+Runde 4 neu: 22:20:34 uptime:: 1.77, 0.93, 0.37 fremde>20%: 0
+  exit 0
+═══ Seed 1 ═══
+  ✓ T  365 Tage in 1263 ms (< 5000)
+Gate 7 nicht gewertet (weniger als 15 Wegzieher bis Tag 365, Entscheidung 8): 1 von 1 Seeds (1)
+Gate Phase 0: BESTANDEN
+FERTIG

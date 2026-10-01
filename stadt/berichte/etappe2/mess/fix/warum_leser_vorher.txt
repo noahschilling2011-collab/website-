@@ -1,0 +1,7 @@
+{"seeds":[1,2,3],"AB":200,"BIS":260,"meldungen":1785,"saetze":1787,"falsch":415,"falschUndrawn":411}
+{"seed":1,"tag":200,"h":7,"p":58,"satz":"ohne Plan","soll":"laden_gruenden","leser":"nichts","aktionen":["kuendigen: L -8.72 E 0 P 0 Z null","freinehmen: L 19.38 E 0 P 0 Z null","laden_gruenden: L 21.6 E 0 P -45 Z null"]}
+{"seed":1,"tag":200,"h":18,"p":288,"satz":"ohne Erfahrung","soll":"freunde_treffen","leser":"nichts","aktionen":["kuendigen: L 16.48 E 5.25 P 0 Z 3.68","freunde_treffen: L 25.35 E 0 P 0 Z -2.39"]}
+{"seed":1,"tag":201,"h":18,"p":426,"satz":"ohne Plan","soll":"kuendigen","leser":"nichts","aktionen":["kuendigen: L 21.68 E 0 P -22.5 Z null","freunde_treffen: L 15.33 E 0 P 0 Z null"]}
+{"seed":1,"tag":202,"h":7,"p":386,"satz":"ohne Plan","soll":"kuendigen","leser":"freinehmen","aktionen":["kuendigen: L 26.9 E 0 P -22.5 Z null","freinehmen: L 26.83 E 0 P 0 Z 0.66","kind_bekommen: L -70.55 E 0 P 0 Z null"]}
+{"seed":1,"tag":202,"h":18,"p":382,"satz":"ohne Plan","soll":"kuendigen","leser":"freunde_treffen","aktionen":["kuendigen: L 21.91 E 0 P -22.5 Z null","freunde_treffen: L 28.35 E 0 P 0 Z 4.16","kind_bekommen: L -60.8 E 0 P 0 Z null"]}
+{"seed":1,"tag":204,"h":7,"p":386,"satz":"ohne Plan","soll":"kuendigen","leser":"nichts","aktionen":["kuendigen: L 23.66 E 0 P -22.5 Z null","freinehmen: L -2.51 E 0 P 0 Z null","kind_bekommen: L -70.55 E 0 P 0 Z null"]}

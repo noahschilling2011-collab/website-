@@ -1,0 +1,6 @@
+leer@1  n 24  Median 4775.5 ms (min 4291, max 5458), µs je Personentag Median 30.865000000000002, Einwohner 1169, alte Felder 0aef350be3e88ab9
+neu@1   n 24  Median 5935.5 ms (min 5475, max 7697), µs je Personentag Median 30.765, Einwohner 1336, alte Felder 9d63f41316a0f05c
+basis   n 24  Median 4743 ms (min 4351, max 5351), µs je Personentag Median 30.655, Einwohner 1169, alte Felder 0aef350be3e88ab9
+leer@1/basis: gepaart Median ×1.019 (min 0.861, max 1.111), 24 Paare
+neu@1/basis: gepaart Median ×1.254 (min 1.103, max 1.461), 24 Paare
+Last vorher 1.52–2.29, fremde Prozesse > 20 % vorher: 0

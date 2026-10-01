@@ -1,0 +1,1 @@
+geschrieben: ausgaben/lokal_v9/paritaet_v9_lokal_1.json (644 Fälle: {'echt': 240, 'kuenstlich': 150, 'nur_warten': 10, 'rand': 244})

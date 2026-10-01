@@ -1,0 +1,6 @@
+ok   Fälle gehören zur Policy v9_lokal_1 (Hash 28385759bed1db02)
+ok   normalisierte Eingaben: größte Abweichung 0.00e+0 (Toleranz 0.000001)
+ok   Logits: größte Abweichung 9.58e-7 (Toleranz 0.0001) über 644 Fälle
+ok   Aktion gleich in 644 von 644 Fällen, 0 Gleichstände (≤ 0.0001), 0 echte Unterschiede; echt 240/240, kuenstlich 150/150, nur_warten 10/10, rand 244/244
+ok   tanh aus Grundrechenarten gegen Math.tanh: größte Abweichung 3.33e-16 (−25…25, Schritt 0,001, Randwerte)
+Parität bestanden

@@ -1,0 +1,39 @@
+A Statisch
+  ok   19 Funktionen würfeln nicht und lesen von Personen nur Fleiß, Ehrgeiz, Geld und Wohnung (gruendungsTyp, techWeltAussicht), keine Namen, kein Geschlecht, keine Herkunft (Stadtbuch-Zeilen ausgenommen)
+  ok   Karten „Tech-Firmen wachsen …“, „Weltmarkt …“ (Spielregel, Live-Zeile, ein Zitat S. 11) und R-A5 (Auslegung): Zahlen passen zu R
+  ok   S. 16 unter „nicht“: Kleinstadt und Bremse als Spielregeln für Gründer, keine Vorschriften der Stadt
+B Ausgeschaltet wie vorher
+  ok   Seed 1, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage jeden Tag wie 31ce452 (185 Einwohner, 0 Tech-Gründungen)
+  ok   Seed 2, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage jeden Tag wie 31ce452 (255 Einwohner, 2 Tech-Gründungen)
+  ok   Seed 3, TECH_FRUEH 0 und WELT 0, ohne die übrigen Bausteine von Version 9 und 10: 200 Tage jeden Tag wie 31ce452 (246 Einwohner, 4 Tech-Gründungen)
+  (ohne --alt: kein Vergleich mit der Fassung vor Teil 5)
+C Je Gründung, je Nacht, je Pleite, je Computerkauf (Seeds 1–3, 730 Tage stündlich)
+  ok   Gründungen (1427, davon 168 Tech-Firmen, 80 Übernahmen, 0 davon mit offenem Anbau, 84 in die Welt; Tüftler im Dorf: 0): dorf ok
+  ok   Gründungen (1427, davon 168 Tech-Firmen, 80 Übernahmen, 0 davon mit offenem Anbau, 84 in die Welt; Tüftler im Dorf: 0): stufe ok
+  ok   Gründungen (1427, davon 168 Tech-Firmen, 80 Übernahmen, 0 davon mit offenem Anbau, 84 in die Welt; Tüftler im Dorf: 0): bremse ok
+  ok   Gründungen (1427, davon 168 Tech-Firmen, 80 Übernahmen, 0 davon mit offenem Anbau, 84 in die Welt; Tüftler im Dorf: 0): frei ok
+  ok   Gründungen (1427, davon 168 Tech-Firmen, 80 Übernahmen, 0 davon mit offenem Anbau, 84 in die Welt; Tüftler im Dorf: 0): preis ok
+  ok   Gründungen (1427, davon 168 Tech-Firmen, 80 Übernahmen, 0 davon mit offenem Anbau, 84 in die Welt; Tüftler im Dorf: 0): markt ok
+  ok   2196 Nächte: freie Tech-Stellen, Stellen in der Welt, Tech- und Umland-Stellen unabhängig nachgezählt, Grenze der Welt, 40 % nur im Umland, Markt nur bei Tech-Firmen, nichts ruht in der Welt, tech9Pruefen
+  ok   2190 Nächte: Preis je Arbeitstag in der Welt = min(140, 12000 / Arbeitstage in der Welt), Arbeitstage unabhängig gezählt
+  ok   Pleiten: 133-mal „gibt auf, fand keine Leute“ (nie eine Kraft), 663-mal „pleite“ (mit Kraft oder Laden)
+  ok   Computer der Schulen: 1325 gekauft, 1316 aus einem Laden der Stadt (nächster Laden, Anteil des Ladens, Rest an die Firma), 9 von außerhalb (nur ohne Computer der Stadt im Regal)
+  ok   Stadtbuch: die Zeile zur Kleinstadt nennt „Tech-Firmen, sobald Tüftler sie gründen“ (3 von 3)
+D Speichern, beschädigte Stände, Übernahme von Version 8
+  ok   Seed 1, gespeichert an Tag 420 um 13 Uhr mit 15 Firmen in der Welt: 30 Tage bitgleich (948bfe6ca286930e)
+  ok   13 beschädigte Stände abgelehnt: Markt 2: Spielstand beschädigt: Tech-Firmen (Gebäude); Markt bei einer Werkstatt: Spielstand beschädigt: Tech-Firmen (Gebäude); Kraft bei einem Laden: Spielstand beschädigt: Tech-Firmen (Gebäude); techFrei −1: Spielstand beschädigt: Tech-Firmen (Zahlen); techFrei 1,5: Spielstand beschädigt: Tech-Firmen (Zahlen); techFrei fehlt: Spielstand beschädigt: Tech-Firmen (Zahlen); weltPreis 150: Spielstand beschädigt: Tech-Firmen (Zahlen); weltPreis fehlt: Spielstand beschädigt: Tech-Firmen (Zahlen); weltPlaetze fehlt: Spielstand beschädigt: Tech-Firmen (Zahlen); Summe welt fehlt: Spielstand beschädigt: Tech-Firmen (Summen); aufgegeben mehr als Pleiten: Spielstand beschädigt: Tech-Firmen (Summen); Feld g.markt fehlt: Spielstand unvollständig: g.markt; Feld g.kraft fehlt: Spielstand unvollständig: g.kraft
+  ok   Version 8 (Seed 2, Tag 250) übernommen: alle Tech-Firmen im Umland, Bremse gleich gezählt (4), „hatte eine Kraft“ nach heute; 30 Tage weiter ohne NaN, 6 Tech-Gründungen
+  ok   direkt nach der Übernahme: techFrei 4 (nachgezählt 4), Gründungen nicht bis Mitternacht gesperrt (Befund der Gegenprüfung)
+E Namenstausch (Seed 2, 450 Tage)
+  ok   Namen getauscht („Mats Jung“ heißt dort „David Braun“): 11 Tech-Firmen im Umland, 18 in der Welt, bitgleich (1b9915e5d808ec56)
+F Messung und Gruppen (nur gemessen, keine Regel liest diese Merkmale)
+       Seed 1: erste Tech-Gründung Tag 54, 18 + 13 Tech-Firmen an Tag 730; Seed 2: erste Tech-Gründung Tag 64, 13 + 17 Tech-Firmen an Tag 730; Seed 3: erste Tech-Gründung Tag 43, 13 + 14 Tech-Firmen an Tag 730
+       Gründungen ab Tag 0, Erwachsenen- und Arbeitstage ab Tag 200: Anteil an Tech-Gründungen (in die Welt) und an Tech-Arbeitstagen, geteilt durch den Anteil an allen Gründungen bzw. Arbeitstagen
+       alle                                         Gründungen 1427  Tech 1.00 (Welt 1.00)  Tech-Arbeitstage 1.00
+       in der Stadt geboren                         Gründungen  325  Tech 0.99 (Welt 0.57)  Tech-Arbeitstage 1.08
+       zugezogen oder vom Start                     Gründungen 1102  Tech 1.00 (Welt 1.13)  Tech-Arbeitstage 0.97
+       Nachnamen Kaya bis Kowalski (Liste 31–37)    Gründungen  151  Tech 0.96 (Welt 1.01)  Tech-Arbeitstage 0.99
+       übrige Nachnamen                             Gründungen 1276  Tech 1.01 (Welt 1.00)  Tech-Arbeitstage 1.00
+       Frauen                                       Gründungen  715  Tech 0.83 (Welt 0.69)  Tech-Arbeitstage 0.98
+       Männer                                       Gründungen  712  Tech 1.17 (Welt 1.31)  Tech-Arbeitstage 1.02
+Alle Prüfungen zu „Tech-Firmen früher und mehr“ bestanden

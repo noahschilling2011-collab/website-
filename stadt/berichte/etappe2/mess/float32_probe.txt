@@ -1,0 +1,15 @@
+alt (../basis_6c1741e.html, sim 3b1a95e0e5ae9ea5):
+  Gewicht 1e39: angenommen
+  Gewicht −3.4028236e38: angenommen
+  Bias 1e39: angenommen
+  Gewichte 1e308: angenommen
+  clip 1e39: angenommen
+  Grenze ±3.4028235e38 (soll gültig sein): angenommen
+neu (../stadt/stadt.html, sim 4aeae2ba112f3d6c):
+  Gewicht 1e39: Policy ungültig: Schicht 0: Zahl über dem float32-Bereich
+  Gewicht −3.4028236e38: Policy ungültig: Schicht 1: Zahl über dem float32-Bereich
+  Bias 1e39: Policy ungültig: Schicht 1: Bias über dem float32-Bereich
+  Gewichte 1e308: Policy ungültig: Schicht 1: Zahl über dem float32-Bereich
+  clip 1e39: Policy ungültig: Normalisierung: clip über dem float32-Bereich
+  Grenze ±3.4028235e38 (soll gültig sein): angenommen
+browser_ki (12) ohne Browser: Datei 1e308: Policy ungültig: Schicht 1: Zahl über dem float32-Bereich; nach 30 Stunden aktiv false, Rückfälle 1, Fehler „Policy: Logit warten ist keine Zahl“; Stadt gleich wie mit Regeln: true

@@ -1,0 +1,22 @@
+Hinweis {"hidden":false,"text":"Ziehen dreht · Rad zoomt · Klick öffnet","l":495.6328125,"t":697.1875,"r":784.3671875,"u":728,"farbe":"rgb(163, 163, 174)"} Tempo {"l":458,"t":736,"r":822,"u":784,"w":364,"h":48,"hidden":false,"sicht":"visible"}
+OK  neue Stadt: Hinweis mit Maus-Text
+OK  Hinweis mittig über dem Tempo
+Hinweis: ungünstigster Grund 32 47 41 Kontrast 5.60
+OK  Hinweis-Text ≥ 4,5:1 vor dem gemessenen Grund
+OK  Ziehen: Hinweis verschwindet
+Tab-Folge haushalt-knopf → regierung-knopf → tempo0 → tempo1 → tempo5 → tempo20 → tempo100 → haupt-zeile×6 → buch-knopf → erf-knopf → name×385
+Tab ab „5 Tage“: hilfe-knopf → einst-knopf → BODY → ⇧einst-knopf
+OK  Tab: Hilfe direkt vor Einstellungen
+Fokusring Hilfe-Knopf: solid 2px rgb(255, 200, 100)
+OK  jeder Tab-Halt mit Fokusring (outline ≥ 2 px)
+Hilfe per Enter {"offen":true,"fokus":"hilfe-titel","titel":"So liest du die Stadt"}
+OK  Enter öffnet die Hilfe, Fokus auf der Überschrift
+OK  Tab im Dialog: Schließen
+OK  Schließen-Knopf: zu, Fokus zurück auf „?“ (hilfe-knopf)
+OK  Leertaste im Hilfe-Dialog ändert das Tempo nicht
+OK  Escape: zu, Fokus zurück auf „?“
+Dialog {"h":746.875,"w":840,"sh":745,"ch":745}
+Überlauf {"scroll":1280,"breite":1280,"raus":[]}
+OK  geladener Spielstand: kein Hinweis
+Fehler: keine
+Hinweis ohne Eingabe (auf/weg/zu, ms): [["auf","",7859],["auf","weg",21764],["zu","weg",22165]]

@@ -1,0 +1,290 @@
+--- sicherung_fix/stadt.html	2026-09-30 23:30:03.233003312 +0000
++++ stadt/stadt.html	2026-10-01 02:51:55.266607195 +0000
+@@ -319,6 +319,7 @@
+   .warum-liste li.gewaehlt .w-teile { color: var(--text); }
+   .w-marke { margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--hell-3); color: var(--text); font-size: 0.72rem; white-space: nowrap; }
+   .gewaehlt .w-marke { background: var(--akzent); color: var(--akzent-auf); }
++  .w-rechnung { color: var(--text-leise); font-variant-numeric: tabular-nums; }   /* Rechnung eines Vergleichs hinter „Ohne … hätte …“ */
+   /* Liste „Heute anders entschieden“ (Karte): Uhrzeit, Name, Grund, „statt … → …“ */
+   .erf-liste { list-style: none; margin: var(--s2) 0 0; padding: 0; }
+   .erf-liste > li { padding: var(--s2) 0; border-bottom: 1px solid var(--hell-1); }
+@@ -391,6 +392,10 @@
+   .bedienung { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--s3); margin: 0 0 var(--s2); font-size: var(--klein); }
+   .bedienung dt { color: var(--text-leise); }
+   .bedienung dd { margin: 0; }
++  /* Etappe 2: Erklärung des Knopfs „heute anders“ nur dort, wo er nur Symbol und Zahl zeigt (Befund Bedienung der Schlussprüfung: am Handy
++     hilft der title nicht); breit steht „anders“ am Knopf, und die Hilfe muss bei 1280 × 800 ohne Scrollen passen (otest/hilfehoehe) */
++  .bedienung .nur-schmal { display: none; }
++  .bedienung .sym { width: 14px; height: 14px; vertical-align: -2px; color: var(--akzent); }
+   .legende { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: var(--klein); }
+   .legende li { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 10px; align-items: start; line-height: 1.45; }
+   .legende strong { font-weight: 500; color: var(--text-stark); }
+@@ -596,6 +601,7 @@
+   @media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {   /* Etappe 2: „heute anders“ nur als Symbol und Zahl */
+     .erf-knopf .erf-wort { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+     #erf-knopf { padding: 0 var(--s2); margin-right: 6px; }
++    .bedienung .nur-schmal { display: block; }             /* Hilfe erklärt dann den Knopf */
+   }
+   @media (max-height: 500px) and (orientation: landscape) {   /* Etappe 2: Handy quer in der ersten Zeile der Hauptfiguren, so hoch wie die Zeile */
+     #erf-knopf { display: none; }
+@@ -909,6 +915,7 @@
+     <dt>Maus</dt><dd>Ziehen dreht, rechts ziehen (oder mit Umschalt, Strg oder ⌘) verschiebt, Rad oder mittlere Taste zoomt. Klick auf ein Gebäude oder eine Figur öffnet ihre Karte.</dd>
+     <dt>Touch</dt><dd>Ein Finger dreht, zwei Finger zoomen und verschieben, Tippen öffnet die Karte.</dd>
+     <dt>Tasten</dt><dd>Leertaste: Pause und weiter. Escape: Karte schließen.</dd>
++    <dt class="nur-schmal">Weiche</dt><dd class="nur-schmal"><svg class="sym" aria-hidden="true"><use href="#s-weiche"/></svg> mit Zahl beim Stadtbuch (Handy quer: bei den Hauptfiguren): So oft haben Bewohner heute wegen Erfahrung oder Plan anders entschieden. Tippen öffnet die Liste mit „Warum?“.</dd>
+   </dl>
+   <p class="leise">Die Kamera bewegt sich nur durch dich oder „Zeigen“ in einer Hauskarte. Am Handy klappt der Pfeil im Kartenkopf die Karte ein und auf.</p>
+   <div class="hilfe-spalten">
+@@ -1156,8 +1163,9 @@
+   FREUNDE_MAX: 5, MEM: 8,
+   // Etappe 2: Gedächtnis, Erfahrung, Plan (Annahmen; VERGLEICH.md Abschnitt 3 mit Noahs Entscheidungen). GED 0 = Tag für Tag wie 6c1741e
+   // (zusammen mit OPFER_FREI 0). GED_STAERKE: Faktor auf die Summanden aus Erfahrung und Plan in entscheide und zielWaehlen (1 = Entwurf C;
+-  // Standard 1,5: Noahs Entscheidung 9 – von den Stufen, die alle Gates halten (1–4, KALIBRIERUNG.md Teil D/E), die, bei der Gate 7 in den
+-  // meisten Städten noch gewertet wird (58 von 80 statt 26 von 80 bei Stufe 4); Noahs Entscheidungen 4, 8 und 9, KALIBRIERUNG.md Teil F).
++  // Standard 1,5: Noahs Entscheidung 9 – von den stärkeren Stufen (1,5–4, Kandidaten in KALIBRIERUNG.md Teil E), die alle Gates halten, die,
++  // bei der Gate 7 in den meisten Städten gewertet wird (damals 58 von 80 statt 26 bei Stufe 4; mit Verblassen 55 von 80); Noahs Entscheidungen
++  // 4, 8 und 9, KALIBRIERUNG.md Teil F).
+   // Gedächtnis: die ersten MEM_KURZ Plätze sind Kurzzeit (der Reihe nach), die übrigen Langzeit; was aus der Kurzzeit fällt und mindestens
+   // MEM_SCHWELLE bedeutet (M_BED), verdrängt in der Langzeit den Platz mit der kleinsten Bedeutung − Alter × MEM_VERBLASSEN, wenn es mehr zählt.
+   // Erfahrung je ERF_AKTION und Lage (Geld knapp: Bedürfnis Geld unter ERF_KNAPP): Frist in Tagen, Ergebnis ohne und mit schlechter Folge
+@@ -2859,32 +2867,35 @@
+ // geprüfter Aktion, dazu die Wahl ohne Erfahrung, ohne Plan und ohne beides. art je Vergleich: null (gleich), 'direkt' (eine beteiligte Aktion
+ // ist eine, auf die Erfahrung oder Plan wirken) oder 'zufall' (nur der Zufall hat sich verschoben). Ohne rs ist das eine neue Wahl ab dem
+ // jetzigen S.rs, nicht die zuletzt getroffene; mit rs (rsVor aus dem Beobachter, dort aufgerufen) genau die gemeldete Entscheidung.
++// rechnung: je Vergleich mit anderer Wahl dessen eigene Rechnung (Zeilen wie aktionen; ab demselben S.rs, aber ohne die Summanden liegen andere
++// Handlungen vorn, darum andere Zufallszahlen), sonst null. Ohne sie ließ sich „Ohne … hätte …“ oft nicht nachrechnen (Schlussprüfung Bedienung)
+ // Kinder entscheiden nie (stunde, tagSchritt): nur { kind: true }
+ function warum(S, p, h, rs) {
+   const P = S.p;
+   if (p < 0 || p >= S.pMax || !P.lebt[p]) return null;
+   if (h === undefined) h = S.stunde;
+   if (P.geb[p] >= S.tag - R.ERWACHSEN * R.JAHR) return { stunde: h, kind: true };
+-  const rsJetzt = S.rs, liste = [];
++  const rsJetzt = S.rs, liste = [], lE = [], lP = [], lB = [];
+   if (rs === undefined) rs = rsJetzt;
+   let wahl, ohneE, ohneP, ohneB;
+   try {
+-    WARUM.liste = liste;
+-    S.rs = rs; wahl = entscheide(S, p, h, 1 | 8); WARUM.liste = null;
+-    S.rs = rs; ohneE = entscheide(S, p, h, 1 | 2);
+-    S.rs = rs; ohneP = entscheide(S, p, h, 1 | 4);
+-    S.rs = rs; ohneB = entscheide(S, p, h, 1 | 2 | 4);
++    WARUM.liste = liste; S.rs = rs; wahl = entscheide(S, p, h, 1 | 8);
++    WARUM.liste = lE; S.rs = rs; ohneE = entscheide(S, p, h, 1 | 2 | 8);
++    WARUM.liste = lP; S.rs = rs; ohneP = entscheide(S, p, h, 1 | 4 | 8);
++    WARUM.liste = lB; S.rs = rs; ohneB = entscheide(S, p, h, 1 | 2 | 4 | 8);
+   } finally { S.rs = rsJetzt; WARUM.liste = null; }
+   const n = (a) => AKTIONSNAMEN[a] || 'nichts', r2 = (x) => Math.round(x * 100) / 100;
+   const art = (o) => (o === wahl ? null : GED_DIREKT[o] || GED_DIREKT[wahl] ? 'direkt' : 'zufall');
++  const zeilen = (L) => L.map(x => {
++    const gezogen = x.v + (x.dE + x.dP) + R.ZUFALL > x.best, zf = gezogen ? (zufallAn(x.rs, 0) * 2 - 1) * R.ZUFALL : 0;
++    return { aktion: n(x.a), lage: r2(x.v), erfahrung: r2(x.dE), plan: r2(x.dP), zufall: gezogen ? r2(zf) : null, summe: r2(x.v + (x.dE + x.dP) + zf) };
++  });
+   return {
+     stunde: h, inHaft: !!P.haftBis[p], schwelle: R.SCHWELLE, staerke: R.GED_STAERKE,
+     wahl: n(wahl), ohneErfahrung: n(ohneE), ohnePlan: n(ohneP), ohneBeides: n(ohneB),
+     art: { erfahrung: art(ohneE), plan: art(ohneP), beides: art(ohneB) },
+-    aktionen: liste.map(x => {
+-      const gezogen = x.v + (x.dE + x.dP) + R.ZUFALL > x.best, zf = gezogen ? (zufallAn(x.rs, 0) * 2 - 1) * R.ZUFALL : 0;
+-      return { aktion: n(x.a), lage: r2(x.v), erfahrung: r2(x.dE), plan: r2(x.dP), zufall: gezogen ? r2(zf) : null, summe: r2(x.v + (x.dE + x.dP) + zf) };
+-    }),
++    aktionen: zeilen(liste),
++    rechnung: { erfahrung: ohneE !== wahl ? zeilen(lE) : null, plan: ohneP !== wahl ? zeilen(lP) : null, beides: ohneB !== wahl ? zeilen(lB) : null },
+   };
+ }
+ function ausfuehren(S, p, a, quelle) {
+@@ -14556,7 +14567,18 @@
+   const codes = fokus ? [] : [...ziel.querySelectorAll('pre.code')].map(c => ({ oben: c.scrollTop, links: c.scrollLeft, fokus: document.activeElement === c }));
+   // Etappe 2 (Schritt 3): Knöpfe mit data-fokus („Warum?“, Liste „heute anders“) behalten beim Auffrischen den Tastatur-Fokus
+   const fokusKnopf = !fokus && ziel.contains(document.activeElement) ? document.activeElement.dataset.fokus : undefined;
+-  ziel.innerHTML = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : k.art === 'e' ? erfListeHtml() : gebaeudeHtml(k.id);
++  const html = k.art === 'p' ? personHtml(k.id, k.gen, k.name) : k.art === 'e' ? erfListeHtml() : gebaeudeHtml(k.id);
++  // Liste „heute anders“ (Befund Bedienung der Schlussprüfung Etappe 2): unverändert → nicht neu einsetzen (nichts verschiebt sich unter Maus
++  // und Auge, ein Klick trifft, was beim Drücken darunter lag); sonst bleibt der oberste sichtbare Eintrag an seiner Stelle, auch wenn oben neue
++  // dazukommen oder „heute“ zu „gestern“ wird (ganz oben bleibt die Liste oben: dort erscheinen die neuen)
++  if (!fokus && k.art === 'e' && html === erfListe.html && ziel.firstElementChild) { hauptMarkieren(); auswahlZeigen(); zeigenKnopf(); return; }
++  let anker = null;
++  if (!fokus && k.art === 'e' && erfListe.html && scroll > 0) {
++    const oben = $('karte').getBoundingClientRect().top, li = [...ziel.querySelectorAll('li[data-nr]')].find(x => x.getBoundingClientRect().bottom > oben);
++    if (li) anker = { nr: li.dataset.nr, y: li.getBoundingClientRect().top };
++  }
++  ziel.innerHTML = html;
++  erfListe.html = k.art === 'e' ? html : '';
+   $('karte-kopf-titel').textContent = (ziel.querySelector('h2') || {}).textContent || '';   // eingeklappt steht er in der Kopfleiste
+   const tbNeu = ziel.querySelector('.tagebuch');
+   ziel.querySelectorAll('pre.code').forEach((c, i) => {
+@@ -14576,6 +14598,8 @@
+     const f = fokusKnopf && ziel.querySelector(`[data-fokus="${fokusKnopf}"]`);
+     if (f) f.focus({ preventScroll: true });
+     $('karte').scrollTop = scroll;
++    const li = anker && ziel.querySelector(`li[data-nr="${anker.nr}"]`);
++    if (li) $('karte').scrollTop += li.getBoundingClientRect().top - anker.y;
+   }
+   hauptMarkieren();
+   auswahlZeigen();
+@@ -14712,34 +14736,49 @@
+ }
+ // Rechnung einer Entscheidung aus Sim.warum: je geprüfter Handlung die Summanden, die Wahl, die Wahl ohne Erfahrung, ohne Plan, ohne beides.
+ // art 'zufall': keine beteiligte Handlung hat Erfahrung oder Plan, nur eine andere Zufallszahl (indirekt)
++const warumTeile = (a) => {
++  const teile = [`Lage und Charakter ${pkt(a.lage)}`];
++  if (a.plan) teile.push(`Plan ${pkt(a.plan)}`);
++  if (a.erfahrung) teile.push(`Erfahrung ${pkt(a.erfahrung)}`);
++  teile.push(a.zufall === null ? 'Zufall –' : `Zufall ${pkt(a.zufall)}`);
++  return teile.join(' · ');
++};
++// Summe einer gewählten Handlung: auf zwei Stellen gerundet kann sie genau auf der Schwelle stehen (25,002 → 25), gewählt ist sie trotzdem
++const knapp = (summe, schwelle) => (summe <= schwelle ? ` (knapp über ${zahl(schwelle)})` : '');
++// Rechnung eines Vergleichs (Sim.warum rechnung.*) in Klammern hinter dem Satz „Ohne … hätte …“: die dort gewählte Handlung und die echte Wahl,
++// je mit ihrer Zufallszahl in diesem Vergleich (Befund Bedienung der Schlussprüfung: ohne diese Zahlen ließ sich der Satz oft nicht nachrechnen)
++function vergleichHtml(L, ohne, wahl, schwelle) {
++  if (!L) return '';
++  const zeile = (a) => { const x = L.find(y => y.aktion === a); return x ? `${aktInf(a)}: ${warumTeile(x)} = <strong>${pkt(x.summe)}</strong>${a === ohne ? knapp(x.summe, schwelle) : ''}` : ''; };
++  const t = [ohne !== 'nichts' && zeile(ohne), wahl !== 'nichts' && zeile(wahl)].filter(Boolean);
++  return t.length ? ` <span class="w-rechnung">(in dieser Rechnung: ${t.join('; ')})</span>` : '';
++}
+ function warumHtml(w, kopf, vorname) {
+   const R = Sim.R;
+   if (!w) return '<p class="leise">Nicht mehr in der Stadt.</p>';
+   if (w.kind) return `<p>${esc(vorname)} ist noch ein Kind und entscheidet noch nicht.</p>`;
+   if (w.inHaft) return `<p>In Haft entscheidet ${esc(vorname)} nichts.</p>`;
+-  const L = w.aktionen.slice().sort((a, b) => b.summe - a.summe);
++  const L = w.aktionen.slice().sort((a, b) => b.summe - a.summe), rech = w.rechnung || {};
+   let h = `<p>${kopf}</p>`;
+   if (L.length) h += '<ol class="warum-liste">' + L.map(a => {
+-    const teile = [`Lage und Charakter ${pkt(a.lage)}`];
+-    if (a.plan) teile.push(`Plan ${pkt(a.plan)}`);
+-    if (a.erfahrung) teile.push(`Erfahrung ${pkt(a.erfahrung)}`);
+-    teile.push(a.zufall === null ? 'Zufall –' : `Zufall ${pkt(a.zufall)}`);
+     const marke = a.aktion === w.wahl ? ' <span class="w-marke">gewählt</span>'
+       : a.aktion === w.ohneErfahrung ? ' <span class="w-marke">ohne Erfahrung gewählt</span>' : '';
+     return `<li${a.aktion === w.wahl ? ' class="gewaehlt"' : ''}><span>${aktInf(a.aktion)}${marke}</span><span class="w-summe">${pkt(a.summe)}</span>`
+-      + `<span class="w-teile">${teile.join(' · ')}</span></li>`;
++      + `<span class="w-teile">${warumTeile(a)}${a.aktion === w.wahl ? knapp(a.summe, w.schwelle) : ''}</span></li>`;
+   }).join('') + '</ol>';
+   h += !L.length ? '<p>Keine Handlung kommt gerade in Frage: <strong>nichts tun</strong>.</p>'
+     : w.wahl === 'nichts' ? `<p>Keine Handlung liegt über ${zahl(w.schwelle)}: <strong>nichts tun</strong>.</p>` : `<p>Gewählt: <strong>${aktInf(w.wahl)}</strong>.</p>`;
+   const zufall = (art) => (art === 'zufall' ? ' <span class="leise">(Zufall: keine beteiligte Handlung hat Erfahrung oder Plan, nur eine andere Zufallszahl wurde gezogen)</span>' : '');
+-  h += w.ohneErfahrung !== w.wahl ? `<p class="w-ohne">${ohneSatz('Ohne diese Erfahrung', vorname, w.ohneErfahrung)}.${zufall(w.art.erfahrung)}</p>`
++  const satz = (wenn, ohne, art, rechnung) => `${ohneSatz(wenn, vorname, ohne)}${vergleichHtml(rechnung, ohne, w.wahl, w.schwelle)}${zufall(art)}`;
++  h += w.ohneErfahrung !== w.wahl ? `<p class="w-ohne">${satz('Ohne diese Erfahrung', w.ohneErfahrung, w.art.erfahrung, rech.erfahrung)}.</p>`
+     : '<p class="w-ohne">Ohne Erfahrung: dieselbe Wahl.</p>';
+   const mehr = [];
+-  if (w.ohnePlan !== w.wahl) mehr.push(`${ohneSatz('Ohne Plan', vorname, w.ohnePlan)}${zufall(w.art.plan)}`);
+-  if (w.ohneBeides !== w.wahl && w.ohneBeides !== w.ohneErfahrung && w.ohneBeides !== w.ohnePlan) mehr.push(`${ohneSatz('Ohne Erfahrung und Plan', vorname, w.ohneBeides)}${zufall(w.art.beides)}`);
++  if (w.ohnePlan !== w.wahl) mehr.push(satz('Ohne Plan', w.ohnePlan, w.art.plan, rech.plan));
++  if (w.ohneBeides !== w.wahl && w.ohneBeides !== w.ohneErfahrung && w.ohneBeides !== w.ohnePlan) mehr.push(satz('Ohne Erfahrung und Plan', w.ohneBeides, w.art.beides, rech.beides));
+   if (mehr.length) h += `<p>${mehr.join('. ')}.</p>`;
+   h += `<p class="leise">Summe = Lage und Charakter (wie in Version 9, mit Zielbonus) + Plan + Erfahrung (beide × Stärke ${pkt(w.staerke).slice(1)}) + Zufall ±${R.ZUFALL}. `
+-    + `Gewählt wird die höchste Summe über ${zahl(w.schwelle)}. „Zufall –“: nicht gezogen, die Handlung konnte nicht mehr vorne liegen. Die Gewichte sind Annahmen der Stadt.</p>`;
++    + `Gewählt wird die höchste Summe über ${zahl(w.schwelle)}. „Zufall –“: nicht gezogen, die Handlung konnte nicht mehr vorne liegen. Ohne Erfahrung oder Plan liegen `
++    + 'andere Handlungen vorn, darum werden dort andere Zufallszahlen gezogen; diese Rechnung steht in Klammern hinter dem Satz. Die Gewichte sind Annahmen der Stadt.</p>';
+   return h;
+ }
+ 
+@@ -14749,11 +14788,15 @@
+ // kein Geschlecht, keine Herkunft; der Name kommt erst beim Zeichnen und nur, solange die Person lebt. Reihenfolge: die Uhrzeit, sonst keine
+ const ERF_MAX = 50;
+ const erfJeLeer = () => ({ erfahrung: 0, plan: 0, 'erfahrung und plan': 0, zufall: 0 });
+-const erfListe = { S: null, stadt: 0, tag: -1, heute: [], zahl: 0, je: erfJeLeer(), gestern: [], tagGestern: -1, zahlGestern: 0, nr: 0, offen: new Set(), angezeigt: '' };
++// seit: ab wann diese Seite für diese Stadt zählt (Tag, Stunde); die Liste lebt nur im offenen Fenster, nach Neuladen oder Laden beginnt sie leer.
++// html: zuletzt eingesetzter Inhalt der Karte, solange sie die Liste zeigt (sonst ''), damit das stündliche Auffrischen sie nur bei Änderungen neu setzt
++const erfListe = { S: null, stadt: 0, tag: -1, heute: [], zahl: 0, je: erfJeLeer(), gestern: [], tagGestern: -1, zahlGestern: 0, nr: 0, offen: new Set(), angezeigt: '',
++  seit: { tag: 0, stunde: 0 }, html: '' };
+ // Auf die Stadt und den Tag von S bringen: andere Stadt (Neu, Laden, Übernahme) → leer; neuer Tag → heute wird gestern (nur der direkte Vortag)
+ function erfListeTag() {
+   const L = erfListe;
+-  if (L.S !== S) { L.S = S; L.stadt++; L.tag = S.tag; L.heute = []; L.zahl = 0; L.je = erfJeLeer(); L.gestern = []; L.tagGestern = -1; L.zahlGestern = 0; L.offen.clear(); return; }
++  if (L.S !== S) { L.S = S; L.stadt++; L.tag = S.tag; L.heute = []; L.zahl = 0; L.je = erfJeLeer(); L.gestern = []; L.tagGestern = -1; L.zahlGestern = 0; L.offen.clear();
++    L.seit = { tag: S.tag, stunde: S.stunde }; return; }
+   if (L.tag === S.tag) return;
+   const vortag = L.tag === S.tag - 1;
+   L.gestern = vortag ? L.heute : []; L.tagGestern = vortag ? L.tag : -1; L.zahlGestern = vortag ? L.zahl : 0;
+@@ -14803,7 +14846,7 @@
+   }
+   const offen = erfListe.offen.has(e.nr);
+   const teileText = teile.length ? teile.join(' · ') : e.grund === 'zufall' ? 'nur eine andere Zufallszahl (indirekt)' : '';
+-  return `<li><div class="erf-kopf"><span class="zeit">${e.stunde} Uhr</span>${wer}<span class="erf-grund${/erfahrung/.test(e.grund) ? ' betont' : ''}">${GRUND_WORT[e.grund] || esc(e.grund)}</span></div>`
++  return `<li data-nr="${e.nr}"><div class="erf-kopf"><span class="zeit">${e.stunde} Uhr</span>${wer}<span class="erf-grund${/erfahrung/.test(e.grund) ? ' betont' : ''}">${GRUND_WORT[e.grund] || esc(e.grund)}</span></div>`
+     + `<p class="erf-statt">statt „${aktInf(e.ohne)}“ → „${aktInf(e.mit)}“</p>`
+     + `<div class="erf-fuss"><span class="leise erf-teile">${teileText}</span><button type="button" class="knopf klein" data-erf-warum="${e.nr}" data-fokus="erf-w-${e.nr}" `
+     + `aria-expanded="${offen}"${offen ? ` aria-controls="erf-warum-${e.nr}"` : ''}>Warum?</button></div>`
+@@ -14815,12 +14858,18 @@
+   const L = erfListe, f = Sim.beobachterFehler;
+   let h = kopfHtml(`<span class="typ-marke" aria-hidden="true">${symbol('s-weiche')}</span>`, 'Heute anders entschieden',
+     `Tag ${S.tag} · ${L.zahl === 1 ? '1 Entscheidung' : `${zahl(L.zahl)} Entscheidungen`}`, 'wegen Erfahrung oder Plan');
+-  h += `<p class="leise">Gezählt wird jede Entscheidung, die ohne Erfahrung und ohne Plan anders ausgefallen wäre; die Stadt rechnet das bei jeder `
+-    + `Entscheidung mit. Heute: Erfahrung ${zahl(L.je.erfahrung)} · Plan ${zahl(L.je.plan)} · beides ${zahl(L.je['erfahrung und plan'])} · Zufall ${zahl(L.je.zufall)}. `
+-    + `Neueste oben, höchstens ${ERF_MAX} je Tag${L.zahl > L.heute.length ? ` (hier die letzten ${L.heute.length} von ${zahl(L.zahl)})` : ''}. Ein Name öffnet die Karte.</p>`;
+-  if (f) h += `<p class="leise">Liste angehalten: ${esc(f)}. Die Stadt rechnet trotzdem richtig weiter.</p>`;
++  // Gezählt wird nur, was die Beobachtung meldet: anders ohne Erfahrung und Plan UND Gründen, Kündigen, Wechseln oder Zusammenziehen beteiligt
++  // (andersMelden, GED_DIREKT; gemessen etwa 9 von 10 solcher Entscheidungen, simtest --gedaechtnis A). Befund Texte der Schlussprüfung
++  const seitHier = L.seit.tag >= S.tag - 1;              // heute oder der gezeigte Vortag beginnen erst mit dieser Seite
++  h += `<p class="leise">Gezählt wird jede Entscheidung, die ohne Erfahrung und ohne Plan anders ausgefallen wäre und an der Gründen, Kündigen, Stelle `
++    + `wechseln oder Zusammenziehen beteiligt ist (etwa 9 von 10 solcher Entscheidungen); die Stadt rechnet das bei jeder Entscheidung mit. `
++    + `Heute: Erfahrung ${zahl(L.je.erfahrung)} · Plan ${zahl(L.je.plan)} · beides ${zahl(L.je['erfahrung und plan'])} · Zufall ${zahl(L.je.zufall)}. `
++    + `Neueste oben, höchstens ${ERF_MAX} je Tag${L.zahl > L.heute.length ? ` (hier die letzten ${L.heute.length} von ${zahl(L.zahl)})` : ''}. Ein Name öffnet die Karte.`
++    + (seitHier ? ` Gezählt erst, seit die Stadt in diesem Fenster läuft (Tag ${L.seit.tag}, ${L.seit.stunde} Uhr); was davor entschieden wurde, steht nicht hier.` : '') + '</p>';
++  // Fehler des Beobachters: für Noah ein deutscher Satz, der Fehlertext (meist englisch) nur im title für die Fehlersuche
++  if (f) h += `<p class="leise" title="${esc(f)}">Liste angehalten (interner Fehler der Anzeige). Die Stadt rechnet trotzdem richtig weiter.</p>`;
+   h += L.heute.length ? `<ol class="erf-liste">${L.heute.slice().reverse().map(erfEintragHtml).join('')}</ol>`
+-    : '<p class="leise">Heute noch keine. Entschieden wird um 7 und um 18 Uhr und nach einem Ereignis.</p>';
++    : `<p class="leise">${L.seit.tag === S.tag ? `Seit ${L.seit.stunde} Uhr noch keine` : 'Heute noch keine'}. Entschieden wird um 7 und um 18 Uhr und nach einem Ereignis.</p>`;
+   if (L.gestern.length) h += `<h3>Gestern · Tag ${L.tagGestern} · ${zahl(L.zahlGestern)}</h3><ol class="erf-liste">${L.gestern.slice().reverse().map(erfEintragHtml).join('')}</ol>`;
+   return h;
+ }
+@@ -15093,15 +15142,20 @@
+   return p ? { v: 1, art: 'policy', name: p.name, hash: p.hash, schema: p.schemaHash } : { v: 1, art: 'regeln' };
+ }
+ // Wahl aus einem Spielstand (Start, Import). Ein Stand ohne Wahl (09083f5 und älter) läuft mit den Regeln. still: keine eigene Meldung,
+-// der Aufrufer hängt kiWahl.hinweis an seine an (Import: sonst überschreibt „Spielstand geladen“ den Rückfall-Hinweis)
+-function kiWahlAusUi(ui, still) {
++// der Aufrufer hängt kiWahl.hinweis an seine an (Import: sonst überschreibt „Spielstand geladen“ den Rückfall-Hinweis). vonVersion: Version eines
++// übernommenen älteren Stands (Import, „Stadt übernehmen“). Seine Policy ist auf diese Version trainiert und gilt nicht mehr: dann „neu trainieren“
++// statt des Rats, sie wieder in ki/ zu legen (Befund Bedienung der Schlussprüfung Etappe 2: sie liegt dort und wird abgelehnt)
++function kiWahlAusUi(ui, still, vonVersion) {
+   const w = ui && ui.entscheidungen;
+   kiWahl.hinweis = '';
+   if (!w || w.art !== 'policy') { kiWahlSetzen('regeln'); return; }
+   if (!kiWahlSetzen('policy', w.hash)) {
+-    kiWahl.hinweis = `Die gespeicherte Policy „${String(w.name || '?').slice(0, 60)}“ (Hash ${String(w.hash || 'fehlt').slice(0, 20)}) ist nicht da oder passt nicht zu `
+-      + `dieser Stadt.${kiWahl.ordnerText ? ' ' + kiWahl.ordnerText : ''} Es entscheiden die Regeln (Rückfall). Liegt sie wieder in ki/, im Fenster „Entscheidungen der `
+-      + 'Bewohner“ neu wählen.';
++    const name = String(w.name || '?').slice(0, 60);
++    kiWahl.hinweis = vonVersion && vonVersion < Sim.VERSION
++      ? `Die gespeicherte Policy „${name}“ stammt aus Version ${vonVersion} und gilt in Version ${Sim.VERSION} nicht mehr (neu trainieren). Es entscheiden die Regeln (Rückfall).`
++      : `Die gespeicherte Policy „${name}“ (Hash ${String(w.hash || 'fehlt').slice(0, 20)}) ist nicht da oder passt nicht zu `
++        + `dieser Stadt.${kiWahl.ordnerText ? ' ' + kiWahl.ordnerText : ''} Es entscheiden die Regeln (Rückfall). Liegt sie wieder in ki/, im Fenster „Entscheidungen der `
++        + 'Bewohner“ neu wählen.';
+     kiPolicyAnzeigen();
+     if (!still) meldung(kiWahl.hinweis, 'warnung');
+   }
+@@ -15155,7 +15209,9 @@
+   if (!kiWahlSetzen('policy', wahl)) {                     // nichts Gültiges: Regeln bleiben, sichtbar
+     kiWahl.hinweis = 'Umschalten auf die Policy nicht möglich.';
+     kiPolicyAnzeigen();
+-    meldung(`${kiWahl.ordnerText || 'Keine gültige Policy in ki/.'} Umschalten nicht möglich, es entscheiden weiter die Regeln.`, 'warnung');
++    const alt = kiWahl.fehler.some(f => f.includes('(neu trainieren)'));   // abgelehnt, weil auf eine ältere Stadt-Version trainiert
++    meldung(`${kiWahl.ordnerText || `Keine gültige Policy in ki/${alt ? ' (die vorhandene ist auf eine ältere Stadt-Version trainiert: neu trainieren)' : ''}.`} `
++      + 'Umschalten nicht möglich, es entscheiden weiter die Regeln.', 'warnung');
+   }
+   speichern();
+ });
+@@ -17524,7 +17580,7 @@
+     S = l.S; akku = 0; buchNeu(); if (G) { G.neueStadt(); }
+     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
+     nachSchritten();                                      // erst zeichnen: wirft es, bleibt die alte Stadt
+-    kiWahlAusUi(l.ui, true);                              // KI-Policy (Etappe 1): Modellwahl aus dem Spielstand (fehlt sie: Regeln, Hinweis unten)
++    kiWahlAusUi(l.ui, true, migriert);                    // KI-Policy (Etappe 1): Modellwahl aus dem Spielstand (fehlt sie: Regeln, Hinweis unten)
+     speichernErlaubt = true; speichern();
+     $('einst-dialog').close();
+     meldung((migriert ? `Spielstand von Version ${migriert} übernommen: Tag ${S.tag}, ${zahl(S.einwohner)} Einwohner. ${NEU_SEIT(migriert)}`
+@@ -17562,7 +17618,7 @@
+     ki.gesendet.clear(); ki.gespraech = null; ki.aufholen.length = 0; hauptSchluessel = '';
+     if (typeof l.tempo === 'number') tempo = tempoAus(l.tempo);
+     nachSchritten();
+-    kiWahlAusUi(l.ui, true);                              // eine Policy aus Version 9 passt nicht mehr (neu trainieren): Regeln, Hinweis in der Meldung
++    kiWahlAusUi(l.ui, true, vonVersion);                  // eine Policy aus Version 9 passt nicht mehr (neu trainieren): Regeln, Hinweis in der Meldung
+     alterSpielstand = null; speichernErlaubt = true; speichern();
+     $('version-dialog').close();
+     setzeTempo(tempo);

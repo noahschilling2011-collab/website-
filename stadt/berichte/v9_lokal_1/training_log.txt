@@ -1,0 +1,26 @@
+start 2026-09-29T02:50:57.541049075Z
+Normalisierung aus 128 Regel-Episoden auf Trainingsseeds …
+Regelarm auf den Validierungsepisoden (Vergleichswert) …
+  Regeln: Defizit Ø 42.59, Rückgabe Ø 15.57
+Training lokal_v9: Ziel 155648 Schritte, höchstens 26 min, Lauf v9_lokal_1
+  Validierung bei 8192 Schritten: Defizit Ø 42.46, Rückgabe Ø 13.72  (bester)
+  Validierung bei 16384 Schritten: Defizit Ø 36.36, Rückgabe Ø 16.34  (bester)
+  Validierung bei 24576 Schritten: Defizit Ø 38.13, Rückgabe Ø 15.06
+  Validierung bei 32768 Schritten: Defizit Ø 39.47, Rückgabe Ø 14.89
+  Validierung bei 40960 Schritten: Defizit Ø 36.95, Rückgabe Ø 16.43
+  Validierung bei 49152 Schritten: Defizit Ø 33.21, Rückgabe Ø 17.01  (bester)
+  Validierung bei 57344 Schritten: Defizit Ø 32.29, Rückgabe Ø 17.55  (bester)
+  Validierung bei 65536 Schritten: Defizit Ø 33.51, Rückgabe Ø 18.23
+  Validierung bei 73728 Schritten: Defizit Ø 34.56, Rückgabe Ø 18.65
+  Validierung bei 81920 Schritten: Defizit Ø 31.03, Rückgabe Ø 19.20  (bester)
+  Validierung bei 90112 Schritten: Defizit Ø 31.18, Rückgabe Ø 18.44
+  Validierung bei 98304 Schritten: Defizit Ø 29.84, Rückgabe Ø 19.30  (bester)
+  Validierung bei 106496 Schritten: Defizit Ø 28.38, Rückgabe Ø 19.99  (bester)
+  Validierung bei 114688 Schritten: Defizit Ø 27.85, Rückgabe Ø 19.77  (bester)
+  Validierung bei 122880 Schritten: Defizit Ø 30.54, Rückgabe Ø 20.04
+  Validierung bei 131072 Schritten: Defizit Ø 29.02, Rückgabe Ø 20.31
+  Validierung bei 139264 Schritten: Defizit Ø 29.07, Rückgabe Ø 20.58
+  Validierung bei 147456 Schritten: Defizit Ø 28.75, Rückgabe Ø 20.35
+  Validierung bei 155648 Schritten: Defizit Ø 27.84, Rückgabe Ø 20.92  (bester)
+Fertig: fertig, 155648 Schritte in 1399 s, Parameteränderung (L2) 14.4946, Lauf /tmp/claude-0/-home-user-website-/584133fa-a5fc-563e-807a-2feca85efaf0/scratchpad/ml/v9/training/laeufe/v9_lokal_1
+ende 2026-09-29T03:15:59.624806886Z exit 0 wandzeit_aussen_s 1502.079648298

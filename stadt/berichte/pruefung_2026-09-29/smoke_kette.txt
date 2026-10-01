@@ -1,0 +1,27 @@
+== smoke
+  Regeln: Defizit Ø 48.75, Rückgabe Ø 13.79
+Training smoke: Ziel 2048 Schritte, höchstens 6 min, Lauf smoke_probe (PID 20759; stoppen mit Strg+C oder kill 20759)
+  Validierung bei 1024 Schritten: Defizit Ø 68.21, Rückgabe Ø 8.61  (bester)
+  Validierung bei 2048 Schritten: Defizit Ø 68.85, Rückgabe Ø 4.97
+  Validierung bei 2048 Schritten: Defizit Ø 71.55, Rückgabe Ø 4.08
+Fertig: fertig, 2048 Schritte in 20 s, Parameteränderung (L2) 1.7266, Lauf <stadt>/training/laeufe/smoke_probe
+== gleicher Name
+trainiere.py: error: Lauf „smoke_probe“ gibt es schon (<stadt>/training/laeufe/smoke_probe): anderen --name wählen oder mit --fortsetzen <stadt>/training/laeufe/smoke_probe weitermachen
+exit 2
+== fortsetzen
+Training smoke: Ziel 4096 Schritte, höchstens 6 min, Lauf smoke_probe (PID 20794; stoppen mit Strg+C oder kill 20794)
+  Validierung bei 3072 Schritten: Defizit Ø 71.97, Rückgabe Ø 3.92
+  Validierung bei 4096 Schritten: Defizit Ø 68.03, Rückgabe Ø 4.97  (bester)
+Fertig: fertig, 4096 Schritte in 23 s, Parameteränderung (L2) 3.1001, Lauf <stadt>/training/laeufe/smoke_probe
+status fertig | schritte 4096 | fortsetzungen [(2048, 4096, True)]
+letzter: manifest 4096 8b401bc20cb68ba6 | datei 4096 8b401bc20cb68ba6 | PASST
+bester: manifest 4096 f77cbda2f6bdc3cf | datei 4096 f77cbda2f6bdc3cf | PASST | val 68.03
+_zustand bester 4096 abbruch None
+== export
+exportiert: <stadt>/ausgabe/policy_smoke_probe_bester.json (107390 Byte), Hash 56ac00344ee56426, Schema e85eca0c, Schichten [64, 64, 13], Status experimentell
+== paritaet
+geschrieben: ausgabe/paritaet_smoke_probe.json (644 Fälle: {'echt': 240, 'kuenstlich': 150, 'nur_warten': 10, 'rand': 244})
+ok   Logits: größte Abweichung 6.23e-8 (Toleranz 0.0001) über 644 Fälle
+ok   Aktion gleich in 644 von 644 Fällen, 0 Gleichstände (≤ 0.0001), 0 echte Unterschiede; echt 240/240, kuenstlich 150/150, nur_warten 10/10, rand 244/244
+ok   tanh aus Grundrechenarten gegen Math.tanh: größte Abweichung 3.33e-16 (−25…25, Schritt 0,001, Randwerte)
+Parität bestanden

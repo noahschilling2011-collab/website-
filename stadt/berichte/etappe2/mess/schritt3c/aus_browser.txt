@@ -1,0 +1,31 @@
+ 23:23:11 up  1:08,  0 user,  load average: 1.63, 3.17, 3.57
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: <repo>; Ausgabe: SP/ml/e2bau/mess/schritt3c/aus_browser
+Seitenserver: python3 -m http.server 9092 (PID 12385), Wurzel SP/ml/e2bau/tmp/kopie_aus_browser
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+=== erweiterung
+exit 0, OK 20 (Soll 20), FEHL 0, 32 s → grün
+=== militaer
+exit 0, OK 16 (Soll 16), FEHL 0, 41 s → grün
+=== ereignis
+exit 0, OK 21 (Soll 21), FEHL 0, 19 s → grün
+=== p8tech
+exit 0, OK 15 (Soll 15), FEHL 0, 20 s → grün
+=== autos_bild
+exit 0, OK 20 (Soll 20), FEHL 0, 114 s → grün
+=== raute_klick
+exit 0, OK 8 (Soll 8), FEHL 0, 11 s → grün
+=== otest/befunde
+exit 0, OK 21 (Soll 21), FEHL 0, 54 s → grün
+Seitenserver PID 12385 beendet
+
+Zusammenfassung (2026-09-30 23:28, PORT 9092, 4 min):
+erweiterung        grün exit 0   OK  20 /  20  FEHL 0     32 s
+militaer           grün exit 0   OK  16 /  16  FEHL 0     41 s
+ereignis           grün exit 0   OK  21 /  21  FEHL 0     19 s
+p8tech             grün exit 0   OK  15 /  15  FEHL 0     20 s
+autos_bild         grün exit 0   OK  20 /  20  FEHL 0    114 s
+raute_klick        grün exit 0   OK   8 /   8  FEHL 0     11 s
+otest/befunde      grün exit 0   OK  21 /  21  FEHL 0     54 s
+ALLES GRÜN
+ 23:28:02 up  1:12,  0 user,  load average: 3.66, 3.84, 3.78

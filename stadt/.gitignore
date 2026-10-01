@@ -1,0 +1,25 @@
+# Python: eigene Umgebung fürs Training (docs/EXPERIMENTE.md), nie im Repo
+.venv
+venv/
+__pycache__/
+*.pyc
+
+# Trainingsläufe mit Checkpoints bleiben lokal; was davon ins Repo gehört, steht in berichte/ und ki/
+training/laeufe/
+# Smoke-Läufe prüfen nur die Kette (docs/EXPERIMENTE.md): ihre Berichte und Policies gehören nicht ins Repo
+berichte/smoke_*/
+ki/policy_smoke_*.json
+*.zip
+*.npz
+
+# Paritätsdaten (je Policy gut 1 MB), erzeugte Ausgaben, Logs, Testbilder
+ki/paritaet_*.json
+ausgabe/
+tests/ausgabe/
+*.png
+*.log
+# außer den Logs, die in berichte/ als Beleg liegen (Etappe 2: Browser-Tests, Schlussmessung; berichte/etappe2/LIESMICH.md)
+!berichte/**/*.log
+
+# Version 8 für simtest (git show 31ce452:stadt/stadt.html; tools/simtest_alle.sh legt sie nur in einem Temp-Ordner an)
+stadt.orig.html

@@ -1,0 +1,58 @@
+Seed 1
+  ok   5 Hauptfiguren beim Start
+  ok   Gehirn ⊆ erlaubte Aktionen (15493 Entscheidungen geprüft, 0 abweichend)
+  ok   Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (287 Leute mit Arbeit, davon 11 im Bauhof, 53 in Tech-Firmen, 1 im Wehr- oder Ersatzdienst, 0 falsch)
+  ok   750 Anfragen in 60 Tagen (gültig 496, ungültig 71, ohne Antwort 183, abgelaufen 183)
+  ok   höchstens 3 Anfragen je Figur und Tag
+  ok   keine Antwort auf eine nicht mehr offene Anfrage (0)
+  ok   Tagebuch: „geklappt“ steht im gespeicherten Eintrag (491 geklappt, davon 144× freinehmen; 0 falsch)
+  ok   Tagebücher höchstens 30 Einträge (30, 30, 30, 30, 30, 30)
+  ok   späte Antwort auf Anfrage 764 verworfen, neue Anfrage 770 bleibt offen
+  ok   nicht gesendete Anfrage 771: sofort normal entschieden, „zu spät“ 196 → 197, keine Anfrage der Figur mehr offen
+  ok   11. Hauptfigur wird abgelehnt (10 Hauptfiguren)
+  ok   Gespräch: Ziel freunde → besserer_job, Erinnerung „mit Noah geredet“, Tagebuch „Wie geht es dir?“
+  ok   schon erreichtes Ziel „ruhe“ abgelehnt (Ziel bleibt besserer_job)
+  ok   Code nur für Programmierende (Felix Kraus), bleibt nach Speichern/Laden
+  ok   Verlust gemeldet: Uwe Wagner (tod), Vorschläge: Johanna Weber (partner), Anton Weber (kind)
+  ok   Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen
+  ok   Hauptfigur Frieda Kraus ohne Kita-Platz für Aylin Walter: erlaubt nichts; Anfrage keine (nichts erlaubt); „bleibt bei Aylin Walter zu Hause, kein Kita-Platz frei“; mit freiem Platz: job_suchen wieder erlaubt
+Seed 2
+  ok   5 Hauptfiguren beim Start
+  ok   Gehirn ⊆ erlaubte Aktionen (16899 Entscheidungen geprüft, 0 abweichend)
+  ok   Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (318 Leute mit Arbeit, davon 7 im Bauhof, 26 in Tech-Firmen, 1 im Wehr- oder Ersatzdienst, 0 falsch)
+  ok   630 Anfragen in 60 Tagen (gültig 447, ungültig 51, ohne Antwort 132, abgelaufen 132)
+  ok   höchstens 3 Anfragen je Figur und Tag
+  ok   keine Antwort auf eine nicht mehr offene Anfrage (0)
+  ok   Tagebuch: „geklappt“ steht im gespeicherten Eintrag (445 geklappt, davon 151× freinehmen; 0 falsch)
+  ok   Tagebücher höchstens 30 Einträge (30, 30, 30, 30, 30)
+  ok   späte Antwort auf Anfrage 643 verworfen, neue Anfrage – bleibt offen
+  ok   nicht gesendete Anfrage 648: sofort normal entschieden, „zu spät“ 143 → 144, keine Anfrage der Figur mehr offen
+  ok   11. Hauptfigur wird abgelehnt (10 Hauptfiguren)
+  ok   Gespräch: Ziel freunde → besserer_job, Erinnerung „mit Noah geredet“, Tagebuch „Wie geht es dir?“
+  ok   schon erreichtes Ziel „ruhe“ abgelehnt (Ziel bleibt besserer_job)
+  ok   Code nur für Programmierende (Mats Jung), bleibt nach Speichern/Laden
+  ok   Verlust gemeldet: Tilda Werner (weg), Vorschläge: keine
+  ok   Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen
+  ok   Hauptfigur Maja Lange ohne Kita-Platz für Jakob Hartmann: erlaubt nichts; Anfrage keine (nichts erlaubt); „bleibt bei Jakob Hartmann zu Hause, kein Kita-Platz frei“; mit freiem Platz: job_suchen wieder erlaubt
+Seed 3
+  ok   5 Hauptfiguren beim Start
+  ok   Gehirn ⊆ erlaubte Aktionen (18781 Entscheidungen geprüft, 0 abweichend)
+  ok   Arbeitstext beginnt mit „arbeitet als“ oder „besitzt“ (343 Leute mit Arbeit, davon 29 im Bauhof, 25 in Tech-Firmen, 1 im Wehr- oder Ersatzdienst, 0 falsch)
+  ok   750 Anfragen in 60 Tagen (gültig 538, ungültig 71, ohne Antwort 141, abgelaufen 141)
+  ok   höchstens 3 Anfragen je Figur und Tag
+  ok   keine Antwort auf eine nicht mehr offene Anfrage (0)
+  ok   Tagebuch: „geklappt“ steht im gespeicherten Eintrag (537 geklappt, davon 165× freinehmen; 0 falsch)
+  ok   Tagebücher höchstens 30 Einträge (30, 30, 30, 30, 30, 30)
+  ok   späte Antwort auf Anfrage 764 verworfen, neue Anfrage 770 bleibt offen
+  ok   nicht gesendete Anfrage 773: sofort normal entschieden, „zu spät“ 156 → 157, keine Anfrage der Figur mehr offen
+  ok   11. Hauptfigur wird abgelehnt (10 Hauptfiguren)
+  ok   Gespräch: Ziel besserer_job → freunde, Erinnerung „mit Noah geredet“, Tagebuch „Wie geht es dir?“
+  ok   schon erreichtes Ziel „ruhe“ abgelehnt (Ziel bleibt freunde)
+  ok   Code nur für Programmierende (Paul Herrmann), bleibt nach Speichern/Laden
+  ok   Verlust gemeldet: Stefan Wagner (tod), Vorschläge: keine
+  ok   Speichern/Laden behält Hauptfiguren, Tagebücher, Anfragen
+  ok   Hauptfigur Hannes König ohne Kita-Platz für Hannes König: erlaubt nichts; Anfrage keine (nichts erlaubt); „bleibt bei Hannes König zu Hause, kein Kita-Platz frei“; mit freiem Platz: job_suchen wieder erlaubt
+  ok   Anweisungen ans Sprachmodell (Sicherheit): 3 Opfer, 6 Anweisungen mit „…weißt du nicht, und du verdächtigst niemanden“ (0 ohne), Name des Täters 0-mal darin; Täter: „Gegen dich läuft ein Strafverfahren wegen Diebstahls; das Urteil kommt an Tag 303.“, U-Haft: „Du bist in Untersuchungshaft in der Justizvollzugsanstalt in der Stadt, bis das Gericht urteilt.“, Strafhaft: „Du bist in Strafhaft in der Justizvollzugsanstalt in der Stadt, noch bis Tag 308; du arbeitest dort.“
+  ok   Antworten ans Sprachmodell: 29 Fälle (Opfer Mats Şahin), 0 falsch beurteilt; „Mehmet Koch hat mich bestohlen“ als Entscheidung verworfen: true; Obhut: „der einzige Erwachsene in ihrem Haushalt ist in Haft“, „alle Erwachsenen in ihrem Haushalt sind in Haft“
+  ok   Bürgermeister: 8 Sätze, 0 falsch beurteilt; „Ich wähle die CDU.“ als Entscheidung beim Amt verworfen, bei anderen nicht; Anweisung nennt die Neutralität
+Alle KI-Prüfungen bestanden

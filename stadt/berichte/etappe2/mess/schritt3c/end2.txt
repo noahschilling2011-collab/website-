@@ -1,0 +1,23 @@
+Playwright 1.56.1 (/opt/node22/lib/node_modules/playwright); Chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+Three.js: lokal SP/three/package; Git für alte Fassungen: <repo>; Ausgabe: SP/ml/e2bau/mess/schritt3c/end2
+Seitenserver: python3 -m http.server 9092 (PID 13570), Wurzel SP/ml/e2bau/stadt
+KI: auf 11434 läuft schon ein KI-Nachbau (test-modell), bleibt unberührt
+=== gedaechtnis
+exit 0, OK 15 (Soll 15), FEHL 0, 60 s → grün
+=== otest/handy
+exit 0, OK 11 (Soll 11), FEHL 0, 27 s → grün
+=== otest/breiten
+exit 0, OK 20 (Soll 20), FEHL 0, 49 s → grün
+=== s2karten
+exit 0, OK 22 (Soll 22), FEHL 0, 51 s → grün
+=== befunde_s2
+exit 0, OK 27 (Soll 27), FEHL 0, 60 s → grün
+Seitenserver PID 13570 beendet
+
+Zusammenfassung (2026-09-30 23:34, PORT 9092, 4 min):
+gedaechtnis        grün exit 0   OK  15 /  15  FEHL 0     60 s
+otest/handy        grün exit 0   OK  11 /  11  FEHL 0     27 s
+otest/breiten      grün exit 0   OK  20 /  20  FEHL 0     49 s
+s2karten           grün exit 0   OK  22 /  22  FEHL 0     51 s
+befunde_s2         grün exit 0   OK  27 /  27  FEHL 0     60 s
+ALLES GRÜN

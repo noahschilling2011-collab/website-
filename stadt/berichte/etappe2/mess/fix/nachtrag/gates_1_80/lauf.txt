@@ -1,0 +1,2 @@
+E/frisch_ich (stadt.html aad98691cb689361,   ERF_HALB: 180,   GED: 1, GED_STAERKE: 1.5,), Seeds 1–80, 2 Prozesse, Start 04:37:00 uptime:: 1.23, 2.16, 2.67 fremde>20%: 0
+Ende 04:38:27

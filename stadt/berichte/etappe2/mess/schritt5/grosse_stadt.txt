@@ -1,0 +1,1 @@
+Schritt 5: große Stadt wie ?debug&umland=300000&tage=750&seed=2 (neueStadt, stündlich bis Tag 750), sim 386c5ec814feb302, Version 10: Tag 750, 7159 Einwohner, Karte 144 × 144 Felder

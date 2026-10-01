@@ -1,0 +1,27 @@
+  ok   Abschnitt „Autos“ (433 Zeilen): Zufall nur aus dem eigenen Strom (zufallAuto), sonst 0
+  ok   Regeln lesen nur ihre Personenfelder (36 Funktionen), keine Namen, kein Geschlecht (Stadtbuch-Zeilen ausgenommen)
+  ok   Reihenfolge der Käufer je Tag gemischt (mischSchritt, jede Nummer genau einmal: true; an 1 von 200 Tagen reine Rotation)
+  ok   Geschlecht nur fürs Pronomen in der Zeile zum ersten Auto (autoKaufZeile)
+  ok   Namenstausch (Seed 2, 450 Tage, 749 Autos): „Mats Jung“ heißt dort „David Braun“, die Stadt läuft trotzdem bitgleich (e45c247be86141c5)
+  ok   Seed 1: 730 Nächte, 17496 Stunden: 2624 Käufe (277 aus dem Umland, der erste an Tag 15), 750435 Fahrten (20 Umzüge mit Auto, 0 Sprünge ohne Umzug, davon 0 neue Stelle nah der Wohnung), 1836 Testfahrten, 3 Umzüge ins Werk, 34 Eröffnungen, höchstens 2 Werke (AUTO_MAX 2), an 0 Nächten ruhende Stellen, 2 Werkskarten an Tag 730
+  ok   Seed 1: Autos aus dem Umland ab Tag 0, das erste lange vor dem ersten Werk (Tag 15, Werk ab Tag 232)
+  ok   Seed 2: 730 Nächte, 17496 Stunden: 2300 Käufe (739 aus dem Umland, der erste an Tag 31), 701590 Fahrten (23 Umzüge mit Auto, 0 Sprünge ohne Umzug, davon 0 neue Stelle nah der Wohnung), 1246 Testfahrten, 2 Umzüge ins Werk, 31 Eröffnungen, höchstens 2 Werke (AUTO_MAX 2), an 0 Nächten ruhende Stellen, 2 Werkskarten an Tag 730
+  ok   Seed 2: Autos aus dem Umland ab Tag 0, das erste lange vor dem ersten Werk (Tag 31, Werk ab Tag 323)
+  ok   Seed 3: 730 Nächte, 17496 Stunden: 2438 Käufe (212 aus dem Umland, der erste an Tag 25), 743806 Fahrten (29 Umzüge mit Auto, 1 Sprünge ohne Umzug, davon 0 neue Stelle nah der Wohnung), 1748 Testfahrten, 4 Umzüge ins Werk, 32 Eröffnungen, höchstens 2 Werke (AUTO_MAX 2), an 0 Nächten ruhende Stellen, 1 Werkskarten an Tag 730
+  ok   Seed 3: Autos aus dem Umland ab Tag 0, das erste lange vor dem ersten Werk (Tag 25, Werk ab Tag 205)
+  ok   Grundregel wie im Bild (Seeds 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, je 730 Tage stündlich, Autoort und Ort des Besitzers aus der Vorstunde gemerkt): 8395734 Fahrten, alle mit Abfahrt und Ziel beim Besitzer (davon 174 in Umzugsstunden); 39 Sprünge ohne Fahrt (38 Umzug, 1 neue Stelle oder Baustelle mitten am Tag, 0 sonst); 16046 Testfahrten ohne eigenes Auto
+       Faire Reihenfolge (natürlich, Tage mit Werk): mittlere Personennummer (Anteil) aus dem Werk 0.512 (6134), aus dem Umland 0.567 (38) — zu wenige Käufe von außen, nur gemessen
+  ok   Faire Reihenfolge (erzwungen ausverkauft, Seed 2, Tag 335–485, 145 Tage mit Werk): mittlere Personennummer (Anteil) aus dem Werk 0.511 (239), aus dem Umland 0.517 (694), erlaubt ±0.076
+  ok   Faire Reihenfolge (erzwungen ausverkauft, Seed 4, Tag 627–777, 150 Tage mit Werk): mittlere Personennummer (Anteil) aus dem Werk 0.523 (392), aus dem Umland 0.533 (714), erlaubt ±0.064
+  ok   Erbe: Paula Fischer erbt den Kiwi Brise 2 (verschrottet an Tag 783)
+  ok   Geldnot: nach 5 Nächten im Minus verkauft, 315 Taler Restwert von außen
+  ok   Haft: das Auto ruht an der Wohnung, ohne Kosten und ohne Fahrt
+  ok   AUTO_MAX bei Übernahme: Mit 1 laufenden Werken und AUTO_MAX = 1 nimmt weder eine Gründung (false) noch eine Firma das leere Werk (Ziel 4); mit einem Platz mehr ginge beides (true, Ziel 9)
+  ok   Ruhende Stellen erzwungen (Seed 2, Tag 400–460 mit 7.9 % statt 40 %): bis 17 ruhend, Anteil höchstens 7.9 % in 60 Nächten, offene und freie Stellen stimmen, niemand in einer ruhenden Stelle; 10 Tage nach der Rückkehr auf 40 % ruhen 0; Speichern mit ruhenden Stellen, 20 Tage weiter: bitgleich
+  ok   Speichern mitten im Werksbau (Seed 2, Tag 323, 13 Uhr, Werk 164, 651 Autos): direkt gleich, 60 Tage weiter über den Umzug hinweg bitgleich
+  ok   Beschädigte Stände abgelehnt (11 Fälle)
+       Seed 1 an Tag 730: 856 Autos, 527 je 1.000 Einwohner, 80.6 % der Haushalte, 111 je 100 Haushalte, 48.5 % der Arbeitstage mit dem Auto; Werke bestellt 2, übernommen 1, Umzüge 3; gebaut 6676, davon ans Umland 65 %; aus dem Umland gekauft 277; Stufen 0/17/5/3/0/4
+       Seed 2 an Tag 730: 722 Autos, 515 je 1.000 Einwohner, 80.5 % der Haushalte, 109 je 100 Haushalte, 49.0 % der Arbeitstage mit dem Auto; Werke bestellt 2, übernommen 1, Umzüge 2; gebaut 4257, davon ans Umland 63 %; aus dem Umland gekauft 739; Stufen 0/17/5/3/1/2
+       Seed 3 an Tag 730: 720 Autos, 493 je 1.000 Einwohner, 77.0 % der Haushalte, 104 je 100 Haushalte, 47.8 % der Arbeitstage mit dem Auto; Werke bestellt 2, übernommen 2, Umzüge 4; gebaut 7799, davon ans Umland 71 %; aus dem Umland gekauft 212; Stufen 0/14/3/3/4/2
+       Vergleich: Destatis (22. 7. 2026) 593 Pkw je 1.000 Einwohner; Destatis (LWR 2024) 77,9 % der Haushalte, 111,5 je 100 Haushalte; Pendeln 2024: 65 % mit dem Auto; VDA 2025: 76 % Export
+Alle Auto-Prüfungen bestanden
