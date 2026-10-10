@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Runs every headless test suite of the project and prints one summary line per suite.
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT"
+# RUNALL_TAG=<name>: run in a private sandbox copy (generated test trees never race with other agents)
+# RUNALL_SRC=<dir>: test that source tree instead of work/src (sandbox mode only)
+if [ -n "${RUNALL_TAG:-}" ]; then
+  SB="$ROOT/agents/$RUNALL_TAG/sandbox"
+  python3 "$ROOT/tests/lead/sandbox.py" "$ROOT" "$SB" ${RUNALL_SRC:-} || exit 1
+  cd "$SB"
+fi
+L=tools/luau
+run() { local name="$1"; shift; local out; out=$("$@" 2>&1); local rc=$?; printf "%-22s rc=%s  %s\n" "$name" "$rc" "$(echo "$out" | grep -E "passed|failed|SUMMARY|orphanDoors" | tail -n 1)"; }
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_lift >/dev/null
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_leadtest >/dev/null
+python3 tests/gen_layout_test.py >/dev/null 2>&1
+python3 tests/gen_door_test.py >/dev/null 2>&1
+python3 people_harness/mkharness.py >/dev/null
+python3 staff_harness/mkharness.py >/dev/null
+run layout            $L tests/layout_test.luau
+run door_service      $L tests/door_service_test.luau
+run lift_logic        $L tests/lift_logic.luau
+run lift_service      $L tests/lift_service.luau
+run lift_ui           $L tests/lift_ui.luau
+run snapshot          $L tests/lead/test_snapshot.luau
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_net >/dev/null
+run net_patch         $L tests/net/test_patch.luau
+run net               $L tests/net/test_net.luau
+run net_e2e           $L tests/net/test_e2e.luau
+run people            $L people_harness/test_people.luau
+run people_client     $L people_harness/test_client.luau
+run people_real       $L people_harness/test_real.luau
+for t in 1 2 3 4; do run "staff_t$t" $L staff_harness/test_staff.luau -a "$t"; done
+run staff_sim         $L staff_harness/test_sim.luau -a 4
+python3 harness/make_manifest.py --gen agents/screens/gen >/dev/null
+run screens_fake      $L agents/screens/test_screens.luau -a fake
+run screens_real      $L agents/screens/test_screens.luau -a real
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_talk >/dev/null
+run talk_dialogue     $L tests/talk/test_dialogue.luau -a .gen_talk --quiet
+run talk              $L tests/talk/test_talk.luau -a .gen_talk
+run talk_client       $L tests/talk/test_client.luau -a .gen_talk
+run talk_real         $L tests/talk/test_real.luau -a .gen_talk 2
+python3 tests/life/mkharness.py >/dev/null
+run life_props        $L tests/life/test_props.luau
+run life_client       $L tests/life/test_client.luau
+for t in 1 2 3 4; do run "life_t$t" $L tests/life/test_life.luau -a "$t"; done
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_shop >/dev/null
+run shop              bash -c 'cd tests/shop && ../../tools/luau test_shop.luau -a .gen_shop'
+run shop_client       bash -c 'cd tests/shop && ../../tools/luau test_client.luau -a .gen_shop'
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_world >/dev/null
+for t in cityplan build travel vehicle client; do run "world_$t" $L tests/world/test_$t.luau -a .gen_world; done
+python3 tests/buildings/mkharness.py >/dev/null
+run buildings_tier0   $L tests/buildings/test_tier0.luau
+run buildings_build   $L tests/buildings/test_build.luau -a all
+run buildings_admin   $L tests/buildings/test_admin.luau
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_corefix >/dev/null
+for t in ops b2b service migration net; do run "econ_$t" bash -c "cd tests/econ && ../../tools/luau test_$t.luau -a .gen_corefix"; done
+run corefix           bash -c "cd tests/corefix && ../../tools/luau test_corefix.luau -a .gen_corefix"
+run corefix_ui        bash -c "cd tests/corefix && ../../tools/luau test_ui.luau -a .gen_corefix"
+run models            bash tests/models/run.sh
