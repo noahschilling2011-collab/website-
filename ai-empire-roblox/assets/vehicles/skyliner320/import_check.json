@@ -1,0 +1,1365 @@
+{
+  "fbx": {
+    "object_count": 34,
+    "bbox_size_studs": {
+      "span_X": 127.853,
+      "height_Y": 42.143,
+      "length_Z": 134.179
+    },
+    "bbox_size_m": {
+      "span": 35.799,
+      "height": 11.8,
+      "length": 37.57
+    },
+    "min_height_studs": 0.0,
+    "nose_direction": "-Y blender",
+    "total_triangles": 31224,
+    "mismatches_vs_manifest": [],
+    "max_triangles_single_object": 7668,
+    "objects": {
+      "Aileron_L": {
+        "triangles": 36,
+        "pivot_roblox": [
+          -50.795,
+          14.183,
+          7.568
+        ],
+        "signed_volume_studs3": 5.354,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Aileron_R": {
+        "triangles": 36,
+        "pivot_roblox": [
+          50.795,
+          14.183,
+          7.568
+        ],
+        "signed_volume_studs3": 5.354,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "CockpitWindows": {
+        "triangles": 536,
+        "pivot_roblox": [
+          -0.0,
+          16.071,
+          -58.875
+        ],
+        "signed_volume_studs3": 1.412,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Door_1L": {
+        "triangles": 764,
+        "pivot_roblox": [
+          -6.6,
+          15.728,
+          -50.536
+        ],
+        "signed_volume_studs3": 1.534,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Door_1R": {
+        "triangles": 764,
+        "pivot_roblox": [
+          6.6,
+          15.728,
+          -50.536
+        ],
+        "signed_volume_studs3": 1.534,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Door_2L": {
+        "triangles": 728,
+        "pivot_roblox": [
+          -6.437,
+          16.516,
+          36.929
+        ],
+        "signed_volume_studs3": 1.571,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Door_2R": {
+        "triangles": 728,
+        "pivot_roblox": [
+          6.437,
+          16.516,
+          36.929
+        ],
+        "signed_volume_studs3": 1.571,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Elevator_L": {
+        "triangles": 36,
+        "pivot_roblox": [
+          -12.589,
+          19.002,
+          59.055
+        ],
+        "signed_volume_studs3": 15.44,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Elevator_R": {
+        "triangles": 36,
+        "pivot_roblox": [
+          12.589,
+          19.002,
+          59.055
+        ],
+        "signed_volume_studs3": 15.44,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Engine_1": {
+        "triangles": 1940,
+        "pivot_roblox": [
+          -20.536,
+          6.429,
+          -25.089
+        ],
+        "signed_volume_studs3": 801.901,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Engine_2": {
+        "triangles": 1940,
+        "pivot_roblox": [
+          20.536,
+          6.429,
+          -25.089
+        ],
+        "signed_volume_studs3": 801.901,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Fan_1": {
+        "triangles": 848,
+        "pivot_roblox": [
+          -20.536,
+          6.429,
+          -25.089
+        ],
+        "signed_volume_studs3": 7.87,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Fan_2": {
+        "triangles": 848,
+        "pivot_roblox": [
+          20.536,
+          6.429,
+          -25.089
+        ],
+        "signed_volume_studs3": 7.87,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Flap_L_In": {
+        "triangles": 36,
+        "pivot_roblox": [
+          -14.882,
+          11.158,
+          -4.547
+        ],
+        "signed_volume_studs3": 76.582,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Flap_L_Out": {
+        "triangles": 36,
+        "pivot_roblox": [
+          -33.913,
+          12.751,
+          0.831
+        ],
+        "signed_volume_studs3": 35.864,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Flap_R_In": {
+        "triangles": 36,
+        "pivot_roblox": [
+          14.882,
+          11.158,
+          -4.547
+        ],
+        "signed_volume_studs3": 76.582,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Flap_R_Out": {
+        "triangles": 36,
+        "pivot_roblox": [
+          33.913,
+          12.751,
+          0.831
+        ],
+        "signed_volume_studs3": 35.864,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Fuselage": {
+        "triangles": 7668,
+        "pivot_roblox": [
+          -0.0,
+          0.0,
+          0.0
+        ],
+        "signed_volume_studs3": 17578.385,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "HStab_L": {
+        "triangles": 288,
+        "pivot_roblox": [
+          -3.393,
+          18.036,
+          47.446
+        ],
+        "signed_volume_studs3": 115.953,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "HStab_R": {
+        "triangles": 288,
+        "pivot_roblox": [
+          3.393,
+          18.036,
+          47.446
+        ],
+        "signed_volume_studs3": 115.953,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "MainGear_L": {
+        "triangles": 236,
+        "pivot_roblox": [
+          -13.554,
+          10.893,
+          -5.625
+        ],
+        "signed_volume_studs3": 12.104,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "MainGear_R": {
+        "triangles": 236,
+        "pivot_roblox": [
+          13.554,
+          10.893,
+          -5.625
+        ],
+        "signed_volume_studs3": 12.104,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "MainWheels_L": {
+        "triangles": 1120,
+        "pivot_roblox": [
+          -13.554,
+          2.086,
+          -3.839
+        ],
+        "signed_volume_studs3": 37.121,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "MainWheels_R": {
+        "triangles": 1120,
+        "pivot_roblox": [
+          13.554,
+          2.086,
+          -3.839
+        ],
+        "signed_volume_studs3": 37.121,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "NoseGear": {
+        "triangles": 192,
+        "pivot_roblox": [
+          -0.0,
+          8.75,
+          -48.982
+        ],
+        "signed_volume_studs3": 3.394,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "NoseWheels": {
+        "triangles": 896,
+        "pivot_roblox": [
+          -0.0,
+          1.361,
+          -48.982
+        ],
+        "signed_volume_studs3": 7.319,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Rudder": {
+        "triangles": 136,
+        "pivot_roblox": [
+          -0.0,
+          32.054,
+          57.784
+        ],
+        "signed_volume_studs3": 43.722,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "TailLogo": {
+        "triangles": 368,
+        "pivot_roblox": [
+          -0.0,
+          31.25,
+          52.732
+        ],
+        "signed_volume_studs3": 0.435,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Titles": {
+        "triangles": 2304,
+        "pivot_roblox": [
+          -0.0,
+          18.714,
+          -27.089
+        ],
+        "signed_volume_studs3": 0.926,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "VStab": {
+        "triangles": 588,
+        "pivot_roblox": [
+          -0.0,
+          21.214,
+          36.125
+        ],
+        "signed_volume_studs3": 289.117,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "WindowStrip_L": {
+        "triangles": 1968,
+        "pivot_roblox": [
+          -7.071,
+          16.429,
+          -6.732
+        ],
+        "signed_volume_studs3": 1.614,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "WindowStrip_R": {
+        "triangles": 1968,
+        "pivot_roblox": [
+          7.071,
+          16.429,
+          -6.732
+        ],
+        "signed_volume_studs3": 1.614,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Wing_L": {
+        "triangles": 1232,
+        "pivot_roblox": [
+          -7.071,
+          10.179,
+          -21.062
+        ],
+        "signed_volume_studs3": 981.189,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      },
+      "Wing_R": {
+        "triangles": 1232,
+        "pivot_roblox": [
+          7.071,
+          10.179,
+          -21.062
+        ],
+        "signed_volume_studs3": 981.189,
+        "non_manifold_edges": 0,
+        "has_vertex_colors": true,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "rotation_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ]
+      }
+    }
+  },
+  "obj": {
+    "object_count": 34,
+    "bbox_size_studs": {
+      "span_X": 127.853,
+      "height_Y": 42.143,
+      "length_Z": 134.179
+    },
+    "bbox_size_m": {
+      "span": 35.799,
+      "height": 11.8,
+      "length": 37.57
+    },
+    "min_height_studs": -0.0,
+    "nose_direction": "-Y blender",
+    "total_triangles": 31224
+  },
+  "fbx_raw": {
+    "global_settings": {
+      "UpAxis": 1,
+      "UpAxisSign": 1,
+      "FrontAxis": 2,
+      "FrontAxisSign": -1,
+      "CoordAxis": 0,
+      "CoordAxisSign": -1,
+      "UnitScaleFactor": 100.0
+    },
+    "bbox_min_studs": [
+      -63.927,
+      0.0,
+      -67.089
+    ],
+    "bbox_max_studs": [
+      63.927,
+      42.143,
+      67.089
+    ],
+    "bbox_size_studs": [
+      127.853,
+      42.143,
+      134.179
+    ],
+    "fuselage_nose_z_tail_z": [
+      -67.089,
+      67.089
+    ],
+    "orientation": "nose -Z, port wing -X, up +Y (matches Roblox: LookVector -Z, RightVector +X)",
+    "node_count": 34,
+    "problems": [],
+    "nodes": {
+      "Aileron_L": {
+        "translation": [
+          -50.795,
+          14.183,
+          7.568
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Aileron_R": {
+        "translation": [
+          50.795,
+          14.183,
+          7.568
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "CockpitWindows": {
+        "translation": [
+          0.0,
+          16.071,
+          -58.875
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Door_1L": {
+        "translation": [
+          -6.6,
+          15.728,
+          -50.536
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Door_1R": {
+        "translation": [
+          6.6,
+          15.728,
+          -50.536
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Door_2L": {
+        "translation": [
+          -6.437,
+          16.516,
+          36.929
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Door_2R": {
+        "translation": [
+          6.437,
+          16.516,
+          36.929
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Elevator_L": {
+        "translation": [
+          -12.589,
+          19.002,
+          59.055
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Elevator_R": {
+        "translation": [
+          12.589,
+          19.002,
+          59.055
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Engine_1": {
+        "translation": [
+          -20.536,
+          6.429,
+          -25.089
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Engine_2": {
+        "translation": [
+          20.536,
+          6.429,
+          -25.089
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Fan_1": {
+        "translation": [
+          -20.536,
+          6.429,
+          -25.089
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Fan_2": {
+        "translation": [
+          20.536,
+          6.429,
+          -25.089
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Flap_L_In": {
+        "translation": [
+          -14.882,
+          11.158,
+          -4.547
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Flap_L_Out": {
+        "translation": [
+          -33.913,
+          12.751,
+          0.831
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Flap_R_In": {
+        "translation": [
+          14.882,
+          11.158,
+          -4.547
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Flap_R_Out": {
+        "translation": [
+          33.913,
+          12.751,
+          0.831
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Fuselage": {
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "HStab_L": {
+        "translation": [
+          -3.393,
+          18.036,
+          47.446
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "HStab_R": {
+        "translation": [
+          3.393,
+          18.036,
+          47.446
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "MainGear_L": {
+        "translation": [
+          -13.554,
+          10.893,
+          -5.625
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "MainGear_R": {
+        "translation": [
+          13.554,
+          10.893,
+          -5.625
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "MainWheels_L": {
+        "translation": [
+          -13.554,
+          2.086,
+          -3.839
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "MainWheels_R": {
+        "translation": [
+          13.554,
+          2.086,
+          -3.839
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "NoseGear": {
+        "translation": [
+          0.0,
+          8.75,
+          -48.982
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "NoseWheels": {
+        "translation": [
+          0.0,
+          1.361,
+          -48.982
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Rudder": {
+        "translation": [
+          0.0,
+          32.054,
+          57.784
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "TailLogo": {
+        "translation": [
+          0.0,
+          31.25,
+          52.732
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Titles": {
+        "translation": [
+          0.0,
+          18.714,
+          -27.089
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "VStab": {
+        "translation": [
+          0.0,
+          21.214,
+          36.125
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "WindowStrip_L": {
+        "translation": [
+          -7.071,
+          16.429,
+          -6.732
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "WindowStrip_R": {
+        "translation": [
+          7.071,
+          16.429,
+          -6.732
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Wing_L": {
+        "translation": [
+          -7.071,
+          10.179,
+          -21.062
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "Wing_R": {
+        "translation": [
+          7.071,
+          10.179,
+          -21.062
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    }
+  }
+}

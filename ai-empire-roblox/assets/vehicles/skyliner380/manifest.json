@@ -1,0 +1,3945 @@
+{
+  "name": "Skyliner380",
+  "kind": "airliner",
+  "reference": "proportions of the Airbus A380-800 (generic model, no branding; developer documentation only - do not use this wording in game UI)",
+  "generated_by": "model.py (bpy 5.0.1)",
+  "units": {
+    "blender_unit": "1 Roblox stud",
+    "stud_in_m": 0.28,
+    "metres_to_studs": 3.571429,
+    "source": "https://create.roblox.com/docs/physics/units (1 stud = 28 cm)"
+  },
+  "axes": {
+    "roblox_model_space": "X = right/starboard, Y = up, -Z = forward (nose); right-handed",
+    "blender": "X = port(left), Y = aft, Z = up (nose points to -Y)",
+    "fbx_export": "axis_forward=Z, axis_up=Y, bake_space_transform=True, apply_scale_options=FBX_SCALE_UNITS",
+    "hinge_axes": "unit vectors in Roblox model space; positive angle = right-hand rule about the axis"
+  },
+  "joints": "Every movable object has \"parent\" (the part it is jointed to), pivot, hinge_axis_roblox and rotation_limits_deg. A child rotation is applied relative to its parent (Motor6D chain): wheels -> bogie -> leg -> Fuselage for the body gears, wheels -> leg -> Fuselage otherwise. Retracted pose = every object at its \"retracted_deg\" (legs +, body-gear bogies -90).",
+  "origin": "model origin = ground level (Y=0 at tyre contact), on the centreline, 35.50 m (126.79 studs) aft of the nose = centroid of the 20 main-gear wheels; this is the Model pivot when importing with \"Set Pivot to Scene Origin\"",
+  "dimensions_studs": {
+    "length": 259.73,
+    "wingspan": 284.82,
+    "height": 86.04
+  },
+  "dimensions_m": {
+    "length": 72.724,
+    "wingspan": 79.75,
+    "height": 24.091
+  },
+  "reference_dimensions_m": {
+    "length": 72.72,
+    "wingspan": 79.75,
+    "height": 24.09,
+    "fuselage_width": 7.14,
+    "fuselage_height": 8.41
+  },
+  "triangles_total": 59686,
+  "roblox_triangle_limit_per_mesh": 20000,
+  "max_triangles_single_mesh": 10416,
+  "problems": [],
+  "mesh_notes": {
+    "closed_shells_per_object": {
+      "WindowStrip_Main_L": 80,
+      "WindowStrip_Main_R": 80,
+      "WindowStrip_Upper_L": 65,
+      "WindowStrip_Upper_R": 65,
+      "WindowStrip_Cockpit": 6,
+      "Wing_L": 6,
+      "Flap_L_Inner": 3,
+      "Flap_L_Outer": 4,
+      "Wing_R": 6,
+      "Flap_R_Inner": 3,
+      "Flap_R_Outer": 4,
+      "TailLogo": 6,
+      "Titles_L": 11,
+      "Titles_R": 11,
+      "Engine_1": 3,
+      "Fan_1": 21,
+      "Engine_2": 3,
+      "Fan_2": 21,
+      "Engine_3": 3,
+      "Fan_3": 21,
+      "Engine_4": 3,
+      "Fan_4": 21,
+      "NoseGear": 4,
+      "NoseGear_Wheels": 2,
+      "MainGear_WL": 8,
+      "MainGear_WL_Wheels1": 2,
+      "MainGear_WL_Wheels2": 2,
+      "MainGear_BL": 3,
+      "MainGear_BL_Bogie": 7,
+      "MainGear_BL_Wheels1": 2,
+      "MainGear_BL_Wheels2": 2,
+      "MainGear_BL_Wheels3": 2,
+      "MainGear_WR": 8,
+      "MainGear_WR_Wheels1": 2,
+      "MainGear_WR_Wheels2": 2,
+      "MainGear_BR": 3,
+      "MainGear_BR_Bogie": 7,
+      "MainGear_BR_Wheels1": 2,
+      "MainGear_BR_Wheels2": 2,
+      "MainGear_BR_Wheels3": 2
+    },
+    "text": "Every object is closed (0 non-manifold edges) with outward normals. Fuselage is one shell: the belly fairing is boolean-unioned into the tube. Objects listed in closed_shells_per_object are built from several closed shells that may intersect each other inside the object (e.g. wing + flap-track fairings, nacelle + core + pylon, gear cylinders, window panes, letters)."
+  },
+  "objects": [
+    {
+      "name": "Fuselage",
+      "role": "fuselage incl. belly / wing-root fairing (boolean union, one closed shell)",
+      "triangles": 10416,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Fuselage",
+      "vertex_colors": [
+        "belly",
+        "gold",
+        "navy",
+        "white"
+      ],
+      "signed_volume_studs3": 130428.83,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": false,
+      "can_collide": true,
+      "pivot_studs_roblox": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 35.5,
+        "lateral_stbd": 0.0,
+        "height": 0.0
+      },
+      "bbox_size_studs_roblox": [
+        30.0,
+        32.177,
+        259.107
+      ]
+    },
+    {
+      "name": "WindowStrip_Main_L",
+      "role": "main-deck window row + dark door-opening plates",
+      "triangles": 2070,
+      "non_manifold_edges": 0,
+      "closed_shells": 80,
+      "material": "MAT_WindowGlass",
+      "vertex_colors": [
+        "glass"
+      ],
+      "signed_volume_studs3": 54.22,
+      "studio_fallback_color_rgb": [
+        13,
+        20,
+        31
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -12.746,
+        22.071,
+        -8.661
+      ],
+      "pivot_m_roblox": [
+        -3.569,
+        6.18,
+        -2.425
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 33.075,
+        "lateral_stbd": -3.569,
+        "height": 6.18
+      },
+      "bbox_size_studs_roblox": [
+        4.854,
+        6.894,
+        186.365
+      ]
+    },
+    {
+      "name": "WindowStrip_Main_R",
+      "role": "main-deck window row + dark door-opening plates",
+      "triangles": 2070,
+      "non_manifold_edges": 0,
+      "closed_shells": 80,
+      "material": "MAT_WindowGlass",
+      "vertex_colors": [
+        "glass"
+      ],
+      "signed_volume_studs3": 54.22,
+      "studio_fallback_color_rgb": [
+        13,
+        20,
+        31
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        12.746,
+        22.071,
+        -8.661
+      ],
+      "pivot_m_roblox": [
+        3.569,
+        6.18,
+        -2.425
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 33.075,
+        "lateral_stbd": 3.569,
+        "height": 6.18
+      },
+      "bbox_size_studs_roblox": [
+        4.854,
+        6.894,
+        186.365
+      ]
+    },
+    {
+      "name": "WindowStrip_Upper_L",
+      "role": "upper-deck window row + dark door-opening plates",
+      "triangles": 1582,
+      "non_manifold_edges": 0,
+      "closed_shells": 65,
+      "material": "MAT_WindowGlass",
+      "vertex_colors": [
+        "glass"
+      ],
+      "signed_volume_studs3": 42.23,
+      "studio_fallback_color_rgb": [
+        13,
+        20,
+        31
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -10.877,
+        31.964,
+        -3.571
+      ],
+      "pivot_m_roblox": [
+        -3.046,
+        8.95,
+        -1.0
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 34.5,
+        "lateral_stbd": -3.046,
+        "height": 8.95
+      },
+      "bbox_size_studs_roblox": [
+        3.786,
+        6.907,
+        153.772
+      ]
+    },
+    {
+      "name": "WindowStrip_Upper_R",
+      "role": "upper-deck window row + dark door-opening plates",
+      "triangles": 1582,
+      "non_manifold_edges": 0,
+      "closed_shells": 65,
+      "material": "MAT_WindowGlass",
+      "vertex_colors": [
+        "glass"
+      ],
+      "signed_volume_studs3": 42.23,
+      "studio_fallback_color_rgb": [
+        13,
+        20,
+        31
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        10.877,
+        31.964,
+        -3.571
+      ],
+      "pivot_m_roblox": [
+        3.046,
+        8.95,
+        -1.0
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 34.5,
+        "lateral_stbd": 3.046,
+        "height": 8.95
+      },
+      "bbox_size_studs_roblox": [
+        3.786,
+        6.907,
+        153.772
+      ]
+    },
+    {
+      "name": "WindowStrip_Cockpit",
+      "role": "cockpit windscreen + side panes",
+      "triangles": 824,
+      "non_manifold_edges": 0,
+      "closed_shells": 6,
+      "material": "MAT_WindowGlass",
+      "vertex_colors": [
+        "glass"
+      ],
+      "signed_volume_studs3": 14.57,
+      "studio_fallback_color_rgb": [
+        13,
+        20,
+        31
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        25.714,
+        -116.071
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        7.2,
+        -32.5
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 3.0,
+        "lateral_stbd": 0.0,
+        "height": 7.2
+      },
+      "bbox_size_studs_roblox": [
+        16.134,
+        3.28,
+        8.932
+      ]
+    },
+    {
+      "name": "Door_M1L",
+      "role": "passenger door M1L (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.96,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -10.338,
+        21.85,
+        -106.154
+      ],
+      "pivot_m_roblox": [
+        -2.895,
+        6.118,
+        -29.723
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 5.777,
+        "lateral_stbd": -2.895,
+        "height": 6.118
+      },
+      "bbox_size_studs_roblox": [
+        1.361,
+        6.96,
+        3.879
+      ],
+      "hinge_axis_roblox": [
+        -0.0634,
+        -0.998,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M1R",
+      "role": "passenger door M1R (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.96,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        10.338,
+        21.85,
+        -106.154
+      ],
+      "pivot_m_roblox": [
+        2.895,
+        6.118,
+        -29.723
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 5.777,
+        "lateral_stbd": 2.895,
+        "height": 6.118
+      },
+      "bbox_size_studs_roblox": [
+        1.361,
+        6.96,
+        3.879
+      ],
+      "hinge_axis_roblox": [
+        -0.0634,
+        0.998,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M2L",
+      "role": "passenger door M2L (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.67,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -12.9,
+        21.833,
+        -69.768
+      ],
+      "pivot_m_roblox": [
+        -3.612,
+        6.113,
+        -19.535
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 15.965,
+        "lateral_stbd": -3.612,
+        "height": 6.113
+      },
+      "bbox_size_studs_roblox": [
+        0.831,
+        6.949,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        0.0616,
+        -0.9981,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M2R",
+      "role": "passenger door M2R (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.67,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        12.9,
+        21.833,
+        -69.768
+      ],
+      "pivot_m_roblox": [
+        3.612,
+        6.113,
+        -19.535
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 15.965,
+        "lateral_stbd": 3.612,
+        "height": 6.113
+      },
+      "bbox_size_studs_roblox": [
+        0.831,
+        6.949,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        0.0616,
+        0.9981,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M3L",
+      "role": "passenger door M3L (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.67,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -12.9,
+        21.833,
+        -11.982
+      ],
+      "pivot_m_roblox": [
+        -3.612,
+        6.113,
+        -3.355
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 32.145,
+        "lateral_stbd": -3.612,
+        "height": 6.113
+      },
+      "bbox_size_studs_roblox": [
+        0.831,
+        6.949,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        0.0616,
+        -0.9981,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M3R",
+      "role": "passenger door M3R (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.67,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        12.9,
+        21.833,
+        -11.982
+      ],
+      "pivot_m_roblox": [
+        3.612,
+        6.113,
+        -3.355
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 32.145,
+        "lateral_stbd": 3.612,
+        "height": 6.113
+      },
+      "bbox_size_studs_roblox": [
+        0.831,
+        6.949,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        0.0616,
+        0.9981,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M4L",
+      "role": "passenger door M4L (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.67,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -12.9,
+        21.833,
+        31.089
+      ],
+      "pivot_m_roblox": [
+        -3.612,
+        6.113,
+        8.705
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 44.205,
+        "lateral_stbd": -3.612,
+        "height": 6.113
+      },
+      "bbox_size_studs_roblox": [
+        0.831,
+        6.949,
+        3.822
+      ],
+      "hinge_axis_roblox": [
+        0.0616,
+        -0.9981,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M4R",
+      "role": "passenger door M4R (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 8.67,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        12.9,
+        21.833,
+        31.089
+      ],
+      "pivot_m_roblox": [
+        3.612,
+        6.113,
+        8.705
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 44.205,
+        "lateral_stbd": 3.612,
+        "height": 6.113
+      },
+      "bbox_size_studs_roblox": [
+        0.831,
+        6.949,
+        3.822
+      ],
+      "hinge_axis_roblox": [
+        0.0616,
+        0.9981,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M5L",
+      "role": "passenger door M5L (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 9.83,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -11.87,
+        21.803,
+        62.858
+      ],
+      "pivot_m_roblox": [
+        -3.324,
+        6.105,
+        17.6
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 53.1,
+        "lateral_stbd": -3.324,
+        "height": 6.105
+      },
+      "bbox_size_studs_roblox": [
+        2.533,
+        6.982,
+        3.867
+      ],
+      "hinge_axis_roblox": [
+        0.2408,
+        -0.9706,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_M5R",
+      "role": "passenger door M5R (main deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 9.83,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        11.87,
+        21.803,
+        62.858
+      ],
+      "pivot_m_roblox": [
+        3.324,
+        6.105,
+        17.6
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 53.1,
+        "lateral_stbd": 3.324,
+        "height": 6.105
+      },
+      "bbox_size_studs_roblox": [
+        2.533,
+        6.982,
+        3.867
+      ],
+      "hinge_axis_roblox": [
+        0.2408,
+        0.9706,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_U1L",
+      "role": "passenger door U1L (upper deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 10.58,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -11.17,
+        31.729,
+        -53.911
+      ],
+      "pivot_m_roblox": [
+        -3.128,
+        8.884,
+        -15.095
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 20.405,
+        "lateral_stbd": -3.128,
+        "height": 8.884
+      },
+      "bbox_size_studs_roblox": [
+        3.792,
+        7.037,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        -0.4561,
+        -0.8899,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_U1R",
+      "role": "passenger door U1R (upper deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 10.58,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        11.17,
+        31.729,
+        -53.911
+      ],
+      "pivot_m_roblox": [
+        3.128,
+        8.884,
+        -15.095
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 20.405,
+        "lateral_stbd": 3.128,
+        "height": 8.884
+      },
+      "bbox_size_studs_roblox": [
+        3.792,
+        7.037,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        -0.4561,
+        0.8899,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_U2L",
+      "role": "passenger door U2L (upper deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 10.58,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -11.17,
+        31.729,
+        15.232
+      ],
+      "pivot_m_roblox": [
+        -3.128,
+        8.884,
+        4.265
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 39.765,
+        "lateral_stbd": -3.128,
+        "height": 8.884
+      },
+      "bbox_size_studs_roblox": [
+        3.792,
+        7.037,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        -0.4561,
+        -0.8899,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_U2R",
+      "role": "passenger door U2R (upper deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 10.58,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        11.17,
+        31.729,
+        15.232
+      ],
+      "pivot_m_roblox": [
+        3.128,
+        8.884,
+        4.265
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 39.765,
+        "lateral_stbd": 3.128,
+        "height": 8.884
+      },
+      "bbox_size_studs_roblox": [
+        3.792,
+        7.037,
+        3.821
+      ],
+      "hinge_axis_roblox": [
+        -0.4561,
+        0.8899,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_U3L",
+      "role": "passenger door U3L (upper deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 10.62,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -11.295,
+        31.729,
+        46.98
+      ],
+      "pivot_m_roblox": [
+        -3.163,
+        8.884,
+        13.154
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 48.654,
+        "lateral_stbd": -3.163,
+        "height": 8.884
+      },
+      "bbox_size_studs_roblox": [
+        3.778,
+        7.035,
+        3.827
+      ],
+      "hinge_axis_roblox": [
+        -0.4521,
+        -0.892,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Door_U3R",
+      "role": "passenger door U3R (upper deck)",
+      "triangles": 442,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Door",
+      "vertex_colors": [
+        "seam",
+        "white"
+      ],
+      "signed_volume_studs3": 10.62,
+      "studio_fallback_color_rgb": [
+        244,
+        245,
+        248
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        11.295,
+        31.729,
+        46.98
+      ],
+      "pivot_m_roblox": [
+        3.163,
+        8.884,
+        13.154
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 48.654,
+        "lateral_stbd": 3.163,
+        "height": 8.884
+      },
+      "bbox_size_studs_roblox": [
+        3.778,
+        7.035,
+        3.827
+      ],
+      "hinge_axis_roblox": [
+        -0.4521,
+        0.892,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        100
+      ],
+      "positive_rotation": "opens outward (simplified swing about forward edge; real doors of this type translate out and slide forward)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Wing_L",
+      "role": "wing (incl. forward halves of the flap-track fairings)",
+      "triangles": 2058,
+      "non_manifold_edges": 0,
+      "closed_shells": 6,
+      "material": "MAT_Wing",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 17816.8,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -14.286,
+        13.536,
+        -57.007
+      ],
+      "pivot_m_roblox": [
+        -4.0,
+        3.79,
+        -15.962
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 19.538,
+        "lateral_stbd": -4.0,
+        "height": 3.79
+      },
+      "bbox_size_studs_roblox": [
+        142.143,
+        19.303,
+        124.258
+      ]
+    },
+    {
+      "name": "Fence_L",
+      "role": "wing-tip fence",
+      "triangles": 248,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Fence",
+      "vertex_colors": [
+        "navy"
+      ],
+      "signed_volume_studs3": 54.63,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -142.143,
+        27.5,
+        40.964
+      ],
+      "pivot_m_roblox": [
+        -39.8,
+        7.7,
+        11.47
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 46.97,
+        "lateral_stbd": -39.8,
+        "height": 7.7
+      },
+      "bbox_size_studs_roblox": [
+        0.536,
+        8.429,
+        20.581
+      ]
+    },
+    {
+      "name": "Flap_L_Inner",
+      "role": "flap (incl. aft halves of its flap-track fairings)",
+      "triangles": 576,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 1066.52,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -31.429,
+        16.615,
+        -2.685
+      ],
+      "pivot_m_roblox": [
+        -8.8,
+        4.652,
+        -0.752
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 34.748,
+        "lateral_stbd": -8.8,
+        "height": 4.652
+      },
+      "bbox_size_studs_roblox": [
+        32.143,
+        9.525,
+        29.17
+      ],
+      "hinge_axis_roblox": [
+        0.9423,
+        -0.1791,
+        -0.2827
+      ],
+      "rotation_limits_deg": [
+        0,
+        35
+      ],
+      "positive_rotation": "trailing edge down",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          -15.357,
+          13.561,
+          -7.507
+        ],
+        [
+          -47.5,
+          19.669,
+          2.136
+        ]
+      ],
+      "note": "flaps simplified as pure rotation about the hinge line (real Fowler flaps also translate aft)"
+    },
+    {
+      "name": "Flap_L_Outer",
+      "role": "flap (incl. aft halves of its flap-track fairings)",
+      "triangles": 872,
+      "non_manifold_edges": 0,
+      "closed_shells": 4,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 935.05,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -72.143,
+        22.321,
+        14.902
+      ],
+      "pivot_m_roblox": [
+        -20.2,
+        6.25,
+        4.172
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 39.672,
+        "lateral_stbd": -20.2,
+        "height": 6.25
+      },
+      "bbox_size_studs_roblox": [
+        47.857,
+        7.405,
+        39.667
+      ],
+      "hinge_axis_roblox": [
+        0.8843,
+        -0.094,
+        -0.4574
+      ],
+      "rotation_limits_deg": [
+        0,
+        35
+      ],
+      "positive_rotation": "trailing edge down",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          -48.214,
+          19.778,
+          2.525
+        ],
+        [
+          -96.071,
+          24.865,
+          27.279
+        ]
+      ],
+      "note": "flaps simplified as pure rotation about the hinge line (real Fowler flaps also translate aft)"
+    },
+    {
+      "name": "Aileron_L",
+      "role": "aileron",
+      "triangles": 206,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 152.37,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -116.786,
+        26.236,
+        39.059
+      ],
+      "pivot_m_roblox": [
+        -32.7,
+        7.346,
+        10.937
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 46.437,
+        "lateral_stbd": -32.7,
+        "height": 7.346
+      },
+      "bbox_size_studs_roblox": [
+        40.0,
+        3.789,
+        24.743
+      ],
+      "hinge_axis_roblox": [
+        0.8934,
+        -0.0605,
+        -0.4452
+      ],
+      "rotation_limits_deg": [
+        -25,
+        20
+      ],
+      "positive_rotation": "trailing edge down",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          -96.786,
+          24.882,
+          29.093
+        ],
+        [
+          -136.786,
+          27.59,
+          49.026
+        ]
+      ]
+    },
+    {
+      "name": "HStab_L",
+      "role": "horizontal stabiliser",
+      "triangles": 502,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_HStab",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 2081.27,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        26.607,
+        77.536
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        7.45,
+        21.71
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 57.21,
+        "lateral_stbd": 0.0,
+        "height": 7.45
+      },
+      "bbox_size_studs_roblox": [
+        54.107,
+        7.32,
+        54.871
+      ]
+    },
+    {
+      "name": "Elevator_L",
+      "role": "elevator",
+      "triangles": 236,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 339.69,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -28.75,
+        29.137,
+        116.111
+      ],
+      "pivot_m_roblox": [
+        -8.05,
+        8.158,
+        32.511
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 68.011,
+        "lateral_stbd": -8.05,
+        "height": 8.158
+      },
+      "bbox_size_studs_roblox": [
+        48.929,
+        5.81,
+        28.833
+      ],
+      "hinge_axis_roblox": [
+        0.8987,
+        -0.0791,
+        -0.4314
+      ],
+      "rotation_limits_deg": [
+        -30,
+        20
+      ],
+      "positive_rotation": "trailing edge down (nose-down pitch)",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          -4.286,
+          26.984,
+          104.368
+        ],
+        [
+          -53.214,
+          31.29,
+          127.854
+        ]
+      ]
+    },
+    {
+      "name": "Wing_R",
+      "role": "wing (incl. forward halves of the flap-track fairings)",
+      "triangles": 2058,
+      "non_manifold_edges": 0,
+      "closed_shells": 6,
+      "material": "MAT_Wing",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 17816.8,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        14.286,
+        13.536,
+        -57.007
+      ],
+      "pivot_m_roblox": [
+        4.0,
+        3.79,
+        -15.962
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 19.538,
+        "lateral_stbd": 4.0,
+        "height": 3.79
+      },
+      "bbox_size_studs_roblox": [
+        142.143,
+        19.303,
+        124.258
+      ]
+    },
+    {
+      "name": "Fence_R",
+      "role": "wing-tip fence",
+      "triangles": 248,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Fence",
+      "vertex_colors": [
+        "navy"
+      ],
+      "signed_volume_studs3": 54.63,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        142.143,
+        27.5,
+        40.964
+      ],
+      "pivot_m_roblox": [
+        39.8,
+        7.7,
+        11.47
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 46.97,
+        "lateral_stbd": 39.8,
+        "height": 7.7
+      },
+      "bbox_size_studs_roblox": [
+        0.536,
+        8.429,
+        20.581
+      ]
+    },
+    {
+      "name": "Flap_R_Inner",
+      "role": "flap (incl. aft halves of its flap-track fairings)",
+      "triangles": 576,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 1066.52,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        31.429,
+        16.615,
+        -2.685
+      ],
+      "pivot_m_roblox": [
+        8.8,
+        4.652,
+        -0.752
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 34.748,
+        "lateral_stbd": 8.8,
+        "height": 4.652
+      },
+      "bbox_size_studs_roblox": [
+        32.143,
+        9.525,
+        29.17
+      ],
+      "hinge_axis_roblox": [
+        0.9423,
+        0.1791,
+        0.2827
+      ],
+      "rotation_limits_deg": [
+        0,
+        35
+      ],
+      "positive_rotation": "trailing edge down",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          15.357,
+          13.561,
+          -7.507
+        ],
+        [
+          47.5,
+          19.669,
+          2.136
+        ]
+      ],
+      "note": "flaps simplified as pure rotation about the hinge line (real Fowler flaps also translate aft)"
+    },
+    {
+      "name": "Flap_R_Outer",
+      "role": "flap (incl. aft halves of its flap-track fairings)",
+      "triangles": 872,
+      "non_manifold_edges": 0,
+      "closed_shells": 4,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 935.05,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        72.143,
+        22.321,
+        14.902
+      ],
+      "pivot_m_roblox": [
+        20.2,
+        6.25,
+        4.172
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 39.672,
+        "lateral_stbd": 20.2,
+        "height": 6.25
+      },
+      "bbox_size_studs_roblox": [
+        47.857,
+        7.405,
+        39.667
+      ],
+      "hinge_axis_roblox": [
+        0.8843,
+        0.094,
+        0.4574
+      ],
+      "rotation_limits_deg": [
+        0,
+        35
+      ],
+      "positive_rotation": "trailing edge down",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          48.214,
+          19.778,
+          2.525
+        ],
+        [
+          96.071,
+          24.865,
+          27.279
+        ]
+      ],
+      "note": "flaps simplified as pure rotation about the hinge line (real Fowler flaps also translate aft)"
+    },
+    {
+      "name": "Aileron_R",
+      "role": "aileron",
+      "triangles": 206,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 152.37,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        116.786,
+        26.236,
+        39.059
+      ],
+      "pivot_m_roblox": [
+        32.7,
+        7.346,
+        10.937
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 46.437,
+        "lateral_stbd": 32.7,
+        "height": 7.346
+      },
+      "bbox_size_studs_roblox": [
+        40.0,
+        3.789,
+        24.743
+      ],
+      "hinge_axis_roblox": [
+        0.8934,
+        0.0605,
+        0.4452
+      ],
+      "rotation_limits_deg": [
+        -25,
+        20
+      ],
+      "positive_rotation": "trailing edge down",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          96.786,
+          24.882,
+          29.093
+        ],
+        [
+          136.786,
+          27.59,
+          49.026
+        ]
+      ]
+    },
+    {
+      "name": "HStab_R",
+      "role": "horizontal stabiliser",
+      "triangles": 502,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_HStab",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 2081.27,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        26.607,
+        77.536
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        7.45,
+        21.71
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 57.21,
+        "lateral_stbd": 0.0,
+        "height": 7.45
+      },
+      "bbox_size_studs_roblox": [
+        54.107,
+        7.32,
+        54.871
+      ]
+    },
+    {
+      "name": "Elevator_R",
+      "role": "elevator",
+      "triangles": 236,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_ControlSurface",
+      "vertex_colors": [
+        "wing"
+      ],
+      "signed_volume_studs3": 339.69,
+      "studio_fallback_color_rgb": [
+        184,
+        191,
+        201
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        28.75,
+        29.137,
+        116.111
+      ],
+      "pivot_m_roblox": [
+        8.05,
+        8.158,
+        32.511
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 68.011,
+        "lateral_stbd": 8.05,
+        "height": 8.158
+      },
+      "bbox_size_studs_roblox": [
+        48.929,
+        5.81,
+        28.833
+      ],
+      "hinge_axis_roblox": [
+        0.8987,
+        0.0791,
+        0.4314
+      ],
+      "rotation_limits_deg": [
+        -30,
+        20
+      ],
+      "positive_rotation": "trailing edge down (nose-down pitch)",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          4.286,
+          26.984,
+          104.368
+        ],
+        [
+          53.214,
+          31.29,
+          127.854
+        ]
+      ]
+    },
+    {
+      "name": "VStab",
+      "role": "vertical stabiliser (fin)",
+      "triangles": 502,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Tail",
+      "vertex_colors": [
+        "navy"
+      ],
+      "signed_volume_studs3": 3980.52,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        38.571,
+        65.857
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        10.8,
+        18.44
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 53.94,
+        "lateral_stbd": 0.0,
+        "height": 10.8
+      },
+      "bbox_size_studs_roblox": [
+        5.872,
+        53.893,
+        73.892
+      ]
+    },
+    {
+      "name": "Rudder",
+      "role": "rudder",
+      "triangles": 236,
+      "non_manifold_edges": 0,
+      "closed_shells": 1,
+      "material": "MAT_Tail",
+      "vertex_colors": [
+        "navy"
+      ],
+      "signed_volume_studs3": 722.17,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        60.714,
+        110.714
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        17.0,
+        31.0
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 66.5,
+        "lateral_stbd": 0.0,
+        "height": 17.0
+      },
+      "bbox_size_studs_roblox": [
+        3.178,
+        47.857,
+        36.753
+      ],
+      "hinge_axis_roblox": [
+        0.0,
+        0.8698,
+        0.4933
+      ],
+      "rotation_limits_deg": [
+        -30,
+        30
+      ],
+      "positive_rotation": "trailing edge to starboard (nose-right yaw)",
+      "parent": "Fuselage",
+      "hinge_line_studs_roblox": [
+        [
+          0.0,
+          36.786,
+          97.143
+        ],
+        [
+          0.0,
+          84.643,
+          124.286
+        ]
+      ]
+    },
+    {
+      "name": "TailLogo",
+      "role": "fictional AI Empire emblem: gold crown + navy \"AI\" monogram (both sides)",
+      "triangles": 648,
+      "non_manifold_edges": 0,
+      "closed_shells": 6,
+      "material": "MAT_Logo",
+      "vertex_colors": [
+        "gold",
+        "navy"
+      ],
+      "signed_volume_studs3": 31.09,
+      "studio_fallback_color_rgb": [
+        222,
+        163,
+        46
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        58.929,
+        101.681
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        16.5,
+        28.471
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 63.971,
+        "lateral_stbd": 0.0,
+        "height": 16.5
+      },
+      "bbox_size_studs_roblox": [
+        4.051,
+        8.571,
+        18.457
+      ]
+    },
+    {
+      "name": "Titles_L",
+      "role": "\"AI EMPIRE AIR\" titles (fictional)",
+      "triangles": 1076,
+      "non_manifold_edges": 0,
+      "closed_shells": 11,
+      "material": "MAT_Titles",
+      "vertex_colors": [
+        "navy"
+      ],
+      "signed_volume_studs3": 4.48,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -12.348,
+        27.476,
+        -30.943
+      ],
+      "pivot_m_roblox": [
+        -3.457,
+        7.693,
+        -8.664
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 26.836,
+        "lateral_stbd": -3.457,
+        "height": 7.693
+      },
+      "bbox_size_studs_roblox": [
+        0.767,
+        3.424,
+        30.256
+      ]
+    },
+    {
+      "name": "Titles_R",
+      "role": "\"AI EMPIRE AIR\" titles (fictional)",
+      "triangles": 1076,
+      "non_manifold_edges": 0,
+      "closed_shells": 11,
+      "material": "MAT_Titles",
+      "vertex_colors": [
+        "navy"
+      ],
+      "signed_volume_studs3": 4.48,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        12.348,
+        27.476,
+        -30.943
+      ],
+      "pivot_m_roblox": [
+        3.457,
+        7.693,
+        -8.664
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 26.836,
+        "lateral_stbd": 3.457,
+        "height": 7.693
+      },
+      "bbox_size_studs_roblox": [
+        0.767,
+        3.424,
+        30.256
+      ]
+    },
+    {
+      "name": "Engine_1",
+      "role": "engine nacelle + core/plug + pylon",
+      "triangles": 2756,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_Engine",
+      "vertex_colors": [
+        "core",
+        "dark",
+        "gold",
+        "lip",
+        "navy",
+        "pylon"
+      ],
+      "signed_volume_studs3": 2178.1,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -91.786,
+        15.179,
+        -16.464
+      ],
+      "pivot_m_roblox": [
+        -25.7,
+        4.25,
+        -4.61
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 30.89,
+        "lateral_stbd": -25.7,
+        "height": 4.25
+      },
+      "bbox_size_studs_roblox": [
+        13.571,
+        16.598,
+        37.515
+      ]
+    },
+    {
+      "name": "Fan_1",
+      "role": "fan + spinner (spins)",
+      "triangles": 720,
+      "non_manifold_edges": 0,
+      "closed_shells": 21,
+      "material": "MAT_Fan",
+      "vertex_colors": [
+        "fan",
+        "spinner"
+      ],
+      "signed_volume_studs3": 45.69,
+      "studio_fallback_color_rgb": [
+        92,
+        97,
+        105
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -91.786,
+        15.179,
+        -16.464
+      ],
+      "pivot_m_roblox": [
+        -25.7,
+        4.25,
+        -4.61
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 30.89,
+        "lateral_stbd": -25.7,
+        "height": 4.25
+      },
+      "bbox_size_studs_roblox": [
+        10.5,
+        10.5,
+        2.929
+      ],
+      "hinge_axis_roblox": [
+        -0.0,
+        -0.0,
+        1.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "clockwise as seen from in front of the engine (continuous)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Engine_2",
+      "role": "engine nacelle + core/plug + pylon",
+      "triangles": 2756,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_Engine",
+      "vertex_colors": [
+        "core",
+        "dark",
+        "gold",
+        "lip",
+        "navy",
+        "pylon"
+      ],
+      "signed_volume_studs3": 2184.4,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -52.857,
+        11.0,
+        -44.0
+      ],
+      "pivot_m_roblox": [
+        -14.8,
+        3.08,
+        -12.32
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 23.18,
+        "lateral_stbd": -14.8,
+        "height": 3.08
+      },
+      "bbox_size_studs_roblox": [
+        13.571,
+        16.785,
+        36.406
+      ]
+    },
+    {
+      "name": "Fan_2",
+      "role": "fan + spinner (spins)",
+      "triangles": 720,
+      "non_manifold_edges": 0,
+      "closed_shells": 21,
+      "material": "MAT_Fan",
+      "vertex_colors": [
+        "fan",
+        "spinner"
+      ],
+      "signed_volume_studs3": 45.69,
+      "studio_fallback_color_rgb": [
+        92,
+        97,
+        105
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -52.857,
+        11.0,
+        -44.0
+      ],
+      "pivot_m_roblox": [
+        -14.8,
+        3.08,
+        -12.32
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 23.18,
+        "lateral_stbd": -14.8,
+        "height": 3.08
+      },
+      "bbox_size_studs_roblox": [
+        10.5,
+        10.5,
+        2.929
+      ],
+      "hinge_axis_roblox": [
+        -0.0,
+        -0.0,
+        1.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "clockwise as seen from in front of the engine (continuous)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Engine_3",
+      "role": "engine nacelle + core/plug + pylon",
+      "triangles": 2756,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_Engine",
+      "vertex_colors": [
+        "core",
+        "dark",
+        "gold",
+        "lip",
+        "navy",
+        "pylon"
+      ],
+      "signed_volume_studs3": 2184.4,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        52.857,
+        11.0,
+        -44.0
+      ],
+      "pivot_m_roblox": [
+        14.8,
+        3.08,
+        -12.32
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 23.18,
+        "lateral_stbd": 14.8,
+        "height": 3.08
+      },
+      "bbox_size_studs_roblox": [
+        13.571,
+        16.785,
+        36.406
+      ]
+    },
+    {
+      "name": "Fan_3",
+      "role": "fan + spinner (spins)",
+      "triangles": 720,
+      "non_manifold_edges": 0,
+      "closed_shells": 21,
+      "material": "MAT_Fan",
+      "vertex_colors": [
+        "fan",
+        "spinner"
+      ],
+      "signed_volume_studs3": 45.69,
+      "studio_fallback_color_rgb": [
+        92,
+        97,
+        105
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        52.857,
+        11.0,
+        -44.0
+      ],
+      "pivot_m_roblox": [
+        14.8,
+        3.08,
+        -12.32
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 23.18,
+        "lateral_stbd": 14.8,
+        "height": 3.08
+      },
+      "bbox_size_studs_roblox": [
+        10.5,
+        10.5,
+        2.929
+      ],
+      "hinge_axis_roblox": [
+        -0.0,
+        -0.0,
+        1.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "clockwise as seen from in front of the engine (continuous)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "Engine_4",
+      "role": "engine nacelle + core/plug + pylon",
+      "triangles": 2756,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_Engine",
+      "vertex_colors": [
+        "core",
+        "dark",
+        "gold",
+        "lip",
+        "navy",
+        "pylon"
+      ],
+      "signed_volume_studs3": 2178.1,
+      "studio_fallback_color_rgb": [
+        15,
+        31,
+        74
+      ],
+      "movable": false,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        91.786,
+        15.179,
+        -16.464
+      ],
+      "pivot_m_roblox": [
+        25.7,
+        4.25,
+        -4.61
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 30.89,
+        "lateral_stbd": 25.7,
+        "height": 4.25
+      },
+      "bbox_size_studs_roblox": [
+        13.571,
+        16.598,
+        37.515
+      ]
+    },
+    {
+      "name": "Fan_4",
+      "role": "fan + spinner (spins)",
+      "triangles": 720,
+      "non_manifold_edges": 0,
+      "closed_shells": 21,
+      "material": "MAT_Fan",
+      "vertex_colors": [
+        "fan",
+        "spinner"
+      ],
+      "signed_volume_studs3": 45.69,
+      "studio_fallback_color_rgb": [
+        92,
+        97,
+        105
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        91.786,
+        15.179,
+        -16.464
+      ],
+      "pivot_m_roblox": [
+        25.7,
+        4.25,
+        -4.61
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 30.89,
+        "lateral_stbd": 25.7,
+        "height": 4.25
+      },
+      "bbox_size_studs_roblox": [
+        10.5,
+        10.5,
+        2.929
+      ],
+      "hinge_axis_roblox": [
+        -0.0,
+        -0.0,
+        1.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "clockwise as seen from in front of the engine (continuous)",
+      "parent": "Fuselage"
+    },
+    {
+      "name": "NoseGear",
+      "role": "landing-gear leg (retracts forward)",
+      "triangles": 192,
+      "non_manifold_edges": 0,
+      "closed_shells": 4,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal",
+        "strut"
+      ],
+      "signed_volume_studs3": 14.83,
+      "studio_fallback_color_rgb": [
+        219,
+        222,
+        227
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        14.286,
+        -105.357
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        4.0,
+        -29.5
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 6.0,
+        "lateral_stbd": 0.0,
+        "height": 4.0
+      },
+      "bbox_size_studs_roblox": [
+        2.893,
+        12.479,
+        4.695
+      ],
+      "hinge_axis_roblox": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        76.0
+      ],
+      "positive_rotation": "retracts forward (retracted at +76 deg)",
+      "parent": "Fuselage",
+      "retracted_deg": 76.0
+    },
+    {
+      "name": "NoseGear_Wheels",
+      "role": "wheel pair on axle 1 of NoseGear (spins; moves with NoseGear)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 43.62,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        0.0,
+        2.268,
+        -109.036
+      ],
+      "pivot_m_roblox": [
+        0.0,
+        0.635,
+        -30.53
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 4.97,
+        "lateral_stbd": 0.0,
+        "height": 0.635
+      },
+      "bbox_size_studs_roblox": [
+        5.375,
+        4.536,
+        4.536
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "NoseGear"
+    },
+    {
+      "name": "MainGear_WL",
+      "role": "landing-gear leg (retracts inboard (inclined axis) into the belly fairing)",
+      "triangles": 320,
+      "non_manifold_edges": 0,
+      "closed_shells": 8,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal",
+        "strut"
+      ],
+      "signed_volume_studs3": 35.53,
+      "studio_fallback_color_rgb": [
+        219,
+        222,
+        227
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -22.243,
+        14.643,
+        -9.821
+      ],
+      "pivot_m_roblox": [
+        -6.228,
+        4.1,
+        -2.75
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 32.75,
+        "lateral_stbd": -6.228,
+        "height": 4.1
+      },
+      "bbox_size_studs_roblox": [
+        3.536,
+        12.728,
+        9.636
+      ],
+      "hinge_axis_roblox": [
+        0.2071,
+        0.2515,
+        0.9454
+      ],
+      "rotation_limits_deg": [
+        0,
+        83.15
+      ],
+      "positive_rotation": "retracts inboard (inclined axis) into the belly fairing (retracted at +83.15 deg)",
+      "parent": "Fuselage",
+      "retracted_deg": 83.15
+    },
+    {
+      "name": "MainGear_WL_Wheels1",
+      "role": "wheel pair on axle 1 of MainGear_WL (spins; moves with MainGear_WL)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -22.243,
+        2.5,
+        -9.893
+      ],
+      "pivot_m_roblox": [
+        -6.228,
+        0.7,
+        -2.77
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 32.73,
+        "lateral_stbd": -6.228,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        6.714,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_WL"
+    },
+    {
+      "name": "MainGear_WL_Wheels2",
+      "role": "wheel pair on axle 2 of MainGear_WL (spins; moves with MainGear_WL)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -22.243,
+        2.5,
+        -3.821
+      ],
+      "pivot_m_roblox": [
+        -6.228,
+        0.7,
+        -1.07
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 34.43,
+        "lateral_stbd": -6.228,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        6.714,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_WL"
+    },
+    {
+      "name": "MainGear_BL",
+      "role": "landing-gear leg (retracts aft into the belly fairing)",
+      "triangles": 144,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal",
+        "strut"
+      ],
+      "signed_volume_studs3": 21.09,
+      "studio_fallback_color_rgb": [
+        219,
+        222,
+        227
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -9.4,
+        12.857,
+        3.75
+      ],
+      "pivot_m_roblox": [
+        -2.632,
+        3.6,
+        1.05
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 36.55,
+        "lateral_stbd": -2.632,
+        "height": 3.6
+      },
+      "bbox_size_studs_roblox": [
+        1.714,
+        9.48,
+        5.5
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        90.0
+      ],
+      "positive_rotation": "retracts aft into the belly fairing (retracted at +90 deg)",
+      "parent": "Fuselage",
+      "retracted_deg": 90.0
+    },
+    {
+      "name": "MainGear_BL_Bogie",
+      "role": "bogie beam + axles of MainGear_BL (tilts flat when stowed)",
+      "triangles": 240,
+      "non_manifold_edges": 0,
+      "closed_shells": 7,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal"
+      ],
+      "signed_volume_studs3": 16.53,
+      "studio_fallback_color_rgb": [
+        133,
+        138,
+        145
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -9.4,
+        3.5,
+        4.821
+      ],
+      "pivot_m_roblox": [
+        -2.632,
+        0.98,
+        1.35
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 36.85,
+        "lateral_stbd": -2.632,
+        "height": 0.98
+      },
+      "bbox_size_studs_roblox": [
+        4.179,
+        1.857,
+        13.929
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        -90,
+        0
+      ],
+      "positive_rotation": "same axis as the leg; -90 deg (relative to the leg) = bogie flat when stowed",
+      "parent": "MainGear_BL",
+      "retracted_deg": -90.0
+    },
+    {
+      "name": "MainGear_BL_Wheels1",
+      "role": "wheel pair on axle 1 of MainGear_BL (spins; moves with MainGear_BL_Bogie)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -9.4,
+        2.5,
+        -1.25
+      ],
+      "pivot_m_roblox": [
+        -2.632,
+        0.7,
+        -0.35
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 35.15,
+        "lateral_stbd": -2.632,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        7.357,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_BL_Bogie"
+    },
+    {
+      "name": "MainGear_BL_Wheels2",
+      "role": "wheel pair on axle 2 of MainGear_BL (spins; moves with MainGear_BL_Bogie)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -9.4,
+        2.5,
+        4.821
+      ],
+      "pivot_m_roblox": [
+        -2.632,
+        0.7,
+        1.35
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 36.85,
+        "lateral_stbd": -2.632,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        7.357,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_BL_Bogie"
+    },
+    {
+      "name": "MainGear_BL_Wheels3",
+      "role": "wheel pair on axle 3 of MainGear_BL (spins; moves with MainGear_BL_Bogie)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        -9.4,
+        2.5,
+        10.893
+      ],
+      "pivot_m_roblox": [
+        -2.632,
+        0.7,
+        3.05
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 38.55,
+        "lateral_stbd": -2.632,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        7.357,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_BL_Bogie"
+    },
+    {
+      "name": "MainGear_WR",
+      "role": "landing-gear leg (retracts inboard (inclined axis) into the belly fairing)",
+      "triangles": 320,
+      "non_manifold_edges": 0,
+      "closed_shells": 8,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal",
+        "strut"
+      ],
+      "signed_volume_studs3": 35.53,
+      "studio_fallback_color_rgb": [
+        219,
+        222,
+        227
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        22.243,
+        14.643,
+        -9.821
+      ],
+      "pivot_m_roblox": [
+        6.228,
+        4.1,
+        -2.75
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 32.75,
+        "lateral_stbd": 6.228,
+        "height": 4.1
+      },
+      "bbox_size_studs_roblox": [
+        3.536,
+        12.728,
+        9.636
+      ],
+      "hinge_axis_roblox": [
+        0.2071,
+        -0.2515,
+        -0.9454
+      ],
+      "rotation_limits_deg": [
+        0,
+        83.15
+      ],
+      "positive_rotation": "retracts inboard (inclined axis) into the belly fairing (retracted at +83.15 deg)",
+      "parent": "Fuselage",
+      "retracted_deg": 83.15
+    },
+    {
+      "name": "MainGear_WR_Wheels1",
+      "role": "wheel pair on axle 1 of MainGear_WR (spins; moves with MainGear_WR)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        22.243,
+        2.5,
+        -9.893
+      ],
+      "pivot_m_roblox": [
+        6.228,
+        0.7,
+        -2.77
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 32.73,
+        "lateral_stbd": 6.228,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        6.714,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_WR"
+    },
+    {
+      "name": "MainGear_WR_Wheels2",
+      "role": "wheel pair on axle 2 of MainGear_WR (spins; moves with MainGear_WR)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        22.243,
+        2.5,
+        -3.821
+      ],
+      "pivot_m_roblox": [
+        6.228,
+        0.7,
+        -1.07
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 34.43,
+        "lateral_stbd": 6.228,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        6.714,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_WR"
+    },
+    {
+      "name": "MainGear_BR",
+      "role": "landing-gear leg (retracts aft into the belly fairing)",
+      "triangles": 144,
+      "non_manifold_edges": 0,
+      "closed_shells": 3,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal",
+        "strut"
+      ],
+      "signed_volume_studs3": 21.09,
+      "studio_fallback_color_rgb": [
+        219,
+        222,
+        227
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        9.4,
+        12.857,
+        3.75
+      ],
+      "pivot_m_roblox": [
+        2.632,
+        3.6,
+        1.05
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 36.55,
+        "lateral_stbd": 2.632,
+        "height": 3.6
+      },
+      "bbox_size_studs_roblox": [
+        1.714,
+        9.48,
+        5.5
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        0,
+        90.0
+      ],
+      "positive_rotation": "retracts aft into the belly fairing (retracted at +90 deg)",
+      "parent": "Fuselage",
+      "retracted_deg": 90.0
+    },
+    {
+      "name": "MainGear_BR_Bogie",
+      "role": "bogie beam + axles of MainGear_BR (tilts flat when stowed)",
+      "triangles": 240,
+      "non_manifold_edges": 0,
+      "closed_shells": 7,
+      "material": "MAT_GearStrut",
+      "vertex_colors": [
+        "metal"
+      ],
+      "signed_volume_studs3": 16.53,
+      "studio_fallback_color_rgb": [
+        133,
+        138,
+        145
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        9.4,
+        3.5,
+        4.821
+      ],
+      "pivot_m_roblox": [
+        2.632,
+        0.98,
+        1.35
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 36.85,
+        "lateral_stbd": 2.632,
+        "height": 0.98
+      },
+      "bbox_size_studs_roblox": [
+        4.179,
+        1.857,
+        13.929
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": [
+        -90,
+        0
+      ],
+      "positive_rotation": "same axis as the leg; -90 deg (relative to the leg) = bogie flat when stowed",
+      "parent": "MainGear_BR",
+      "retracted_deg": -90.0
+    },
+    {
+      "name": "MainGear_BR_Wheels1",
+      "role": "wheel pair on axle 1 of MainGear_BR (spins; moves with MainGear_BR_Bogie)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        9.4,
+        2.5,
+        -1.25
+      ],
+      "pivot_m_roblox": [
+        2.632,
+        0.7,
+        -0.35
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 35.15,
+        "lateral_stbd": 2.632,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        7.357,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_BR_Bogie"
+    },
+    {
+      "name": "MainGear_BR_Wheels2",
+      "role": "wheel pair on axle 2 of MainGear_BR (spins; moves with MainGear_BR_Bogie)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        9.4,
+        2.5,
+        4.821
+      ],
+      "pivot_m_roblox": [
+        2.632,
+        0.7,
+        1.35
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 36.85,
+        "lateral_stbd": 2.632,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        7.357,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_BR_Bogie"
+    },
+    {
+      "name": "MainGear_BR_Wheels3",
+      "role": "wheel pair on axle 3 of MainGear_BR (spins; moves with MainGear_BR_Bogie)",
+      "triangles": 512,
+      "non_manifold_edges": 0,
+      "closed_shells": 2,
+      "material": "MAT_Tyre",
+      "vertex_colors": [
+        "metal",
+        "tyre"
+      ],
+      "signed_volume_studs3": 61.74,
+      "studio_fallback_color_rgb": [
+        15,
+        15,
+        18
+      ],
+      "movable": true,
+      "can_collide": false,
+      "pivot_studs_roblox": [
+        9.4,
+        2.5,
+        10.893
+      ],
+      "pivot_m_roblox": [
+        2.632,
+        0.7,
+        3.05
+      ],
+      "pivot_aircraft_m": {
+        "station_from_nose": 38.55,
+        "lateral_stbd": 2.632,
+        "height": 0.7
+      },
+      "bbox_size_studs_roblox": [
+        7.357,
+        5.0,
+        5.0
+      ],
+      "hinge_axis_roblox": [
+        -1.0,
+        -0.0,
+        -0.0
+      ],
+      "rotation_limits_deg": null,
+      "positive_rotation": "forward rolling (continuous)",
+      "parent": "MainGear_BR_Bogie"
+    }
+  ],
+  "groups": {
+    "Flap_L": [
+      "Flap_L_Inner",
+      "Flap_L_Outer"
+    ],
+    "Flap_R": [
+      "Flap_R_Inner",
+      "Flap_R_Outer"
+    ],
+    "Doors": [
+      "Door_M1L",
+      "Door_M1R",
+      "Door_M2L",
+      "Door_M2R",
+      "Door_M3L",
+      "Door_M3R",
+      "Door_M4L",
+      "Door_M4R",
+      "Door_M5L",
+      "Door_M5R",
+      "Door_U1L",
+      "Door_U1R",
+      "Door_U2L",
+      "Door_U2R",
+      "Door_U3L",
+      "Door_U3R"
+    ],
+    "Windows": [
+      "WindowStrip_Main_L",
+      "WindowStrip_Main_R",
+      "WindowStrip_Upper_L",
+      "WindowStrip_Upper_R",
+      "WindowStrip_Cockpit"
+    ],
+    "Gear": {
+      "NoseGear": [
+        "NoseGear_Wheels"
+      ],
+      "MainGear_WL": [
+        "MainGear_WL_Wheels1",
+        "MainGear_WL_Wheels2"
+      ],
+      "MainGear_BL": [
+        "MainGear_BL_Bogie",
+        "MainGear_BL_Wheels1",
+        "MainGear_BL_Wheels2",
+        "MainGear_BL_Wheels3"
+      ],
+      "MainGear_WR": [
+        "MainGear_WR_Wheels1",
+        "MainGear_WR_Wheels2"
+      ],
+      "MainGear_BR": [
+        "MainGear_BR_Bogie",
+        "MainGear_BR_Wheels1",
+        "MainGear_BR_Wheels2",
+        "MainGear_BR_Wheels3"
+      ]
+    },
+    "Engines": {
+      "Engine_1": "Fan_1",
+      "Engine_2": "Fan_2",
+      "Engine_3": "Fan_3",
+      "Engine_4": "Fan_4"
+    }
+  },
+  "colors_srgb": {
+    "white": [
+      0.955,
+      0.962,
+      0.972
+    ],
+    "belly": [
+      0.78,
+      0.81,
+      0.84
+    ],
+    "navy": [
+      0.06,
+      0.12,
+      0.29
+    ],
+    "gold": [
+      0.87,
+      0.64,
+      0.18
+    ],
+    "wing": [
+      0.72,
+      0.75,
+      0.79
+    ],
+    "glass": [
+      0.05,
+      0.08,
+      0.12
+    ],
+    "seam": [
+      0.6,
+      0.64,
+      0.69
+    ],
+    "tyre": [
+      0.06,
+      0.06,
+      0.07
+    ],
+    "metal": [
+      0.52,
+      0.54,
+      0.57
+    ],
+    "strut": [
+      0.86,
+      0.87,
+      0.89
+    ],
+    "lip": [
+      0.8,
+      0.82,
+      0.85
+    ],
+    "core": [
+      0.4,
+      0.42,
+      0.45
+    ],
+    "dark": [
+      0.09,
+      0.09,
+      0.1
+    ],
+    "fan": [
+      0.36,
+      0.38,
+      0.41
+    ],
+    "spinner": [
+      0.1,
+      0.1,
+      0.11
+    ],
+    "pylon": [
+      0.88,
+      0.89,
+      0.91
+    ]
+  },
+  "export": {
+    "fbx": {
+      "file": "Skyliner380.fbx",
+      "use": "Roblox (primary)",
+      "apply_scale_options": "FBX_SCALE_UNITS (Roblox docs: \"FBX Unit Scale\")",
+      "global_scale": 1.0,
+      "axis_forward": "Z",
+      "axis_up": "Y",
+      "bake_space_transform": true,
+      "use_triangles": true,
+      "mesh_smooth_type": "FACE",
+      "colors_type": "SRGB (face-corner vertex colours)",
+      "add_leaf_bones": false,
+      "bake_anim": false,
+      "path_mode": "COPY",
+      "embed_textures": true,
+      "note": "1 Blender unit = 1 stud; raw FBX vertex numbers are studs"
+    },
+    "gltf": {
+      "file": "Skyliner380.gltf",
+      "format": "GLTF_SEPARATE",
+      "use": "alternative for Roblox (Importer lists .gltf with multiple meshes, hierarchy, vertex colours); not tested in Studio",
+      "units": "1 glTF unit = 1 stud (Importer Scale Unit = Studs)",
+      "axes": "raw glTF coordinates = FBX layout: X right, Y up, nose at -Z (scene turned 180 deg about the vertical before export). If Studio shows the nose at +Z, set World Forward = Back.",
+      "vertex_colors": "COLOR_0 (active colour attribute)"
+    },
+    "obj": {
+      "file": "Skyliner380.obj",
+      "mtl": "Skyliner380.mtl",
+      "use": "DCC interchange only - NOT for Roblox",
+      "forward_axis": "Z",
+      "up_axis": "Y",
+      "global_scale": 1.0,
+      "triangulated": true,
+      "vertex_colors": false,
+      "note": "OBJ stores no object transforms (every hinge/axle pivot is lost) and no vertex colours here (one Kd colour per object). The Roblox Importer lists multiple meshes / hierarchies / vertex colours only for .fbx and .gltf; merged, the OBJ would exceed 20,000 triangles."
+    }
+  },
+  "roblox_import": {
+    "importer": "Studio File > Import 3D (Importer)",
+    "scale_unit": "Studs",
+    "set_pivot_to_scene_origin": true,
+    "use_imported_pivot": true,
+    "merge_meshes": false,
+    "anchored": false,
+    "ignore_vertex_colors": false,
+    "target_path": "ReplicatedStorage/VehicleAssets/Skyliner380",
+    "after_import": "set every MeshPart.Color = (255,255,255): Roblox multiplies vertex colours with MeshPart.Color (default Medium Stone Grey)",
+    "can_collide": [
+      "Fuselage"
+    ]
+  },
+  "cockpit_panes": {
+    "front_pane_corners_b_z_m": [
+      [
+        0.075,
+        6.7
+      ],
+      [
+        1.18,
+        6.8
+      ],
+      [
+        1.18,
+        7.56
+      ],
+      [
+        0.075,
+        7.47
+      ]
+    ],
+    "side_pane_corners_s_z_m": [
+      [
+        [
+          2.5187311651462974,
+          6.83
+        ],
+        [
+          3.4,
+          6.86
+        ],
+        [
+          3.4,
+          7.4
+        ],
+        [
+          3.3221940373175745,
+          7.48
+        ]
+      ],
+      [
+        [
+          3.52,
+          6.87
+        ],
+        [
+          3.98,
+          6.89
+        ],
+        [
+          3.98,
+          7.33
+        ],
+        [
+          3.52,
+          7.37
+        ]
+      ]
+    ]
+  },
+  "build_seconds": 30.5,
+  "motion_checks": {
+    "method": "generalised winding number (inside >= 0.5) of posed vertices against closed target meshes; poses = manifest pivots, hinge axes and rotation limits (children follow their \"parent\" chain)",
+    "gear_retracted_inside_hull": {
+      "NoseGear": {
+        "NoseGear": {
+          "vertices": 104,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "NoseGear_Wheels": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        }
+      },
+      "MainGear_WL": {
+        "MainGear_WL": {
+          "vertices": 176,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_WL_Wheels1": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_WL_Wheels2": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        }
+      },
+      "MainGear_BL": {
+        "MainGear_BL": {
+          "vertices": 78,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BL_Bogie": {
+          "vertices": 134,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BL_Wheels1": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BL_Wheels2": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BL_Wheels3": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        }
+      },
+      "MainGear_WR": {
+        "MainGear_WR": {
+          "vertices": 176,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_WR_Wheels1": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_WR_Wheels2": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        }
+      },
+      "MainGear_BR": {
+        "MainGear_BR": {
+          "vertices": 78,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BR_Bogie": {
+          "vertices": 134,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BR_Wheels1": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BR_Wheels2": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        },
+        "MainGear_BR_Wheels3": {
+          "vertices": 260,
+          "outside": 0,
+          "max_outside_m": 0.0
+        }
+      }
+    },
+    "gear_retracted_total_outside": 0,
+    "control_test_gear_down_wheels_outside": {
+      "NoseGear": {
+        "wheel_vertices": 260,
+        "outside_when_down": 260
+      },
+      "MainGear_WL": {
+        "wheel_vertices": 520,
+        "outside_when_down": 520
+      },
+      "MainGear_BL": {
+        "wheel_vertices": 780,
+        "outside_when_down": 780
+      },
+      "MainGear_WR": {
+        "wheel_vertices": 520,
+        "outside_when_down": 520
+      },
+      "MainGear_BR": {
+        "wheel_vertices": 780,
+        "outside_when_down": 780
+      }
+    },
+    "stowed_gear_overlaps": "none",
+    "control_surfaces_at_limits": {
+      "Flap_L_Inner": {
+        "+0deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 0
+        },
+        "+35deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 16
+        }
+      },
+      "Flap_L_Outer": {
+        "+0deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 17
+        },
+        "+35deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 18
+        }
+      },
+      "Aileron_L": {
+        "-25deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        },
+        "+20deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        }
+      },
+      "Elevator_L": {
+        "-30deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        },
+        "+20deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        }
+      },
+      "Flap_R_Inner": {
+        "+0deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 0
+        },
+        "+35deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 16
+        }
+      },
+      "Flap_R_Outer": {
+        "+0deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 17
+        },
+        "+35deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0,
+          "info_fairing_halves_overlap_vertices": 18
+        }
+      },
+      "Aileron_R": {
+        "-25deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        },
+        "+20deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        }
+      },
+      "Elevator_R": {
+        "-30deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        },
+        "+20deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        }
+      },
+      "Rudder": {
+        "-30deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        },
+        "+30deg": {
+          "parent_vertices_inside_surface": 0,
+          "surface_vertices_inside_parent": 0
+        }
+      }
+    },
+    "control_surfaces_breakthroughs_total": 0,
+    "flaps_vs_gear_and_neighbours": {
+      "MainGear_WL (down) inside Flap_L_Inner@35": 0,
+      "Flap_L_Inner@35 inside MainGear_WL (down)": 0,
+      "MainGear_WL (down) inside Flap_L_Outer@35": 0,
+      "Flap_L_Outer@35 inside MainGear_WL (down)": 0,
+      "MainGear_BL (down) inside Flap_L_Inner@35": 0,
+      "Flap_L_Inner@35 inside MainGear_BL (down)": 0,
+      "MainGear_BL (down) inside Flap_L_Outer@35": 0,
+      "Flap_L_Outer@35 inside MainGear_BL (down)": 0,
+      "Flap_L_Inner@35 inside Flap_L_Outer@35": 0,
+      "MainGear_WR (down) inside Flap_R_Inner@35": 0,
+      "Flap_R_Inner@35 inside MainGear_WR (down)": 0,
+      "MainGear_WR (down) inside Flap_R_Outer@35": 0,
+      "Flap_R_Outer@35 inside MainGear_WR (down)": 0,
+      "MainGear_BR (down) inside Flap_R_Inner@35": 0,
+      "Flap_R_Inner@35 inside MainGear_BR (down)": 0,
+      "MainGear_BR (down) inside Flap_R_Outer@35": 0,
+      "Flap_R_Outer@35 inside MainGear_BR (down)": 0,
+      "Flap_R_Inner@35 inside Flap_R_Outer@35": 0
+    },
+    "doors_open_100deg": {
+      "Door_M1L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M1R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M2L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M2R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M3L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M3R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M4L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M4R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M5L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_M5R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_U1L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_U1R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_U2L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_U2R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_U3L": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      },
+      "Door_U3R": {
+        "door_vertices_in_fuselage": 0,
+        "window_vertices_in_door": 0,
+        "door_vertices_in_wing": 0
+      }
+    },
+    "doors_total_intersections": 0,
+    "seconds": 28.9
+  }
+}

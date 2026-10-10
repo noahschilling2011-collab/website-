@@ -1,0 +1,842 @@
+{
+  "name": "CityCar",
+  "generic_identity": "CityCar - generic compact executive electric sedan (no brand, no logos)",
+  "units": {
+    "studs_per_metre": 3.571429,
+    "metres_per_stud": 0.28,
+    "source": "https://create.roblox.com/docs/physics/units (1 stud = 28 cm)"
+  },
+  "frame": {
+    "forward": "-Z (Model LookVector)",
+    "right": "+X",
+    "up": "+Y",
+    "origin": "ground level, car centre line, half-way between the axles",
+    "driver_side": "left (-X), like the game's DriverSeat at x = -1.35"
+  },
+  "dimensions_measured_from_mesh": {
+    "length": {
+      "m": 4.75,
+      "studs": 16.964
+    },
+    "width_body_without_mirrors": {
+      "m": 1.8499,
+      "studs": 6.607
+    },
+    "width_over_mirrors": {
+      "m": 2.08,
+      "studs": 7.429
+    },
+    "height": {
+      "m": 1.4447,
+      "studs": 5.16
+    },
+    "ground_clearance": {
+      "m": 0.132,
+      "studs": 0.471
+    },
+    "wheelbase": {
+      "m": 2.865,
+      "studs": 10.232
+    },
+    "track_front": {
+      "m": 1.593,
+      "studs": 5.689
+    },
+    "track_rear": {
+      "m": 1.607,
+      "studs": 5.739
+    },
+    "wheel_diameter": {
+      "m": 0.6687,
+      "studs": 2.388
+    },
+    "front_overhang": {
+      "m": 0.86,
+      "studs": 3.071
+    },
+    "rear_overhang": {
+      "m": 1.025,
+      "studs": 3.661
+    },
+    "overall_bbox_studs_XYZ": [
+      7.429,
+      5.16,
+      16.964
+    ],
+    "overall_bbox_min_studs": [
+      -3.7143,
+      0.0,
+      -8.1875
+    ],
+    "overall_bbox_max_studs": [
+      3.7143,
+      5.1598,
+      8.7768
+    ]
+  },
+  "dimensions_target_m": {
+    "length": 4.75,
+    "width": 1.85,
+    "height": 1.445,
+    "wheelbase": 2.865,
+    "track_front": 1.593,
+    "track_rear": 1.607,
+    "ground_clearance": 0.132,
+    "width_over_mirrors": 2.08,
+    "front_overhang": 0.86,
+    "rear_overhang": 1.025,
+    "tyre": "235/45 R18 (diameter 0.6687 m)"
+  },
+  "anchors": {
+    "seat_driver_top_studs": [
+      -1.3393,
+      1.8036,
+      -0.5714
+    ],
+    "seat_passenger_top_studs": [
+      1.3393,
+      1.8036,
+      -0.5714
+    ],
+    "front_plate_centre_studs": [
+      -0.0,
+      1.125,
+      -8.1275
+    ],
+    "rear_plate_centre_studs": [
+      -0.0,
+      2.0,
+      8.7254
+    ],
+    "plate_note": "centre of the plate face on the bumper surface; plate faces -Z (front) / +Z (rear)",
+    "ground_contact_y_studs": 0.0
+  },
+  "game_config_relation": {
+    "CampusConfig.CARS.executive": {
+      "length_studs": 15,
+      "width_studs": 7
+    },
+    "model_length_studs": 16.964,
+    "model_body_width_studs": 6.607,
+    "model_width_over_mirrors_studs": 7.429,
+    "scale_to_match_config_length": 0.8842,
+    "note": "Model is real-world size at 1 stud = 0.28 m. Model:ScaleTo(scale_to_match_config_length) makes it as long as the procedural 'executive' car if the garage needs it."
+  },
+  "triangles_total": 14184,
+  "triangle_limit_per_mesh": 20000,
+  "triangle_limit_source": "https://create.roblox.com/docs/art/modeling/specifications",
+  "objects": [
+    {
+      "name": "Body",
+      "kind": "static",
+      "role": "painted shell, mirrors, trim, wheel wells; tint with MeshPart.Color",
+      "can_collide": true,
+      "meshpart_color": "company colour (paint zone is white in the vertex colours)",
+      "triangles": 7836,
+      "materials": [
+        "Paint",
+        "Trim_Black",
+        "Roof_Black",
+        "Cladding",
+        "Chrome",
+        "Panel_Gap",
+        "Wheelwell",
+        "Underbody",
+        "Headlight",
+        "Taillight",
+        "Mirror_Glass",
+        "Body_Inner"
+      ],
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.7143,
+        0.4714,
+        -8.1875
+      ],
+      "bbox_max_studs": [
+        3.7143,
+        5.1598,
+        8.7768
+      ],
+      "size_studs": [
+        7.4286,
+        4.6884,
+        16.9643
+      ],
+      "mesh_check": {
+        "tris": 7836,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 25.7347,
+        "shells": 7,
+        "ngons": 0
+      }
+    },
+    {
+      "name": "Glass",
+      "kind": "static",
+      "role": "all glazing (windshield, side windows, backlight)",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "transparency": 0.35,
+      "material": "Glass",
+      "triangles": 792,
+      "materials": [
+        "Glass"
+      ],
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.0487,
+        3.3119,
+        -3.6007
+      ],
+      "bbox_max_studs": [
+        3.0487,
+        5.0043,
+        6.7117
+      ],
+      "size_studs": [
+        6.0974,
+        1.6924,
+        10.3124
+      ],
+      "mesh_check": {
+        "tris": 792,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 1.0757,
+        "shells": 6,
+        "ngons": 0
+      }
+    },
+    {
+      "name": "Headlights",
+      "kind": "static",
+      "role": "front light strips; set Material=Neon for lights on",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 176,
+      "materials": [
+        "Headlight"
+      ],
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -2.9383,
+        2.0743,
+        -7.8696
+      ],
+      "bbox_max_studs": [
+        2.9383,
+        2.3044,
+        -7.2839
+      ],
+      "size_studs": [
+        5.8766,
+        0.2301,
+        0.5857
+      ],
+      "mesh_check": {
+        "tris": 176,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0163,
+        "shells": 2,
+        "ngons": 0
+      }
+    },
+    {
+      "name": "Taillights",
+      "kind": "static",
+      "role": "full-width rear light bar; Neon for brake/lights on",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 328,
+      "materials": [
+        "Taillight"
+      ],
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -2.8274,
+        3.1128,
+        8.158
+      ],
+      "bbox_max_studs": [
+        2.8274,
+        3.3244,
+        8.7729
+      ],
+      "size_studs": [
+        5.6548,
+        0.2116,
+        0.6149
+      ],
+      "mesh_check": {
+        "tris": 328,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0391,
+        "shells": 1,
+        "ngons": 0
+      }
+    },
+    {
+      "name": "Wheel_FL",
+      "kind": "wheel",
+      "role": "tyre + rim; spins about local X; front wheels also steer about Y",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 908,
+      "materials": [
+        "Tire",
+        "Rim_Silver",
+        "Wheel_Dark",
+        "Hub_Dark"
+      ],
+      "pivot_studs": [
+        -2.8446,
+        1.1941,
+        -5.1161
+      ],
+      "pivot_m": [
+        -0.7965,
+        0.3343,
+        -1.4325
+      ],
+      "bbox_min_studs": [
+        -3.2643,
+        0.0,
+        -6.3102
+      ],
+      "bbox_max_studs": [
+        -2.425,
+        2.3882,
+        -3.922
+      ],
+      "size_studs": [
+        0.8393,
+        2.3882,
+        2.3882
+      ],
+      "mesh_check": {
+        "tris": 908,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.2894,
+        "shells": 15,
+        "ngons": 0
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about +X; forward roll (car moving towards -Z) is a NEGATIVE angle: part.CFrame = pivot * CFrame.Angles(-distance/radius, 0, 0)",
+      "radius_studs": 1.1941,
+      "radius_m": 0.33435,
+      "width_m": 0.235,
+      "tyre": "235/45 R18",
+      "steer_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "steer_limits_deg": [
+        -30.0,
+        30.0
+      ],
+      "steer_note": "positive angle about +Y turns the wheel's front towards the car's left (-X)"
+    },
+    {
+      "name": "Wheel_FR",
+      "kind": "wheel",
+      "role": "tyre + rim; spins about local X; front wheels also steer about Y",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 908,
+      "materials": [
+        "Tire",
+        "Rim_Silver",
+        "Wheel_Dark",
+        "Hub_Dark"
+      ],
+      "pivot_studs": [
+        2.8446,
+        1.1941,
+        -5.1161
+      ],
+      "pivot_m": [
+        0.7965,
+        0.3343,
+        -1.4325
+      ],
+      "bbox_min_studs": [
+        2.425,
+        0.0,
+        -6.3102
+      ],
+      "bbox_max_studs": [
+        3.2643,
+        2.3882,
+        -3.922
+      ],
+      "size_studs": [
+        0.8393,
+        2.3882,
+        2.3882
+      ],
+      "mesh_check": {
+        "tris": 908,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.2894,
+        "shells": 15,
+        "ngons": 0
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about +X; forward roll (car moving towards -Z) is a NEGATIVE angle: part.CFrame = pivot * CFrame.Angles(-distance/radius, 0, 0)",
+      "radius_studs": 1.1941,
+      "radius_m": 0.33435,
+      "width_m": 0.235,
+      "tyre": "235/45 R18",
+      "steer_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "steer_limits_deg": [
+        -30.0,
+        30.0
+      ],
+      "steer_note": "positive angle about +Y turns the wheel's front towards the car's left (-X)"
+    },
+    {
+      "name": "Wheel_RL",
+      "kind": "wheel",
+      "role": "tyre + rim; spins about local X; front wheels also steer about Y",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 908,
+      "materials": [
+        "Tire",
+        "Rim_Silver",
+        "Wheel_Dark",
+        "Hub_Dark"
+      ],
+      "pivot_studs": [
+        -2.8696,
+        1.1941,
+        5.1161
+      ],
+      "pivot_m": [
+        -0.8035,
+        0.3343,
+        1.4325
+      ],
+      "bbox_min_studs": [
+        -3.2893,
+        0.0,
+        3.922
+      ],
+      "bbox_max_studs": [
+        -2.45,
+        2.3882,
+        6.3102
+      ],
+      "size_studs": [
+        0.8393,
+        2.3882,
+        2.3882
+      ],
+      "mesh_check": {
+        "tris": 908,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.2894,
+        "shells": 15,
+        "ngons": 0
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about +X; forward roll (car moving towards -Z) is a NEGATIVE angle: part.CFrame = pivot * CFrame.Angles(-distance/radius, 0, 0)",
+      "radius_studs": 1.1941,
+      "radius_m": 0.33435,
+      "width_m": 0.235,
+      "tyre": "235/45 R18"
+    },
+    {
+      "name": "Wheel_RR",
+      "kind": "wheel",
+      "role": "tyre + rim; spins about local X; front wheels also steer about Y",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 908,
+      "materials": [
+        "Tire",
+        "Rim_Silver",
+        "Wheel_Dark",
+        "Hub_Dark"
+      ],
+      "pivot_studs": [
+        2.8696,
+        1.1941,
+        5.1161
+      ],
+      "pivot_m": [
+        0.8035,
+        0.3343,
+        1.4325
+      ],
+      "bbox_min_studs": [
+        2.45,
+        0.0,
+        3.922
+      ],
+      "bbox_max_studs": [
+        3.2893,
+        2.3882,
+        6.3102
+      ],
+      "size_studs": [
+        0.8393,
+        2.3882,
+        2.3882
+      ],
+      "mesh_check": {
+        "tris": 908,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.2894,
+        "shells": 15,
+        "ngons": 0
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about +X; forward roll (car moving towards -Z) is a NEGATIVE angle: part.CFrame = pivot * CFrame.Angles(-distance/radius, 0, 0)",
+      "radius_studs": 1.1941,
+      "radius_m": 0.33435,
+      "width_m": 0.235,
+      "tyre": "235/45 R18"
+    },
+    {
+      "name": "Interior",
+      "kind": "static",
+      "role": "floor, dashboard, screen, console, passenger + rear seats",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 856,
+      "materials": [
+        "Interior_Dark",
+        "Seat_Leather",
+        "Interior_Trim",
+        "Screen"
+      ],
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -2.9643,
+        0.6071,
+        -3.6429
+      ],
+      "bbox_max_studs": [
+        2.9643,
+        4.4223,
+        6.6429
+      ],
+      "size_studs": [
+        5.9286,
+        3.8152,
+        10.2858
+      ],
+      "mesh_check": {
+        "tris": 856,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 51.7889,
+        "shells": 22,
+        "ngons": 0
+      }
+    },
+    {
+      "name": "Seat_Driver",
+      "kind": "anchor",
+      "role": "driver seat mesh; pivot = cushion top centre (VehicleSeat goes here)",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 232,
+      "materials": [
+        "Seat_Leather",
+        "Interior_Dark"
+      ],
+      "pivot_studs": [
+        -1.3393,
+        1.8036,
+        -0.5714
+      ],
+      "pivot_m": [
+        -0.375,
+        0.505,
+        -0.16
+      ],
+      "bbox_min_studs": [
+        -2.25,
+        1.2143,
+        -1.4643
+      ],
+      "bbox_max_studs": [
+        -0.4286,
+        4.4223,
+        1.5504
+      ],
+      "size_studs": [
+        1.8214,
+        3.208,
+        3.0147
+      ],
+      "mesh_check": {
+        "tris": 232,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 4.0453,
+        "shells": 6,
+        "ngons": 0
+      },
+      "seat_note": "Weld a VehicleSeat (Size 2,0.5,2, Transparency 1) so its top face is at the pivot: seat.CFrame = Seat_Driver:GetPivot() * CFrame.new(0, -0.25, 0)"
+    },
+    {
+      "name": "SteeringWheel",
+      "kind": "rotating",
+      "role": "steering wheel; rotate about the column axis",
+      "can_collide": false,
+      "meshpart_color": [
+        255,
+        255,
+        255
+      ],
+      "triangles": 332,
+      "materials": [
+        "Interior_Dark",
+        "Interior_Trim"
+      ],
+      "pivot_studs": [
+        -1.3393,
+        3.0714,
+        -1.7857
+      ],
+      "pivot_m": [
+        -0.375,
+        0.86,
+        -0.5
+      ],
+      "bbox_min_studs": [
+        -2.0571,
+        2.4256,
+        -2.6479
+      ],
+      "bbox_max_studs": [
+        -0.6214,
+        3.7173,
+        -1.4644
+      ],
+      "size_studs": [
+        1.4357,
+        1.2917,
+        1.1835
+      ],
+      "mesh_check": {
+        "tris": 332,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0994,
+        "shells": 6,
+        "ngons": 0
+      },
+      "hinge_axis": [
+        0.0,
+        0.40674,
+        0.91355
+      ],
+      "hinge_axis_note": "column axis, pointing from the dashboard towards the driver",
+      "rotation_limits_deg": [
+        -450.0,
+        450.0
+      ],
+      "suggested_game_limits_deg": [
+        -120.0,
+        120.0
+      ],
+      "rotation_note": "positive angle (right-hand rule about hinge_axis) turns the rim counter-clockwise as seen by the driver = steering LEFT"
+    }
+  ],
+  "materials": {
+    "Paint": {
+      "srgb_hex": "2B5A86",
+      "vertex_colour_hex": "FFFFFF"
+    },
+    "Trim_Black": {
+      "srgb_hex": "121417",
+      "vertex_colour_hex": "121417"
+    },
+    "Roof_Black": {
+      "srgb_hex": "0A0D11",
+      "vertex_colour_hex": "0A0D11"
+    },
+    "Cladding": {
+      "srgb_hex": "1D1F22",
+      "vertex_colour_hex": "1D1F22"
+    },
+    "Chrome": {
+      "srgb_hex": "C9CDD3",
+      "vertex_colour_hex": "C9CDD3"
+    },
+    "Panel_Gap": {
+      "srgb_hex": "0C0D0F",
+      "vertex_colour_hex": "0C0D0F"
+    },
+    "Wheelwell": {
+      "srgb_hex": "17181A",
+      "vertex_colour_hex": "17181A"
+    },
+    "Underbody": {
+      "srgb_hex": "1A1B1D",
+      "vertex_colour_hex": "1A1B1D"
+    },
+    "Headlight": {
+      "srgb_hex": "F3F6FF",
+      "vertex_colour_hex": "F3F6FF"
+    },
+    "Taillight": {
+      "srgb_hex": "D8101F",
+      "vertex_colour_hex": "D8101F"
+    },
+    "Body_Inner": {
+      "srgb_hex": "2A2C30",
+      "vertex_colour_hex": "2A2C30"
+    },
+    "Mirror_Glass": {
+      "srgb_hex": "A9B3BD",
+      "vertex_colour_hex": "A9B3BD"
+    },
+    "Glass": {
+      "srgb_hex": "6E8696",
+      "vertex_colour_hex": "1E2A33"
+    },
+    "Tire": {
+      "srgb_hex": "1C1C1E",
+      "vertex_colour_hex": "1C1C1E"
+    },
+    "Rim_Silver": {
+      "srgb_hex": "BCC1C8",
+      "vertex_colour_hex": "BCC1C8"
+    },
+    "Wheel_Dark": {
+      "srgb_hex": "2A2D31",
+      "vertex_colour_hex": "2A2D31"
+    },
+    "Hub_Dark": {
+      "srgb_hex": "3A3D42",
+      "vertex_colour_hex": "3A3D42"
+    },
+    "Interior_Dark": {
+      "srgb_hex": "2B2D31",
+      "vertex_colour_hex": "2B2D31"
+    },
+    "Seat_Leather": {
+      "srgb_hex": "D9D3C6",
+      "vertex_colour_hex": "D9D3C6"
+    },
+    "Interior_Trim": {
+      "srgb_hex": "9EA3AA",
+      "vertex_colour_hex": "9EA3AA"
+    },
+    "Screen": {
+      "srgb_hex": "0E1A26",
+      "vertex_colour_hex": "0E1A26"
+    }
+  },
+  "export": {
+    "fbx": "CityCar.fbx",
+    "obj": "CityCar.obj",
+    "fbx_settings": "axis_forward=Z, axis_up=Y, apply_scale_options=FBX_SCALE_UNITS, global_scale=1, bake_space_transform, mesh_smooth_type=FACE, colors_type=SRGB, triangulated, no leaf bones, no animation, path_mode=COPY+embed (no textures used)",
+    "blender_units": "1 Blender unit = 1 stud (scene Unit System None, Unit Scale 1.0)"
+  },
+  "problems": []
+}
