@@ -26,7 +26,8 @@ local HardwareConfig = require(Config.HardwareConfig)
 
 local PhoneMath = {}
 
-PhoneMath.INBOX_MAX = 40 -- messages kept in the phone (the newest 20 news lines + derived events)
+PhoneMath.INBOX_MAX = 40 -- messages kept in the phone (the newest NEWS_SHOWN log lines + derived events + package messages)
+PhoneMath.NEWS_SHOWN = 20 -- company-log lines the phone shows (CORE_SPEC: deals.news keeps <= 40, the phone the newest 20)
 PhoneMath.CALLS_MAX = 20 -- call log entries per session (server memory)
 PhoneMath.CALL_RING = 25 -- seconds an incoming call rings before it counts as missed
 PhoneMath.CALENDAR_MAX = 24 -- items other packages may add per session (PhoneService.addCalendarItem)
@@ -37,6 +38,8 @@ PhoneMath.CHAT_GLOBAL_PER_MINUTE = 90 -- the whole server stays below TextGenera
 PhoneMath.CHAT_MAX_TOKENS = 200 -- short replies
 PhoneMath.CHAT_REPLY_CHARS = 700 -- a longer generated text is cut on a character boundary
 PhoneMath.CHAT_HISTORY = 20 -- turns kept in memory per model (never saved)
+PhoneMath.CHAT_RECAP_TURNS = 6 -- turns re-sent inside UserPrompt when the ContextToken is gone (after an error)
+PhoneMath.CHAT_RECAP_CHARS = 1200
 PhoneMath.DEMO_LABEL = "Demo reply (offline)"
 PhoneMath.AI_LABEL = "AI reply"
 
@@ -81,10 +84,22 @@ end
 
 -- Company day and hour of a play-second deadline (trips `back`, accounts `expires`: empire.seconds runs while
 -- the company is online, one play second per server second). Past deadlines map to now.
-function PhoneMath.atPlay(e: any, clock: number, play: number): (number, number)
+-- offset = server clock minus play seconds, taken from ONE snapshot (snapshot.serverTime - empire.seconds,
+-- PhoneMath.anchor): empire.seconds only steps once per second, so converting with the live clock would make
+-- the shown minute jitter (1 server second = 2.8 game minutes at night). Without offset: the live clock.
+function PhoneMath.atPlay(e: any, clock: number, play: number, offset: number?): (number, number)
 	local seconds = tonumber(e.seconds) or 0
-	local dt = math.max(0, (tonumber(play) or seconds) - seconds)
-	return PhoneMath.atClock(e, clock, clock + dt)
+	local p = tonumber(play) or seconds
+	if offset then return PhoneMath.atClock(e, clock, math.max(clock, p + offset)) end
+	return PhoneMath.atClock(e, clock, clock + math.max(0, p - seconds))
+end
+
+-- Anchor of the play clock: keeps the previous offset while a new snapshot agrees within `slack` seconds (the
+-- 1 Hz step of empire.seconds), so times derived from play seconds stay put; a real jump (offline time) moves it.
+function PhoneMath.anchor(previous: number?, serverTime: number, seconds: number, slack: number?): number
+	local candidate = serverTime - seconds
+	if previous and math.abs(candidate - previous) <= (slack or 2) then return previous end
+	return candidate
 end
 
 -- "10:30" today, "Day 9 · 10:30" another day
@@ -162,11 +177,13 @@ function PhoneMath.classify(text: string): (string, string, string, string)
 	return "Company", cap(title), cap(text), "info"
 end
 
--- Messages of the replicated company log (newest first; each line keeps its own stamp)
+-- Messages of the replicated company log: the newest NEWS_SHOWN lines (deals.news is newest first; each line
+-- keeps its own stamp)
 function PhoneMath.newsMessages(deals: any): { Message }
 	local out: { Message } = {}
 	local news = if typeof(deals) == "table" and typeof(deals.news) == "table" then deals.news else {}
-	for i, line in news do
+	for i = 1, math.min(#news, PhoneMath.NEWS_SHOWN) do
+		local line = news[i]
 		if typeof(line) ~= "string" then continue end
 		local day, hour, text = PhoneMath.parseNews(line)
 		local from, title, body, tone = PhoneMath.classify(text)
@@ -385,15 +402,38 @@ function PhoneMath.unread(messages: { Message }, read: { [string]: boolean }): n
 end
 
 ------------------------------------------------------------------------------------------------ calendar
-export type CalItem = { key: string, title: string, detail: string, day: number, hour: number, order: number, kind: string, now: boolean?, tag: string? }
+export type CalItem = { key: string, title: string, detail: string, day: number, hour: number, order: number, kind: string, now: boolean?, tag: string?, public: boolean? }
 
 local WHERE = { city = "Business City", region = "Business City", abroad = "Port Meridian" }
 
+-- lowest company stage with a client abroad (Port Meridian)
+local ABROAD_STAGE = math.huge
+for _, c in Ops.CLIENTS do if c.trip == "abroad" and c.stage < ABROAD_STAGE then ABROAD_STAGE = c.stage end end
+PhoneMath.ABROAD_STAGE = ABROAD_STAGE
+
+-- Port Meridian matters to this company: a client abroad, a trip abroad, or the stage that unlocks abroad
+-- clients (the public shuttle timetable is only listed then)
+function PhoneMath.abroadRelevant(e: any): boolean
+	if Ops.stageIndex(e) >= ABROAD_STAGE then return true end
+	local deals = if typeof(e.deals) == "table" then e.deals else {}
+	for id in (if typeof(deals.accounts) == "table" then deals.accounts else {}) do
+		local c = Ops.client(id)
+		if c and c.trip == "abroad" then return true end
+	end
+	for _, t in (if typeof(deals.tripList) == "table" then deals.tripList else {}) do
+		local c = if typeof(t) == "table" then Ops.client(t.client) else nil
+		if c and c.trip == "abroad" then return true end
+	end
+	return false
+end
+
 -- Calendar of today and the coming days from the replicated state. clock = workspace:GetServerTimeNow();
--- extra = items of PhoneService.addCalendarItem ({key, title, detail?, at = server clock, kind?});
--- shuttle = {at = server clock of the next departure to Port Meridian, flight = "PM 101", airline}?;
--- hotels = {city = "City Hotel", abroad = "Meridian Grand Hotel"}?. Returns the items (soonest first).
-function PhoneMath.calendar(data: any, live: any, clock: number, extra: { any }?, shuttle: any?, hotels: any?): { CalItem }
+-- extra = items of PhoneService.addCalendarItem ({key, title, detail?, at = server clock | day + hour, kind?});
+-- shuttle = {at = server clock of the next departure to Port Meridian, flight = "PM 101", airline}? (listed as a
+-- public timetable entry only when Port Meridian matters to the company: PhoneMath.abroadRelevant);
+-- hotels = {city = "City Hotel", abroad = "Meridian Grand Hotel"}?; offset = play-clock anchor (PhoneMath.anchor).
+-- Returns the items (soonest first).
+function PhoneMath.calendar(data: any, live: any, clock: number, extra: { any }?, shuttle: any?, hotels: any?, offset: number?): { CalItem }
 	local e = data.empire
 	local out: { CalItem } = {}
 	local today = Ops.day(e)
@@ -408,7 +448,7 @@ function PhoneMath.calendar(data: any, live: any, clock: number, extra: { any }?
 	for _, trip in (if typeof(deals.tripList) == "table" then deals.tripList else {}) do
 		local c = if typeof(trip) == "table" then Ops.client(trip.client) else nil
 		if not c then continue end
-		local day, hour = PhoneMath.atPlay(e, clock, tonumber(trip.back) or 0)
+		local day, hour = PhoneMath.atPlay(e, clock, tonumber(trip.back) or 0, offset)
 		local info = names[c.id .. ":" .. tostring(trip.back)]
 		local crew = if typeof(info) == "table" then tonumber(info.crew) or 1 else 1
 		local title, detail
@@ -434,22 +474,24 @@ function PhoneMath.calendar(data: any, live: any, clock: number, extra: { any }?
 		if not c or typeof(acc) ~= "table" or acc.renewing == true then continue end
 		local expires = tonumber(acc.expires) or 0
 		local due = expires - (Ops.TRIPS[c.trip].days + Ops.RENEW_LEAD_DAYS) * DAY
-		local day, hour = PhoneMath.atPlay(e, clock, due)
-		local endDay, endHour = PhoneMath.atPlay(e, clock, expires)
+		local day, hour = PhoneMath.atPlay(e, clock, due, offset)
+		local endDay, endHour = PhoneMath.atPlay(e, clock, expires, offset)
 		local overdue = due <= seconds
 		table.insert(out, { key = "renew:" .. c.id, title = "Check-in visit: " .. c.name,
 			detail = (if overdue then "Due now · waiting for a free seller (trips leave " .. PhoneMath.clock(Ops.DEPART.from) .. "-" .. PhoneMath.clock(Ops.DEPART.to) .. ")" else "Due " .. PhoneMath.when(day, hour, today))
 				.. " · contract ends " .. PhoneMath.when(endDay, endHour, today) .. " · " .. Ops.money(c.retainer) .. "/day",
 			day = day, hour = hour, order = math.max(nowOrder, PhoneMath.order(day, hour)), kind = "renewal", tag = "due" })
 	end
-	-- the next shuttle to Port Meridian (public timetable, FlightPlan)
-	if typeof(shuttle) == "table" and typeof(shuttle.at) == "number" then
+	-- the next shuttle to Port Meridian (public timetable, FlightPlan): only when Port Meridian matters
+	if typeof(shuttle) == "table" and typeof(shuttle.at) == "number" and PhoneMath.abroadRelevant(e) then
 		local day, hour = PhoneMath.atClock(e, clock, shuttle.at)
 		table.insert(out, { key = "shuttle:" .. tostring(math.floor(shuttle.at)), title = "Shuttle " .. tostring(shuttle.flight or "") .. " to Port Meridian",
-			detail = tostring(shuttle.airline or "Meridian Air") .. " · City Airport gate · departs " .. PhoneMath.when(day, hour, today), day = day, hour = hour,
-			order = PhoneMath.order(day, hour), kind = "flight" })
+			detail = "Public shuttle timetable · " .. tostring(shuttle.airline or "Meridian Air") .. " · City Airport · departs " .. PhoneMath.when(day, hour, today), day = day, hour = hour,
+			order = PhoneMath.order(day, hour), kind = "flight", public = true })
 	end
-	-- items of other packages (itinerary: flights, hotel, meetings, driver)
+	-- items of other packages (itinerary: flights, hotel, meetings, driver). day + hour mean exactly what the
+	-- status bar shows at that moment: company days turn at 08:00, so {day = 13, hour = 7} is 07:00 at the END
+	-- of company day 13 (the night before day 14 starts). Prefer `at` (server clock).
 	local extraList: { any } = extra or {}
 	for _, item in extraList do
 		if typeof(item) ~= "table" or typeof(item.title) ~= "string" then continue end
@@ -489,6 +531,80 @@ function PhoneMath.todayLine(e: any, live: any): string?
 	return "Today: " .. table.concat(parts, " · ")
 end
 
+------------------------------------------------------------------------------------------------ field staff reports
+-- First names of the travellers of `trip` (an entry of deals.tripList): the k-th field rep for the k-th trip of
+-- the reps, the engineer CompanyOps.presence marks as travelling for the m-th region/abroad pilot (same order;
+-- ShuttleService flies the same people). (rep?, engineer?)
+function PhoneMath.travellers(e: any, trip: any): (string?, string?)
+	local deals = if typeof(e.deals) == "table" then e.deals else {}
+	local k, m = 0, 0
+	local found = false
+	for _, t in (if typeof(deals.tripList) == "table" then deals.tripList else {}) do
+		if typeof(t) ~= "table" or t.founder == true then continue end
+		k += 1
+		local c = Ops.client(t.client)
+		if c and t.kind == "sign" and not t.hosted and c.trip ~= "city" then m += 1 end
+		if t == trip then found = true; break end
+	end
+	if not found then return nil, nil end
+	local staff = if typeof(e.staffProfiles) == "table" then e.staffProfiles else {}
+	local rep = if k <= Ops.fieldReps(e) then profileName(staff.marketer, k) else nil
+	local eng: string? = nil
+	if trip.kind == "sign" and (tonumber(trip.crew) or 0) >= 2 then
+		local n = 0
+		for i, state in Ops.presence(e, "engineer") do
+			if state == "trip" then
+				n += 1
+				if n == m then eng = profileName(staff.engineer, i) end
+			end
+		end
+	end
+	local function first(name: string?): string?
+		if not name then return nil end
+		local text: string = name
+		local f: string? = string.match(text, "^(%S+)")
+		return f
+	end
+	return first(rep), first(eng)
+end
+
+-- fallback legs (share of a game day after the trip leaves) when no shuttle timetable applies
+PhoneMath.ARRIVE = { region = 0.08, jet = 0.06, abroad = 0.12 }
+
+-- Server clock when the travellers of `trip` arrive (leftClock = the server clock of trip.left): abroad without
+-- the jet = when the shuttle they fly lands (shuttleArrive(leftClock), from the FlightPlan timetable), otherwise
+-- a short drive or jet hop. nil for city trips, the founder's own trips and client teams at the guest house.
+function PhoneMath.arrivalAt(e: any, trip: any, leftClock: number, shuttleArrive: ((number) -> number?)?): number?
+	local c = if typeof(trip) == "table" then Ops.client(trip.client) else nil
+	if not c or c.trip == "city" or trip.founder == true or trip.hosted == true then return nil end
+	if c.trip == "abroad" then
+		if e.jet == true then return leftClock + PhoneMath.ARRIVE.jet * DAY end
+		local t = if shuttleArrive then shuttleArrive(leftClock) else nil
+		return t or (leftClock + PhoneMath.ARRIVE.abroad * DAY)
+	end
+	return leftClock + PhoneMath.ARRIVE.region * DAY
+end
+
+-- "Arrived in Port Meridian": the field staff's report when they arrive and check in at the hotel.
+-- arrive = PhoneMath.arrivalAt(...); clock = now; offset = play-clock anchor; hotels as in PhoneMath.calendar.
+function PhoneMath.arrivalMessage(e: any, trip: any, arrive: number, clock: number, hotels: any?, offset: number?): Message?
+	local c = if typeof(trip) == "table" then Ops.client(trip.client) else nil
+	if not c or c.trip == "city" then return nil end
+	local rep, eng = PhoneMath.travellers(e, trip)
+	local who = if rep and eng then rep .. " and " .. eng elseif rep then rep else "Your field team"
+	local abroad = c.trip == "abroad"
+	local cityHotel = if typeof(hotels) == "table" and typeof(hotels.city) == "string" then hotels.city else "City Hotel"
+	local intlHotel = if typeof(hotels) == "table" and typeof(hotels.abroad) == "string" then hotels.abroad else "Meridian Grand Hotel"
+	local how = if abroad then (if e.jet == true then "landed in Port Meridian on the company jet" else "landed in Port Meridian") else "arrived in Business City"
+	local what = if trip.kind == "renew" then "check-in visit" else "pilot meeting"
+	local day, hour = PhoneMath.atClock(e, clock, arrive)
+	local backDay, backHour = PhoneMath.atPlay(e, clock, tonumber(trip.back) or 0, offset)
+	return { key = "arrived:" .. c.id .. ":" .. tostring(trip.left), from = "Travel desk", title = "Arrived in " .. WHERE[c.trip],
+		body = who .. " " .. how .. " and checked in at the " .. (if abroad then intlHotel else cityHotel) .. ". Next: the " .. what .. " at " .. c.name
+			.. ". Back " .. PhoneMath.when(backDay, backHour, day) .. ".",
+		tone = "info", day = day, hour = hour, order = PhoneMath.order(day, hour), source = "event" }
+end
+
 ------------------------------------------------------------------------------------------------ calls
 -- The assistant's call texts (short, real data only). Returned as (title, text).
 function PhoneMath.firstClientCall(clientName: string, retainer: number, goal: any): (string, string)
@@ -524,10 +640,28 @@ function PhoneMath.tripCall(t: TripCall): (string, string)
 end
 
 function PhoneMath.officeCall(officeName: string, price: number): (string, string)
-	return "We can move!", "We have enough cash for the " .. officeName .. " (" .. Ops.money(price) .. ") and a safety reserve. Open Company → Offices when you want to move."
+	return "We can move!", "We have enough cash for the " .. officeName .. " (" .. Ops.money(price) .. ") and a safety reserve. Open Company → Office when you want to move."
 end
 
 ------------------------------------------------------------------------------------------------ AI chat
+-- UserPrompt when the ContextToken is gone (after an error, or a new generator): the last turns of this chat
+-- (the player's lines and real AI replies, not the offline demo replies), then the new message.
+function PhoneMath.recapPrompt(turns: { any }, text: string): string
+	local lines: { string } = {}
+	local total = 0
+	for i = #turns, 1, -1 do
+		if #lines >= PhoneMath.CHAT_RECAP_TURNS then break end
+		local t = turns[i]
+		if typeof(t) ~= "table" or (t.who ~= "you" and t.who ~= "ai") then continue end
+		local line = (if t.who == "you" then "Player: " else "You: ") .. tostring(t.text)
+		if total + #line > PhoneMath.CHAT_RECAP_CHARS then break end
+		total += #line
+		table.insert(lines, 1, line)
+	end
+	if #lines == 0 then return text end
+	return "Earlier in this chat:\n" .. table.concat(lines, "\n") .. "\n\nThe player now says: " .. text
+end
+
 local function statValue(model: any, id: string): number
 	local stats = if typeof(model.stats) == "table" then model.stats else {}
 	return math.floor(tonumber(stats[id]) or 0)

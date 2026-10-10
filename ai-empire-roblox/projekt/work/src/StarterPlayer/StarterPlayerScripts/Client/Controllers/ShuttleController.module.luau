@@ -4,19 +4,27 @@
 --     frame from workspace:GetServerTimeNow() with FlightPlan (the server only publishes timetable attributes,
 --     never positions). One BulkMoveTo per frame (AircraftMover), fans spin with the engines on, gear retracts.
 --     Distance LOD: full model within 900 studs of the camera, medium up to 5,000, nothing beyond (riders
---     always see the full model). The airport package's parked aircraft on the shuttle stand is hidden locally
---     (the shuttle parks exactly there, at the same scale, so the jet bridge still meets its door).
+--     always see the full model). The full model collides locally only while it stands still (a player on the
+--     apron is never trapped inside the moving fuselage). The airport package's parked aircraft on the
+--     shuttle stand is hidden locally (the shuttle parks exactly there, at the same scale, so the jet bridge
+--     still meets its door).
 --   * The two pilots: clones of the server-built rigs (ReplicatedStorage.Shuttle.Crew) walk from the CrewRoom
---     marker through the gate and the jet bridge (Port Meridian: from the terminal up a client airstair) into
---     the cockpit and sit there (visible through the windshield) until they leave after arrival; poses from
+--     marker through the gate and the jet bridge into the cockpit and sit there (visible through the
+--     windshield) until they leave after the arrival home; at Port Meridian they stay aboard and the first
+--     officer does the walkaround (down the airstairs to the nose gear and back). Poses from
 --     EmployeeController.pose (no animation assets).
+--   * Ground handling and flight information (ShuttleGround): pushback tugs, the jet bridge retracting and
+--     docking, live rows on the airport's flight information boards, the Port Meridian gate board. Field staff
+--     flying on the leg (ShuttlePassengers) walk on and off when players are near.
 --   * Tickets and boarding: check-in -> TravelAction {action="ticket"}; a boarding pass panel counts down
---     (all times computed locally from FlightPlan); a beacon marks the gate; the gate board shows the live
---     status of the next departure ("missed it" = the next one). Board prompt -> {action="board"}.
+--     (all times computed locally from FlightPlan); a beacon marks the gate; the boards show the live status
+--     of the next departure ("missed it" = the next one). Board prompt -> {action="board"}.
 --   * The ride (Player attribute ShuttleLeg set by the server): scriptable camera on the local aircraft -
---     window seat (cabin window frame overlay, wing and engine outside), cockpit (over the pilots' shoulders)
---     or outside chase view; flight info panel; cabin announcements by the captain. The character itself is
---     held by the server (see ShuttleService), so nothing here needs physics or network ownership.
+--     window seat (cabin window frame overlay, wing and engine outside; the thin window / outline / livery
+--     plates right at the camera are hidden locally), cockpit (jump seat behind the pilots; their inner arms
+--     are hidden locally) or outside chase view; flight info panel; cabin announcements by the captain. The
+--     character itself is held by the server (see ShuttleService), so nothing here needs physics or network
+--     ownership.
 local Players=game:GetService("Players")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local RunService=game:GetService("RunService")
@@ -25,6 +33,8 @@ local FP=require(ReplicatedStorage.Shared.FlightPlan)
 local Aircraft=require(ReplicatedStorage.Shared.AircraftModel)
 local Format=require(ReplicatedStorage.Shared.Format)
 local Mover=require(script.Parent.AircraftMover)
+local Ground=require(script.Parent.ShuttleGround)
+local Pax=require(script.Parent.ShuttlePassengers)
 local Action=require(script.Parent.ActionController)
 local Employee=require(script.Parent.EmployeeController)
 local Toast=require(script.Parent.Parent.UI.Toast)
@@ -61,7 +71,7 @@ Shuttle.clock=clock
 ------------------------------------------------------------------------------------------------ state
 local folder: Folder?=nil
 local clientFolder: Folder?=nil
-type Plane={model: Model,mover: Mover.Mover,lod: string,last: CFrame?}
+type Plane={model: Model,mover: Mover.Mover,lod: string,last: CFrame?,solid: {BasePart},colliding: boolean,nearCam: {BasePart},camHidden: boolean}
 local plane: Plane?=nil
 local fanAngle=0
 local lastState: FP.State?=nil
@@ -104,17 +114,31 @@ local function ensureClientFolder(): Folder
 end
 
 ------------------------------------------------------------------------------------------------ aircraft
+local NEAR_CAM_HIDE: {[string]: boolean}={Window=true,Outline=true,Cheatline=true,Pinstripe=true,Titles=true}
 local function destroyPlane()
 	if plane then plane.model:Destroy();plane=nil end
 end
 local function buildPlane(lod: string,cf: CFrame)
 	destroyPlane()
 	local kind,scale=kindScale()
-	-- the full model collides locally (players cannot walk through the parked shuttle); far LODs never do
+	-- the full model collides locally while it stands still (players cannot walk through the parked shuttle);
+	-- far LODs never do
 	local m=Aircraft.build(nil,cf,{kind=kind,scale=scale,lod=lod,livery=Color3.fromRGB(24,120,128),airline=FP.CONFIG.airline,name="ShuttleAircraft",collide=lod=="full"})
 	m:SetAttribute("ShuttleClient",true)
+	local solid: {BasePart}={}
+	local nearCam: {BasePart}={}
+	local cam=Aircraft.points(kind,scale).cabinCamera.Position
+	local root=m.PrimaryPart
+	for _,d in m:GetDescendants() do
+		if d:IsA("BasePart") then
+			if d.CanCollide then table.insert(solid,d) end
+			-- thin skin plates within 4 studs of the window-seat camera (the fuselage cylinder is culled from
+			-- inside, these are not): hidden locally while riding in the window seat
+			if root and NEAR_CAM_HIDE[d.Name] and (root.CFrame:PointToObjectSpace(d.Position)-cam).Magnitude<4 then table.insert(nearCam,d) end
+		end
+	end
 	m.Parent=ensureClientFolder()
-	plane={model=m,mover=Mover.new(m,cf),lod=lod}
+	plane={model=m,mover=Mover.new(m,cf),lod=lod,last=nil,solid=solid,colliding=true,nearCam=nearCam,camHidden=false}
 end
 -- The airport package parks an aircraft on the shuttle stand; the shuttle replaces it locally.
 local nextStandSearch=0
@@ -125,11 +149,12 @@ local function hideStandAircraft(t: number)
 	nextStandSearch=t+3 -- searched only every 3 s while it is not streamed in
 	local world=workspace:FindFirstChild("WorldCity")
 	if not world then return end
-	-- AirportBuilder: WorldCity/Airport/Apron/ParkedAircraft (a few dozen children); full search as a fallback
+	-- AirportBuilder: WorldCity/Airport/Apron/ParkedAircraft (a few dozen children); until the apron has
+	-- streamed in, just retry in 3 s
 	local airport=world:FindFirstChild("Airport")
 	local apron=if airport then airport:FindFirstChild("Apron") else nil
-	local list=if apron then apron:GetChildren() else world:GetDescendants()
-	for _,d in list do
+	if not apron then return end
+	for _,d in apron:GetChildren() do
 		if d:IsA("Model") and d.Name=="ParkedAircraft" and d:GetAttribute("Stand")==CityPlan.AIRPORT.shuttleStand then
 			local function hidePart(p: Instance)
 				if p:IsA("BasePart") then p.LocalTransparencyModifier=1;p.CanCollide=false;p.CanQuery=false end
@@ -200,7 +225,8 @@ local function setAirstairs(show: boolean)
 end
 
 ------------------------------------------------------------------------------------------------ crew
-type CrewMember={model: Model,root: BasePart,joints: {[string]: Motor6D},seed: number,seat: CFrame,delay: number,visible: boolean?,parts: {BasePart}}
+type CrewMember={model: Model,root: BasePart,joints: {[string]: Motor6D},seed: number,seat: CFrame,delay: number,visible: boolean?,parts: {BasePart},
+	inner: {BasePart},armsHidden: boolean}
 local crew: {CrewMember}={}
 local function dropCrew()
 	for _,c in crew do c.model:Destroy() end
@@ -229,9 +255,21 @@ local function buildCrew(): boolean
 					end
 				end
 				root.Anchored=true
+				-- the arm on the aisle side (captain: right, first officer: left) and its hand: hidden in the
+				-- cockpit view, where it would fill the lower middle of the frame
+				local arm=m:FindFirstChild(if i==1 then "Right Arm" else "Left Arm")
+				local inner: {BasePart}={}
+				if arm and arm:IsA("BasePart") then
+					table.insert(inner,arm)
+					for _,d in m:GetDescendants() do
+						local w=if d:IsA("BasePart") then d:FindFirstChildOfClass("WeldConstraint") else nil
+						if w and w.Part0==arm and d:IsA("BasePart") then table.insert(inner,d) end
+					end
+				end
 				m.Parent=ensureClientFolder()
 				local seed=m:GetAttribute("PersonalitySeed")
-				table.insert(crew,{model=m,root=root,joints=joints,seed=if typeof(seed)=="number" then seed else i*97,seat=if i==1 then pts.captain else pts.firstOfficer,delay=(i-1)*1.4,visible=nil,parts=parts})
+				table.insert(crew,{model=m,root=root,joints=joints,seed=if typeof(seed)=="number" then seed else i*97,seat=if i==1 then pts.captain else pts.firstOfficer,
+					delay=(i-1)*1.4,visible=nil,parts=parts,inner=inner,armsHidden=false})
 			else m:Destroy() end
 		end
 	end
@@ -280,15 +318,28 @@ local function crewPath(atHome: boolean,cf: CFrame,seat: CFrame): {Vector3}
 		table.insert(path,Vector3.new(terminalDoor.X,room[1].Y,terminalDoor.Z))
 		table.insert(path,sillPoint+door.LookVector*4)
 	else
+		-- Port Meridian walkaround: from the foot of the airstairs (ahead of the nose gear and back - see
+		-- walkaroundPath) up into the aircraft
 		local stairs=airstairs
 		local bottom=if stairs and typeof(stairs:GetAttribute("Bottom"))=="Vector3" then stairs:GetAttribute("Bottom") :: Vector3 else sillPoint+door.LookVector*14
-		table.insert(path,Vector3.new(cf.Position.X-40,CityPlan.GROUND+3.5,CityPlan.ABROAD.terminal.z1-2))
-		table.insert(path,bottom+door.LookVector*4)
+		local top=if stairs and typeof(stairs:GetAttribute("Top"))=="Vector3" then stairs:GetAttribute("Top") :: Vector3 else sillPoint+door.LookVector*1.2
 		table.insert(path,bottom)
-		table.insert(path,sillPoint+door.LookVector*1.2)
+		table.insert(path,top)
 	end
 	table.insert(path,sillPoint)
 	for _,p in inCabin do table.insert(path,p) end
+	return path
+end
+-- The first officer's walkaround at Port Meridian: seat -> door -> down the airstairs -> beside the nose gear
+-- -> back up -> seat.
+local function walkaroundPath(cf: CFrame,seat: CFrame): {Vector3}
+	local into=crewPath(false,cf,seat) -- foot of the stairs ... seat
+	local pts=points()
+	local nose=cf*Vector3.new(pts.doorL1.X*0.5,3,pts.noseGearZ-5)
+	local path: {Vector3}={}
+	for i=#into,1,-1 do table.insert(path,into[i]) end
+	table.insert(path,nose)
+	for _,p in into do table.insert(path,p) end
 	return path
 end
 local function along(path: {Vector3},u: number): (Vector3,Vector3)
@@ -309,7 +360,8 @@ end
 local function poseCrew(c: CrewMember,cf: CFrame,sitting: boolean,walking: boolean,t: number,near: boolean)
 	c.root.CFrame=cf
 	if not near then return end
-	local transforms=Employee.pose(if sitting then "WORKING" else "WALKING",sitting,walking,t,c.seed)
+	-- seated: "COCKPIT" (not a desk activity: arms down, hands in the lap - the autopilot flies)
+	local transforms=Employee.pose(if sitting then "COCKPIT" else "WALKING",sitting,walking,t,c.seed)
 	for name,tr in transforms do
 		local j=c.joints[name]
 		if j and j.Parent then j.Transform=tr end
@@ -324,9 +376,24 @@ local function updateCrew(st: FP.State,pose: FP.Pose,t: number,camPos: Vector3)
 	local state,since=FP.crewTimes(st)
 	local atHome=(st.dir=="out" and st.phase=="boarding") or (st.dir=="back" and st.phase=="deboarding")
 	local closeUp=riding~=nil or (camPos-pose.cf.Position).Magnitude<160
+	local wa=FP.walkaround(st)
 	for idx,c in crew do
 		local visible=true
-		if (state=="walking" or state=="leaving") and since then
+		if wa and idx==2 then
+			local key="wa"..st.cycle
+			if key~=pathKey then pathKey=key;table.clear(pathCache) end
+			local path=pathCache[idx]
+			if not path then path=walkaroundPath(pose.cf,c.seat);pathCache[idx]=path end
+			local u=math.clamp(wa/FP.WALKAROUND,0,1)
+			-- a short look at the nose gear half way round
+			local half=0.5
+			if math.abs(u-half)<0.06 then u=half end
+			local p,dir=along(path,u)
+			local flatDir=Vector3.new(dir.X,0,dir.Z)
+			if flatDir.Magnitude<1e-3 then flatDir=pose.cf.LookVector*Vector3.new(1,0,1) end
+			if u<=0.001 or u>=0.999 then poseCrew(c,pose.cf*c.seat,true,false,t,closeUp)
+			else poseCrew(c,CFrame.lookAt(p,p+flatDir.Unit),false,u~=half,t,closeUp) end
+		elseif (state=="walking" or state=="leaving") and since then
 			local walkT=since-c.delay
 			local dur=(if state=="walking" then FP.CREW_WALK else FP.CREW_LEAVE)-2
 			local u=math.clamp(walkT/dur,0,1)
@@ -352,6 +419,7 @@ local function updateCrew(st: FP.State,pose: FP.Pose,t: number,camPos: Vector3)
 		if c.visible~=visible then
 			c.visible=visible
 			for _,d in c.parts do d.LocalTransparencyModifier=if visible then 0 else 1 end
+			if c.armsHidden then for _,d in c.inner do d.LocalTransparencyModifier=1 end end
 		end
 	end
 end
@@ -360,7 +428,6 @@ end
 local passGui: ScreenGui?=nil
 local passText: TextLabel?=nil
 local beacon: Part?=nil
-local gateBoards: {BillboardGui}={}
 local function playerGui(): Instance? return player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui",2) end
 local function closePass()
 	if passGui then passGui:Destroy();passGui=nil;passText=nil end
@@ -393,21 +460,8 @@ local function openPass()
 		beacon=b
 	end
 end
--- Status line of the next departure in direction dir at time t (gate boards, pass).
-function Shuttle.statusText(dir: string,t: number): (string,string)
-	local st=FP.at(t)
-	local leg=FP.leg(dir)
-	if st.dir==dir and st.phase=="boarding" then
-		return "BOARDING",clock(st.legStart+leg.phases.pushback.t0-t)
-	end
-	if st.dir==dir and st.phase=="doors" then return "GATE CLOSED",clock(st.legStart+leg.phases.pushback.t0-t) end
-	if st.dir==dir and st.tau<leg.phases.deboarding.t0 then
-		local _,_,dep=FP.nextLeg(dir,t+1)
-		return "DEPARTED",clock(dep-t)
-	end
-	local _,start,dep=FP.nextLeg(dir,t)
-	return if start-t<60 then "BOARDING SOON" else "ON TIME",clock(dep-t)
-end
+-- Status line of the next departure in direction dir at time t (boards, pass): ShuttleGround.statusText.
+Shuttle.statusText=Ground.statusText
 local function updatePass(t: number)
 	local tk=ticket
 	local label=passText
@@ -429,38 +483,6 @@ local function updatePass(t: number)
 	end
 	label.Text="BOARDING PASS · "..tk.flight.."\n"..route.."\n"..line
 end
-local function updateGateBoards(t: number)
-	local gates=workspace:FindFirstChild("ShuttleGates")
-	if not gates then return end
-	local pg=playerGui()
-	if not pg then return end
-	type Board={part: string,dir: string,dest: string}
-	local defs: {Board}={{part="GateBoardHome",dir="out",dest="PORT MERIDIAN"},{part="GateBoardAbroad",dir="back",dest="CITY AIRPORT"}}
-	for i,def in defs do
-		local part=gates:FindFirstChild(def.part)
-		local existing=gateBoards[i]
-		if not part or not part:IsA("BasePart") then if existing then existing.Enabled=false end continue end
-		local gui: BillboardGui
-		if existing and existing.Parent then gui=existing
-		else
-			gui=Instance.new("BillboardGui");gui.Name="ShuttleGateBoard";gui.Size=UDim2.fromOffset(260,74);gui.StudsOffsetWorldSpace=Vector3.new(0,7,0)
-			gui.MaxDistance=90;gui.LightInfluence=0;gui.ResetOnSpawn=false
-			local bg=Instance.new("Frame");bg.Size=UDim2.fromScale(1,1);bg.BackgroundColor3=Color3.fromRGB(18,24,36);bg.BackgroundTransparency=0.1;bg.BorderSizePixel=0;bg.Parent=gui
-			local c=Instance.new("UICorner");c.CornerRadius=UDim.new(0,6);c.Parent=bg
-			local l=Instance.new("TextLabel");l.Name="Text";l.BackgroundTransparency=1;l.Size=UDim2.new(1,-12,1,-8);l.Position=UDim2.fromOffset(6,4)
-			l.Font=Enum.Font.RobotoMono;l.TextSize=15;l.TextColor3=Color3.fromRGB(250,206,80);l.TextXAlignment=Enum.TextXAlignment.Left;l.Parent=bg
-			gui.Parent=pg
-			gateBoards[i]=gui
-		end
-		gui.Adornee=part;gui.Enabled=true
-		local status,left=Shuttle.statusText(def.dir,t)
-		local text=gui:FindFirstChild("Text",true)
-		if text and text:IsA("TextLabel") then
-			text.Text=FP.CONFIG.flights[def.dir].."  "..def.dest.."\n"..status.."\nDEPARTS IN "..left
-		end
-	end
-end
-
 ------------------------------------------------------------------------------------------------ ride
 local rideGui: ScreenGui?=nil
 local rideInfo: TextLabel?=nil
@@ -501,7 +523,27 @@ local function openRide()
 	gui.Parent=pg
 	rideGui=gui
 end
+local function setCamHidden(hide: boolean)
+	local pl=plane
+	if pl and pl.camHidden~=hide then
+		pl.camHidden=hide
+		for _,p in pl.nearCam do
+			p.LocalTransparencyModifier=if hide then 1 else 0
+			for _,g in p:GetChildren() do if g:IsA("SurfaceGui") then g.Enabled=not hide end end
+		end
+	end
+end
+local function setArmsHidden(hide: boolean)
+	for _,c in crew do
+		local h=hide and c.visible==true
+		if c.armsHidden~=h then
+			c.armsHidden=h
+			for _,p in c.inner do p.LocalTransparencyModifier=if h or c.visible==false then 1 else 0 end
+		end
+	end
+end
 local function closeRide()
+	setCamHidden(false);setArmsHidden(false)
 	if rideGui then rideGui:Destroy();rideGui=nil;rideInfo=nil;windowFrame=nil end
 	local camera=workspace.CurrentCamera
 	if camera then
@@ -520,11 +562,13 @@ local function updateRideCamera(pose: FP.Pose,dt: number)
 	local pts=points()
 	local win=windowFrame
 	if win then win.Visible=rideMode=="window" end
+	setCamHidden(rideMode=="window")
+	setArmsHidden(rideMode=="cockpit")
 	if rideMode=="window" then
 		camera.FieldOfView=62
 		camera.CFrame=pose.cf*pts.cabinCamera
 	elseif rideMode=="cockpit" then
-		camera.FieldOfView=55 -- narrower: the windshield, not the cockpit ceiling, fills the view
+		camera.FieldOfView=56 -- jump seat: windshield, glareshield and displays between the pilots' heads
 		camera.CFrame=pose.cf*pts.cockpitCamera
 	else
 		camera.FieldOfView=60
@@ -603,7 +647,10 @@ end
 local accum=0
 local function step(dt: number)
 	local f=folder
-	if not f or f:GetAttribute("Enabled")~=true then destroyPlane();dropCrew();return end
+	if not f or f:GetAttribute("Enabled")~=true then
+		if plane or #crew>0 then Ground.reset();Pax.reset() end
+		destroyPlane();dropCrew();return
+	end
 	local t=workspace:GetServerTimeNow()
 	local pose,st=FP.pose(t)
 	local camera=workspace.CurrentCamera
@@ -621,6 +668,12 @@ local function step(dt: number)
 			pl.last=pose.cf
 		end
 		Mover.setGear(pl.mover,pose.gearDown)
+		-- collide only while standing still: never trap a player inside the moving fuselage
+		local still=pose.onGround and pose.speed<0.01
+		if still~=pl.colliding then
+			pl.colliding=still
+			for _,p in pl.solid do p.CanCollide=still end
+		end
 	end
 	-- announcements + ride
 	local prev=lastState
@@ -631,12 +684,13 @@ local function step(dt: number)
 	local atPM=(st.dir=="back" and (st.phase=="boarding" or st.phase=="doors")) or (st.dir=="out" and st.phase=="deboarding")
 	setAirstairs(atPM and (camPos-FP.PM_STAND.Position).Magnitude<1500)
 	updateCrew(st,pose,t,camPos)
+	Ground.step(st,t,camPos,ensureClientFolder())
+	Pax.step(st,pose,t,camPos,folder,ensureClientFolder(),airstairs)
 	accum+=dt
 	if accum>=0.25 then
 		accum=0
 		hideStandAircraft(t)
 		updatePass(t)
-		updateGateBoards(t)
 		if riding then updateRideInfo(st,t) end
 	end
 end

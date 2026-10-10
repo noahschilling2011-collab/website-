@@ -21,7 +21,9 @@
 --            AircraftModel.REAL_SCALE = real size (134.2 studs for the 320).
 --   livery   tail fin, cheatline, nacelles, winglets;  body: fuselage colour;  collide: fuselage, wings,
 --            engines and gear collide (default false = pure decoration);  name: Model name.
---   kind     "320" | "380";  lod "full" (<= ~350 parts) | "medium" (~75) | "low" (<= 30);
+--   kind     "320" | "380";  lod "full" (<= ~350 parts) | "medium" (~76) | "low" (<= 30) - the distance LODs
+--            keep a smooth silhouette (LOD_LOFTS: a few long ellipsoids per cone; the 320's upper nose one
+--            ellipsoid with the windshield band painted on);
 --   airline  title text on the fuselage + tail letters (e.g. "AI Empire Air", "Meridian Air"); nil = none;
 --   mesh     false = never use an imported mesh.
 -- Imported meshes: if ReplicatedStorage.Assets.Aircraft.<Skyliner320|Skyliner380> (or the manifest's
@@ -115,7 +117,7 @@ SPECS["380"]={
 
 -- Smooth lofts: the nose / tail cone profiles resampled into `count` evenly spaced overlapping ellipsoids
 -- (spacing/c small enough that the envelope shows no scallops); none reaches past the tip.
-local function densify(list: {Sample},count: number,tipZ: number,front: boolean): {Sample}
+local function densify(list: {Sample},count: number,tipZ: number,front: boolean,overlap: number?): {Sample}
 	local out: {Sample}={}
 	local z1,z2=list[1].z,list[#list].z
 	local step=(z2-z1)/(count-1)
@@ -126,7 +128,7 @@ local function densify(list: {Sample},count: number,tipZ: number,front: boolean)
 		local a,b=list[i],list[i+1]
 		local u=math.clamp((z-a.z)/math.max(b.z-a.z,1e-3),0,1)
 		local reach=if front then z-tipZ else tipZ-z
-		local c=math.max(0.4,math.min(step*4.2,reach+0.15))
+		local c=math.max(0.4,math.min(step*(overlap or 4.2),reach+0.15))
 		table.insert(out,sample(z,a.top+(b.top-a.top)*u,a.bot+(b.bot-a.bot)*u,a.hw+(b.hw-a.hw)*u,c))
 	end
 	return out
@@ -134,6 +136,17 @@ end
 for _,spec in SPECS do
 	spec.noseFine=densify(spec.nose,7,spec.noseZ,true)
 	spec.tailFine=densify(spec.tail,11,spec.tailZ,false)
+end
+-- Distance LODs ("medium" / "low"): a few long, overlapping ellipsoids per cone (smooth silhouette, no lumps);
+-- the 320's upper nose, which the full model builds as the glazed canopy, is one ellipsoid continuing the barrel
+-- (LOD_NOSE_L: its length ahead of the barrel - its tip meets the lower nose, its crown passes y 19 at z -60).
+local LOD_NOSE_L=16.2
+local LOD_LOFTS: {[string]: {[number]: {nose: {Sample},tail: {Sample}}}}={}
+for key,spec in SPECS do
+	LOD_LOFTS[key]={
+		[1]={nose=densify(spec.nose,4,spec.noseZ,true,1.6),tail=densify(spec.tail,5,spec.tailZ,false,1.6)},
+		[0]={nose=densify(spec.nose,3,spec.noseZ,true,1.6),tail=densify(spec.tail,4,spec.tailZ,false,1.6)},
+	}
 end
 
 ------------------------------------------------------------------------------------------------ points
@@ -145,9 +158,12 @@ end
 SPECS["320"].points={
 	doorL1=CFrame.lookAt(Vector3.new(-7.05,15.4,-46.6),Vector3.new(-20,15.4,-46.6)),doorR1=CFrame.lookAt(Vector3.new(7.05,15.4,-46.6),Vector3.new(20,15.4,-46.6)),
 	doorL2=CFrame.lookAt(Vector3.new(-7.05,15.6,30.8),Vector3.new(-20,15.6,30.8)),
-	captain=CFrame.new(-1.9,15.9,-57.6),firstOfficer=CFrame.new(1.9,15.9,-57.6),
-	-- jump seat: behind and above the pilots' heads, 6 degrees down (heads in the lower corners, windshield ahead)
-	cockpitCamera=CFrame.lookAt(Vector3.new(0,17.95,-53.7),Vector3.new(0,17.95-math.tan(math.rad(6))*20,-73.7)),
+	captain=CFrame.new(-2.05,15.9,-57.6),firstOfficer=CFrame.new(2.05,15.9,-57.6), -- heads inside the front panes (seen from ahead)
+	-- jump seat 3.2 behind the pilots, at their eye height (the horizon shows through the windshield, whose top
+	-- is only a little higher), 8 degrees down: heads at the left / right edges, windshield, glareshield and
+	-- displays in the middle (ShuttleController: FieldOfView 56; the pilots' inner arms are hidden locally - at
+	-- this distance they would fill the lower middle of the view)
+	cockpitCamera=CFrame.lookAt(Vector3.new(0,17.7,-54.4),Vector3.new(0,17.7-math.tan(math.rad(8))*20,-74.4)),
 	-- window seat just ahead of the wing root: 6 degrees down, 10 degrees aft (wing and engine low, horizon high)
 	cabinCamera=CFrame.lookAt(Vector3.new(-4.9,15.9,-20.3),Vector3.new(-40,15.9-math.tan(math.rad(6))*35.6,-20.3+math.tan(math.rad(10))*35.1)),
 	cabinSeats=seatRows({-4.9,-3.3,3.3,4.9},{-13.5,-10.9,-8.3},13.4),
@@ -344,8 +360,13 @@ local function buildHull(ctx: Ctx,body: Color3,detail: number)
 		loft(spec.noseFine or spec.nose,"Nose",1)
 		loft(spec.tailFine or spec.tail,"TailCone",1)
 	else
-		loft(spec.nose,"Nose",2)
-		loft(spec.tail,"TailCone",2)
+		local lofts=LOD_LOFTS[spec.key][if detail>=1 then 1 else 0]
+		if spec.cockpit then
+			local c=spec.circles[1]
+			ellipsoid(ctx,"Nose",Vector3.new(0,c.y,b1),Vector3.new(c.r*0.995,c.r*0.995,LOD_NOSE_L),body,true)
+		end
+		loft(lofts.nose,"Nose",1)
+		loft(lofts.tail,"TailCone",1)
 	end
 	ellipsoid(ctx,"BellyFairing",spec.belly[1],spec.belly[2],BELLY,true)
 end
@@ -362,10 +383,12 @@ local CANOPY_Z={-61.6,-58.9,-56.2,-53.0,-49.4}
 local CANOPY_HW={4.9,5.9,6.55,7.0,7.2} -- half-width at the canopy centre line
 local CANOPY_YC={12.7,13.0,13.3,13.55,13.7} -- canopy ellipse centre height
 local CANOPY_TOP={18.4,19.5,20.2,20.6,20.9} -- crown height
-local CANOPY_TH={-30,10,62,90} -- band angles (degrees); the window band is band 2
+local CANOPY_TH={-30,10,62,76,90} -- band angles (degrees); the window band is band 2, the roof two bands
+-- (the -30 ring is replaced by a line just above the widest line of the nose ellipsoids, under their surface,
+-- so the cheek plates leave the lower nose almost tangentially: no shelf where the radome meets the cockpit)
 local CANOPY_APEX=Vector3.new(0,14.4,-63.6) -- windshield base on the centre line
-local FRONT_TOP=80 -- the front panes reach up to this angle on the first ring; above it the centre post
-local COCKPIT_GLASS_T=0.62 -- see-through enough that the seated pilots read from the apron, still reads as tinted glass
+local FRONT_TOP=86 -- the front panes reach up to this angle on the first ring; above it the (narrow) centre post
+local COCKPIT_GLASS_T=0.7 -- see-through enough that the seated pilots read from the apron, still reads as tinted glass
 local function buildCockpit(ctx: Ctx,body: Color3)
 	local frame=rgb(40,44,52)
 	local function plate(name: string,a: Vector3,b: Vector3,c: Vector3,d: Vector3,color: Color3,thick: number)
@@ -391,9 +414,31 @@ local function buildCockpit(ctx: Ctx,body: Color3)
 		local function g(v: Vector3): Vector3 return m+(v-m)*1.02+inward*0.03 end
 		tri(ctx,name,g(a),g(b),g(c),0.1,GLASS,false,Enum.Material.Glass)
 	end
+	-- widest line of the lower nose (ellipsoids only) at each canopy station: (half-width, height)
+	local cheek: {{number}}={}
+	local nose=ctx.spec.noseFine or ctx.spec.nose
+	for k,z in CANOPY_Z do
+		local bx,by=0,CANOPY_YC[k]
+		for y=6,15,0.05 do
+			for i,smp in nose do
+				local x=ellX(smp,y,z,sampleC(nose,i))
+				if x and x>bx then bx=x;by=y end
+			end
+		end
+		-- just above the widest line, buried 0.3 under the nose surface: the nearly vertical cheek plate leaves
+		-- the nose almost tangentially (no step, no shelf)
+		local y1=by+0.5
+		local x1=0
+		for i,smp in nose do
+			local x=ellX(smp,y1,z,sampleC(nose,i))
+			if x and x>x1 then x1=x end
+		end
+		cheek[k]={math.max(x1-0.3,0.5),y1}
+	end
 	local function P(k: number,deg: number,side: number): Vector3
+		if deg<0 then return Vector3.new(side*cheek[k][1],cheek[k][2],CANOPY_Z[k]) end
 		local th=math.rad(deg)
-		local yc=CANOPY_YC[k];local b=if th>=0 then CANOPY_TOP[k]-yc else 3.2
+		local yc=CANOPY_YC[k];local b=CANOPY_TOP[k]-yc
 		return Vector3.new(side*CANOPY_HW[k]*math.cos(th),yc+b*math.sin(th),CANOPY_Z[k])
 	end
 	local function stripAlong(name: string,a: Vector3,b: Vector3,w: number,color: Color3)
@@ -440,10 +485,10 @@ local function buildCockpit(ctx: Ctx,body: Color3)
 	local wall=rgb(120,124,130) -- light enough that the pilots' dark uniforms stand out against it
 	part(ctx,"CockpitBulkhead",Vector3.new(10.4,6.6,0.3),CFrame.new(0,15.0,-50.2),wall)
 	part(ctx,"CockpitBulkheadTop",Vector3.new(5.6,2.0,0.3),CFrame.new(0,19.0,-50.2),wall)
-	part(ctx,"Glareshield",Vector3.new(7.0,0.5,2.0),CFrame.new(0,15.0,-60.6),rgb(26,28,32))
+	part(ctx,"Glareshield",Vector3.new(7.0,0.5,1.4),CFrame.new(0,15.0,-60.3),rgb(26,28,32))
 	-- instrument panel: a dark panel with a primary flight display (sky over ground) and a navigation display
 	-- (dark, magenta route) in front of each pilot
-	local panelCf=CFrame.new(0,15.55,-59.55)*CFrame.Angles(math.rad(-20),0,0)
+	local panelCf=CFrame.new(0,15.25,-58.95)*CFrame.Angles(math.rad(-20),0,0) -- below the glareshield edge, seen from the seats
 	part(ctx,"InstrumentPanel",Vector3.new(6.4,0.9,0.08),panelCf,rgb(38,40,46))
 	for _,side in {-1,1} do
 		local pfd=panelCf*CFrame.new(side*2.35,0,0.05)
@@ -454,12 +499,14 @@ local function buildCockpit(ctx: Ctx,body: Color3)
 		part(ctx,"DisplayGround",Vector3.new(0.62,0.24,0.02),pfd*CFrame.new(0,-0.13,0.03),rgb(132,86,46),{material=Enum.Material.Neon})
 		part(ctx,"DisplayRoute",Vector3.new(0.06,0.44,0.02),nd*CFrame.new(0.05,0.02,0.03)*CFrame.Angles(0,0,math.rad(-14)),rgb(228,70,210),{material=Enum.Material.Neon})
 	end
-	part(ctx,"Pedestal",Vector3.new(1.3,1.0,3.0),CFrame.new(0,14.5,-58.6),rgb(58,60,66))
-	part(ctx,"ThrustLevers",Vector3.new(0.9,0.5,0.25),CFrame.new(0,15.2,-58.9)*CFrame.Angles(math.rad(-25),0,0),rgb(28,30,34))
-	for _,x in {-1.9,1.9} do
-		part(ctx,"PilotSeat",Vector3.new(1.8,0.7,1.8),CFrame.new(x,14.0,-57.5),rgb(34,36,40))
-		part(ctx,"PilotSeatBack",Vector3.new(1.8,3.4,0.45),CFrame.new(x,16.0,-56.35)*CFrame.Angles(math.rad(-8),0,0),rgb(34,36,40))
-		part(ctx,"Headrest",Vector3.new(1.3,0.8,0.5),CFrame.new(x,18.05,-56.05),rgb(40,42,48))
+	part(ctx,"Pedestal",Vector3.new(1.3,1.0,2.6),CFrame.new(0,14.5,-57.4),rgb(58,60,66))
+	part(ctx,"ThrustLevers",Vector3.new(0.9,0.5,0.25),CFrame.new(0,15.2,-57.6)*CFrame.Angles(math.rad(-25),0,0),rgb(28,30,34))
+	for _,x in {-2.05,2.05} do
+		-- sheepskin seat covers: light behind the pilots' dark caps and jackets (they read through the glass, and
+		-- the jump-seat view is not a dark box)
+		part(ctx,"PilotSeat",Vector3.new(1.8,0.7,1.8),CFrame.new(x,14.0,-57.5),rgb(196,184,160),{material=Enum.Material.Fabric})
+		part(ctx,"PilotSeatBack",Vector3.new(1.8,3.4,0.45),CFrame.new(x,16.0,-56.35)*CFrame.Angles(math.rad(-8),0,0),rgb(196,184,160),{material=Enum.Material.Fabric})
+		part(ctx,"Headrest",Vector3.new(1.3,0.8,0.5),CFrame.new(x,18.05,-56.05),rgb(206,196,174),{material=Enum.Material.Fabric})
 	end
 end
 local function buildWindows(ctx: Ctx,body: Color3,detail: number)
@@ -510,12 +557,10 @@ local function buildLivery(ctx: Ctx,livery: Color3,airline: string?,detail: numb
 	strip(ctx,"Cheatline",y,y,b1+0.5,b2,if spec.key=="380" then 1.3 else 0.62,livery,n)
 	if detail>=2 then
 		strip(ctx,"Pinstripe",y-0.62,y-0.62,b1+0.5,b2,0.2,GOLD,1)
-		-- the cheatline sweeps up along the tail cone and runs forward under the cockpit
-		local t1,t2=spec.tail[2].z,spec.tail[#spec.tail-2].z
+		-- the cheatline sweeps up along the tail cone; it ends where the nose begins (the cockpit cheeks cover
+		-- the nose's upper half, a forward sweep would vanish under them)
+		local t2=spec.tail[#spec.tail-2].z
 		strip(ctx,"Cheatline",y,y+(spec.tail[#spec.tail-2].bot-spec.tail[2].bot)*0.75,b2,t2,if spec.key=="380" then 1.1 else 0.5,livery,3)
-		local n1=spec.nose[3].z
-		strip(ctx,"Cheatline",y+0.4,y,n1,b1+0.5,if spec.key=="380" then 1.1 else 0.5,livery,5)
-		local _=t1
 	end
 	if airline and detail>=2 then
 		for side=-1,1,2 do
@@ -683,6 +728,51 @@ local function cockpitWindowsPainted(ctx: Ctx,detail: number)
 	local n=spec.nose
 	local s=n[math.max(1,#n-3)]
 	local y=s.top-(s.top-s.bot)*(if spec.key=="380" then 0.33 else 0.2)
+	if spec.key=="380" and detail>=1 then
+		-- a continuous band of four panes per side (narrow pillars between them) wrapping round the nose
+		-- between the decks, plus the sloping front panes: reads as a cockpit, not as two small "eyes"
+		local zs={-120.4,-116.9,-113.2,-109.4}
+		local lens={2.6,3.4,3.5,3.5}
+		for side=-1,1,2 do
+			for i,z in zs do skin(ctx,"CockpitWindow",side,24.9+(i-1)*0.12,z,2.9,lens[i],WINDOW,0.1,0.02) end
+			-- front pane: on the forward-facing surface at the band's height, beside the centre post
+			local wy=24.6
+			local z=spec.noseZ
+			while z<-115 and (surfX(spec,wy,z) or 0)<1.9 do z+=0.05 end
+			local p,nrm=surface(spec,side,wy,z)
+			if p and nrm then part(ctx,"CockpitWindow",Vector3.new(3.0,2.5,0.1),CFrame.lookAt(p+nrm*0.06,p+nrm*1.06),WINDOW) end
+		end
+		return
+	end
+	if spec.cockpit then
+		-- 320 distance LODs: the windshield band painted on the upper-nose ellipsoid (buildHull, LOD_NOSE_L):
+		-- two side panes per side and the two front panes beside the centre post
+		local c=spec.circles[1]
+		local a,b1,wy=c.r*0.995,spec.barrel[1],16.6
+		local function surf(side: number,z: number): (Vector3?,Vector3?)
+			local q=1-((wy-c.y)/a)^2-((z-b1)/LOD_NOSE_L)^2
+			if q<=0 then return nil,nil end
+			local x=a*math.sqrt(q)
+			return Vector3.new(side*x,wy,z),Vector3.new(side*x/(a*a),(wy-c.y)/(a*a),(z-b1)/(LOD_NOSE_L*LOD_NOSE_L)).Unit
+		end
+		for side=-1,1,2 do
+			local panes: {{number}}=if detail>=1 then {{-55.4,2.4},{-58.3,2.6}} else {{-57.0,4.6}} -- low: one long pane
+			if detail>=1 then
+				-- front pane: where the band's half-width is 1.25 (beside the centre post)
+				local z=b1-LOD_NOSE_L
+				while z<b1 do local p0=surf(side,z);if p0 and math.abs(p0.X)>=1.25 then break end;z+=0.05 end
+				table.insert(panes,{z,0})
+			end
+			for _,pz in panes do
+				local p0,nrm=surf(side,pz[1])
+				if p0 and nrm then
+					local w=if pz[2]>0 then pz[2] else 2.2
+					part(ctx,"CockpitWindow",Vector3.new(w,1.5,0.1),CFrame.lookAt(p0+nrm*0.06,p0+nrm*1.06),WINDOW)
+				end
+			end
+		end
+		return
+	end
 	if detail>=1 then
 		for side=-1,1,2 do
 			skin(ctx,"CockpitWindow",side,y,n[#n-3].z-0.6,(s.top-s.bot)*0.13,(n[#n-2].z-n[#n-4].z)*0.55,WINDOW,0.1,0.02)

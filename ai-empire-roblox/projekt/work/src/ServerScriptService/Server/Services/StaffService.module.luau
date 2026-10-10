@@ -17,8 +17,10 @@
 -- server time and is never behind it, so EmployeeConfig.hour(Staff.now()) shows the same hour).
 -- Who is on duty (StaffRota, CORE_SPEC 5.3 / 11.1): absent people (vacation, sick, unpaid leave, trips) stay
 -- OFF_DUTY with their desk released (employees[role] never changes), night crews work 22-06, operations
--- posts follow a covering day shift (security + IT night rota at stage 5), apprentices follow their own
--- schedule. Visible flows (StaffEvents): first-day arrivals through reception, IT/engineer rack repairs in
+-- posts follow a covering day shift (at stage 5 two night rota people take over security and IT at night),
+-- apprentices follow their own schedule. Operations rigs that appear in a running office (a rebuilt post,
+-- the Training Lead with a new apprentice batch, the night rota) are not new hires: no first day.
+-- Visible flows (StaffEvents): first-day arrivals through reception, IT/engineer rack repairs in
 -- sync with CompanyOps faults, the apprentices' tour, training session, shadowing and the Training Lead.
 -- Staff changes (hire / fire / graduation) are applied incrementally: StaffAssignment keeps every unchanged
 -- rig, StaffService registers the new ones (StaffRev) instead of recreating the whole office.
@@ -43,7 +45,7 @@ local caches: {[Instance]:any}={}
 local records: {[Model]:any}={}
 local evaluationFloors: {[number]:{[number]:boolean}}={}
 -- monotonic campus timer (starts at the server clock, never falls behind it; see header)
-local time=workspace:GetServerTimeNow();local accumulator=0;local ticks=0
+local time=workspace:GetServerTimeNow();local accumulator=0;local ticks=0;local lastSky=-1
 -- the ONE visible clock (CORE_SPEC 6): same hour and day index as the economy
 local function shownHour(): number return Ops.hour(workspace:GetServerTimeNow()) end
 local function shownDay(): number return math.floor(workspace:GetServerTimeNow()/Ops.DAY) end
@@ -74,6 +76,7 @@ end
 local applyRota: (c: any,e: any,r: Rota.Snapshot)->()
 local function onDutyAt(e: any,hour: number): boolean
  if e.role=="support" then
+  if e.nightPerson then return Rota.nightRotaOnDuty(hour,e.shiftStart or 18,e.shiftEnd or 7.5) end
   return Rota.opsOnDuty(hour,e.shiftStart or 0,e.shiftEnd or 24,e.nightRota)
  end
  return Rota.hiredOnDuty(hour,e.personality.start,e.personality.finish,e.away,e.night)
@@ -92,6 +95,7 @@ end
 -- The apprentice look (lanyard, badge, size) follows graduation without a rebuild.
 applyRota=function(c: any,e: any,r: Rota.Snapshot)
  if e.role=="support" then
+  if e.nightPerson then return end
   local nightRota=Rota.nightRota(r,e.post or 0)
   if nightRota~=(e.nightRota==true) then e.nightRota=nightRota or nil;shiftAttrs(e) end
   return
@@ -105,6 +109,16 @@ applyRota=function(c: any,e: any,r: Rota.Snapshot)
  if a and a.seed~=e.personality.seed then a=nil end -- the profile at this index changed: next resync fixes it
  e.apprentice=a
  local dressed=e.model:GetAttribute("Apprentice")==true
+ -- the rig's Skill follows the apprentice ramp (CompanyOps.apprentice: 1 -> 3) and, at graduation, the
+ -- profile skill CompanyOps.graduate wrote; ordinary staff keep the Skill StaffAssignment gave them
+ local skill: number?=if a then a.skill else nil
+ if not a and dressed then
+  local profiles=c.session.data.empire.staffProfiles
+  local list=if typeof(profiles)=="table" then profiles[e.role] else nil
+  local p=if typeof(list)=="table" then list[i] else nil
+  if typeof(p)=="table" and typeof(p.k)=="number" and typeof(p.s)=="number" and math.floor(math.abs(p.s))%2147483647==e.personality.seed then skill=p.k end
+ end
+ if skill and skill~=e.skillK then e.skillK=skill;e.skill=Workforce.factor(skill);e.model:SetAttribute("Skill",skill) end
  if (a~=nil)~=dressed then Assignment.dressApprentice(e.model,a~=nil,c.session.data.empire) end
 end
 -- Off duty at the commute point (hidden by the client, never talked to, desk released).
@@ -128,7 +142,20 @@ local function register(c: any,m: Model,mode: string): any?
  e.garage=e.personality.seed%3==0
  if role=="support" then
   e.post=index-300
-  e.shiftStart,e.shiftEnd=Rota.opsShift(e.personality.seed)
+  -- the job loop needs a task even when the post is held by someone else right now (the night rota shares
+  -- the stations of posts 3 / 6 with the day people; a step may run before the own post is reserved)
+  e.task=Config.TASKS.support[1]
+  -- a stage-5 night rota person (EmployeeConfig.NIGHT_ROTA) works the night at another post's station
+  local dayPost=Config.NIGHT_ROTA[e.post]
+  e.nightPerson=dayPost~=nil or nil
+  if dayPost then
+   -- hand-over at the day person's own shift ends (that rig's seeded Rota.opsShift): on when they leave,
+   -- off when they are back the next morning
+   local dayRig=if c.ops then c.ops:FindFirstChild("Employee_"..tostring(300+dayPost)) else nil
+   local daySeed=if dayRig then dayRig:GetAttribute("PersonalitySeed") else nil
+   if typeof(daySeed)=="number" then local a,b=Rota.opsShift(daySeed);e.shiftStart,e.shiftEnd=b,a
+   else e.shiftStart,e.shiftEnd=Rota.nightRotaShift(e.personality.seed) end
+  else e.shiftStart,e.shiftEnd=Rota.opsShift(e.personality.seed) end
  end
  for _,part in m:GetDescendants() do if part:IsA("BasePart") then part.CollisionGroup="CompanyEmployees" end end
  e.died=h.Died:Connect(function()
@@ -143,9 +170,16 @@ local function register(c: any,m: Model,mode: string): any?
  shiftAttrs(e)
  if mode=="added" then
   local seed=e.personality.seed
+  if role=="support" then
+   -- operations staff are no new hires (no badge at reception): on duty they walk in from the commute
+   -- point to their post on the next tick (StaffService.tick shift start), else they wait off duty
+   park(e)
+   if duty then e.next=time+1 end
+   return e
+  end
   if not duty then
    park(e)
-   if role~="support" or m:GetAttribute("Role")=="Training Lead" then Events.expect(c.office,seed,nil) end
+   Events.expect(c.office,seed,nil)
   elseif Events.held(c.office,seed) then
    park(e);e.next=time+1 -- the hired candidate is still walking out to the speed gates
   else
@@ -207,9 +241,11 @@ local function sync(p: any,s: any): any
  if cached then for _,e in cached.all do destroy(e) end end
  Workstations.reset(office)
  Workstations.scan(office)
- local c={office=office,folder=folder,ops=ops,all={},recordsSet={},session=s,event={},cf=p.cframe,rev=office:GetAttribute("StaffRev"),tier=(function(): number local t=office:GetAttribute("OfficeTier");return if typeof(t)=="number" then t else Plan.tierForOffice(s.data.empire.office) end)(),lastTraining=s.data.training~=nil,lastResearch=if s.data.empire.researchJob then s.data.empire.researchJob.id else nil,lastReleased=s.data.stats.modelsReleased,lastTrained=s.data.stats.modelsTrained,lastHardware=ModelMath.fleet(s.data.gpus).slotsUsed,lastData=ModelMath.dataSummary(s.data.data).total,nextMeeting=time+55,nextSocial=time+40,moving=0,onBreak=0,load={}}
+ -- per-office passes are staggered by plot index (12 offices do not compute their rota in the same frame)
+ local phase=((tonumber(p.index) or 0)%10)*.2
+ local c={office=office,folder=folder,ops=ops,all={},recordsSet={},session=s,event={},cf=p.cframe,rev=office:GetAttribute("StaffRev"),phase=phase,eventsAt=time+phase,tier=(function(): number local t=office:GetAttribute("OfficeTier");return if typeof(t)=="number" then t else Plan.tierForOffice(s.data.empire.office) end)(),lastTraining=s.data.training~=nil,lastResearch=if s.data.empire.researchJob then s.data.empire.researchJob.id else nil,lastReleased=s.data.stats.modelsReleased,lastTrained=s.data.stats.modelsTrained,lastHardware=ModelMath.fleet(s.data.gpus).slotsUsed,lastData=ModelMath.dataSummary(s.data.data).total,nextMeeting=time+55,nextSocial=time+40,moving=0,onBreak=0,load={}}
  caches[p.model]=c
- c.rota=Rota.compute(s.data.empire,shownHour());c.rotaAt=time+2
+ c.rota=Rota.compute(s.data.empire,shownHour());c.rotaAt=time+2+phase
  for _,group in {folder,ops} do if group then for _,m in group:GetChildren() do register(c,m,"initial") end end end
  return c
 end
@@ -491,12 +527,15 @@ function Staff.init()
  end)
 end
 -- Office rota (every 2 s): absences, night crew, night rota, apprentices; the Training Lead leaves with
--- the last apprentice (CORE_SPEC 11.1: the post exists only while there are apprentices).
+-- the last apprentice (CORE_SPEC 11.1: the post exists only while there are apprentices). Rota.compute is
+-- memoised: while nothing changed it returns the snapshot already applied and this pass ends here.
 local function refreshRota(c: any,s: any,hour: number)
  if time<(c.rotaAt or 0) then return end
  c.rotaAt=time+2
  local r=Rota.compute(s.data.empire,hour)
  c.rota=r
+ if c.rotaApplied==r then return end
+ c.rotaApplied=r
  for i=#c.all,1,-1 do
   local e=c.all[i]
   if r.apprenticeCount==0 and e.role=="support" and e.model:GetAttribute("Role")=="Training Lead" then
@@ -508,7 +547,9 @@ end
 function Staff.tick(dt: number)
  time=math.max(time+dt,workspace:GetServerTimeNow());accumulator+=dt;if accumulator<.2 then return end;accumulator=0;ticks+=1
  local positions={};for _,s in Session.all() do if not s.closed and s.player.Character and s.player.Character.PrimaryPart then table.insert(positions,s.player.Character.PrimaryPart.Position) end end
- local hour=shownHour();Lighting.ClockTime=hour
+ local hour=shownHour()
+ -- the sky follows the shown hour (written when it moved by at least 0.01 h, about 1 s of day time)
+ local sky=math.abs(hour-lastSky);if math.min(sky,24-sky)>=.01 then lastSky=hour;Lighting.ClockTime=hour end
  local clock=workspace:GetServerTimeNow()
  for _,p in Plot.all() do if p.office and p.owner then
   local s=Session.get(p.owner);if not s or s.closed then continue end
@@ -574,7 +615,7 @@ function Staff.tick(dt: number)
   Jobs.officeTick(c)
   -- once a second: rack faults (blade states + repairs, in sync with CompanyOps) and the apprentices
   if time>=(c.eventsAt or 0) then
-   c.eventsAt=time+1
+   c.eventsAt=math.max(c.eventsAt+1,time+.5)
    Events.rackTick(c,s,clock)
    Events.academyTick(c,hour,if c.rota then c.rota.day else Ops.day(s.data.empire))
   end

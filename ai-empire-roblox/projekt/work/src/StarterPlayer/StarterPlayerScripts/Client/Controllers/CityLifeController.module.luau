@@ -18,12 +18,19 @@
 --     and shop glass ("MetroNightGlow", attribute GlowColor), the turning Harbour Wheel ("MetroWheel"), the far
 --     skyline beyond the walls (MetroPlan.FAR), the tunnel gates (MetroPlan.TUNNELS) and impostors for towers
 --     streamed out on this client (their material, tint, silhouette, crown / needle and night glow).
+--   * City Airport terminal (airport request #5): 30 walkers (the top of the requested 20-30: the hall is 600 studs
+--     long), no cars, on the airport package's walk graph
+--     (MetroPlan.airportNet: check-in queues and desks, security, concourse, shops, food court, lounge, gates,
+--     baggage reclaim) with seat spurs at gate A1 and the landside seating islands; they board / arrive through
+--     the A1 jet bridge and the doors. Only while the camera is between the forecourt and the jet bridges, below
+--     the roof line (MetroPlan.REGIONS).
 --   * Budget: <= 60 walkers / 25 cars (downtown 44 / 18) around the camera: spawn 110-340 studs out (the first
 --     fill anywhere within the radius; walkers prefer the nearer spots), recycle beyond 380. One step at <= 30 Hz
 --     writes every moved CFrame with a single workspace:BulkMoveTo; walkers beyond 170 studs update at 10 Hz
 --     without limb swing, eyes or shadows. Shadows: car bodies and the torso / legs of near walkers only. Outside
---     both regions (campus, plots, City Airport, the flight) all of it is unparented and the step connection is
---     cut: the only cost left is one region check every 0.5 s. No server instance is written, no network traffic.
+--     the regions (campus, plots, the airport forecourt / apron, the flight) all of it is unparented and the step
+--     connection is cut: the only cost left is one region check every 0.5 s. No server instance is written, no
+--     network traffic.
 --   * Deterministic: Random seeded per region activation from MetroPlan.SEED; signal phases follow
 --     workspace:GetServerTimeNow(), so every client shows the same lights.
 local RunService=game:GetService("RunService")
@@ -34,7 +41,7 @@ local Plan=require(ReplicatedStorage.Shared.Config.MetroPlan)
 local City=require(ReplicatedStorage.Shared.Config.CityPlan)
 
 local CityLife={}
-CityLife.CAPS={metro={walkers=60,cars=25},downtown={walkers=44,cars=18}} :: {[string]: {walkers: number,cars: number}}
+CityLife.CAPS={metro={walkers=60,cars=25},downtown={walkers=44,cars=18},airport={walkers=30,cars=0}} :: {[string]: {walkers: number,cars: number}}
 CityLife.SPAWN_MIN=110
 CityLife.RADIUS=340
 CityLife.DESPAWN=380
@@ -273,7 +280,7 @@ end
 local function getRegion(id: string): Region
 	local cached=regionCache[id]
 	if cached then return cached end
-	local net=if id=="metro" then Plan.portMeridian() else Plan.downtown()
+	local net=if id=="metro" then Plan.portMeridian() elseif id=="airport" then Plan.airportNet() else Plan.downtown()
 	local lanes,by,total=laneRecords(net)
 	local portals: {number}={}
 	for _,n in net.nodes do if n.portal then table.insert(portals,n.id) end end
@@ -1322,7 +1329,7 @@ local function activate(id: string,focus: Vector3)
 	-- switching regions (or the first fill) keeps the step connection that is calling us
 	releaseRegion()
 	local R=getRegion(id)
-	R.rng=Random.new(Plan.SEED+(if id=="metro" then 1 else 2))
+	R.rng=Random.new(Plan.SEED+(if id=="metro" then 1 elseif id=="downtown" then 2 else 3))
 	region=R
 	acc,scanAcc,signalAcc,wheelAcc=0,0,0,0
 	local f=ensureFolder()

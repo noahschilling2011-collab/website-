@@ -5,12 +5,15 @@
 --   * The server only writes FxState / FxUntil (or a linked station's OccupiedBy); everything that moves,
 --     glows, steams or burns here is local to this client.
 --   * LOD from the camera, rebuilt every 0.5 s: < 60 studs every frame, 60–120 studs at 10 Hz, beyond
---     (or > 24 studs above/below) the prop is put back to its home pose once and sleeps.
+--     (or > 24 studs above/below) the prop is put back to its home pose once and sleeps. A prop may widen
+--     its own range with the attributes FxFar / FxVertical (e.g. the airport tower radar and beacon).
 --   * CFrames of one frame go out in a single workspace:BulkMoveTo(parts, cframes, FireCFrameChanged).
 --   * staffops: rack faults (CompanyOps faults mirrored by StaffEvents onto the GPU blade + rack door:
---     FxState "broken", FaultSlot, FaultUntil): the blade blinks red, the door LEDs blink red with a
---     "R3 · FAULT" banner, and a local beacon with a label "Rack R3 · fault · capacity −1" and the
---     economy's repair estimate sits on the rack. All client-only, active-set LOD like every prop.
+--     FxState "broken", FaultSlot, FaultUntil, FaultWorker, FaultFix): the blade blinks red, the door LEDs
+--     blink red with a "R3 · FAULT" banner, and ONE local beacon + label per rack sits on the rack top
+--     ("Rack R3 · fault" / "−1 compute unit · back in ~1 min" / "IT Support repairing"; a garage cabinet
+--     with several broken blades lists them in one label). When the fault clears the blade gets back its
+--     current server colour. All client-only, active-set LOD like every prop.
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -84,6 +87,9 @@ export type Prop = {
 	ledAt: number,
 	moved: boolean,
 	fault: any?, -- staffops: client-only rack fault effects while broken (beacon, label, banner, colours)
+	rackKey: Instance?, -- staffops: the rack (its RackDoor, else the blade) whose shared fault overlay a blade joins
+	far: number, -- activation range (FxFar, default FAR)
+	vertical: number, -- activation height band (FxVertical, default VERTICAL)
 }
 
 local props: { [Instance]: Prop } = {}
@@ -274,6 +280,9 @@ function Controller.register(root: Instance): Prop?
 		ledAt = 0,
 		moved = false,
 		fault = nil,
+		rackKey = nil,
+		far = math.max(NEAR, num(root:GetAttribute("FxFar"), FAR)),
+		vertical = math.max(1, num(root:GetAttribute("FxVertical"), VERTICAL)),
 	}
 	-- parts: the root part itself plus descendants
 	local parts: { BasePart } = {}
@@ -452,28 +461,104 @@ local function localFolder(): Folder
 	return folder :: Folder
 end
 
--- Rack fault label text: "Rack R3 · fault · capacity −1" and the economy's repair estimate (FaultUntil).
-function Controller.faultText(slot: number?, untilTime: number?, now: number): (string, string)
-	local units = Ops.FAULT.units
-	local title = string.format("Rack R%s · fault · capacity −%d", if slot then tostring(slot) else "?", units)
-	local sub
-	if typeof(untilTime) == "number" then
-		local left = math.max(0, math.floor(untilTime - now + 0.5))
-		if left >= 90 then
-			sub = string.format("Repair · back in ~%d min", math.floor(left / 60 + 0.5))
-		elseif left > 0 then
-			sub = string.format("Repair · back in ~%d s", left)
-		else
-			sub = "Repair · finishing"
-		end
-	else
-		sub = "IT notified"
+-- Rack fault texts (one label per rack): title "Rack R48 · fault" ("Rack R1 + R3 · 2 faults" when several blades
+-- of one cabinet are down), status "−1 compute unit · back in ~5 min" (CompanyOps.FAULT.units per fault, the
+-- latest of the economy's repair estimates FaultUntil), and who repairs it (FaultWorker / FaultFix, StaffEvents).
+export type FaultInfo = { slot: number?, untilTime: number?, worker: string?, fix: string? }
+local function backIn(untilTime: number?, now: number): string?
+	if typeof(untilTime) ~= "number" then
+		return nil
 	end
-	return title, sub
+	local left = math.max(0, math.floor(untilTime - now + 0.5))
+	if left >= 90 then
+		return string.format("back in ~%d min", math.floor(left / 60 + 0.5))
+	elseif left > 0 then
+		return string.format("back in ~%d s", left)
+	end
+	return "finishing"
+end
+local function slotName(slot: number?): string
+	return "R" .. (if slot then tostring(slot) else "?")
+end
+function Controller.rackText(list: { FaultInfo }, now: number): (string, string, string)
+	local n = #list
+	local sorted = table.clone(list)
+	table.sort(sorted, function(a: FaultInfo, b: FaultInfo): boolean
+		return (a.slot or 0) < (b.slot or 0)
+	end)
+	local title
+	if n <= 1 then
+		title = "Rack " .. slotName(sorted[1] and sorted[1].slot) .. " · fault"
+	else
+		local names = {}
+		for _, f in sorted do
+			table.insert(names, slotName(f.slot))
+		end
+		title = "Rack " .. (if n == 2 then names[1] .. " + " .. names[2] else table.concat(names, ", ")) .. " · " .. n .. " faults"
+	end
+	local units = Ops.FAULT.units * math.max(1, n)
+	local latest: number? = nil
+	for _, f in sorted do
+		if typeof(f.untilTime) == "number" and (latest == nil or f.untilTime > (latest :: number)) then
+			latest = f.untilTime
+		end
+	end
+	local back = backIn(latest, now)
+	local status = string.format("−%d compute unit%s", units, if units == 1 then "" else "s") .. (if back then " · " .. back else "")
+	local who = "Waiting for a technician"
+	for _, f in sorted do
+		if typeof(f.worker) == "string" and f.worker ~= "" then
+			if f.fix == "walk" then
+				who = f.worker .. " on the way"
+			elseif f.fix == "remote" then
+				who = f.worker .. " · remote fix"
+			else
+				who = f.worker .. " repairing"
+			end
+			break
+		end
+	end
+	return title, status, who
+end
+-- One fault (kept for callers of the single-blade form): title + status.
+function Controller.faultText(slot: number?, untilTime: number?, now: number): (string, string)
+	local title, status = Controller.rackText({ { slot = slot, untilTime = untilTime } }, now)
+	return title, status
 end
 
--- Beacon + label on top of a broken GPU blade's rack (blade front face = -Z, rack body behind it).
-local function faultBeacon(blade: BasePart): (Part, BillboardGui, TextLabel, TextLabel, PointLight)
+-- The rack a blade sits in: the RackDoor PropFx part just in front of the blade (HQ rack: one blade per rack;
+-- garage cabinet: three stacked blades behind one door). Its home pose gives the rack top (door top + 0.1).
+local function rackDoor(blade: BasePart): BasePart?
+	local best: BasePart? = nil
+	local bestD = math.huge
+	for _, d in CollectionService:GetTagged(TAG) do
+		if d:IsA("BasePart") and d.Name == "RackDoor" then
+			local home = if props[d] then props[d].pivot else d.CFrame
+			local l = blade.CFrame:PointToObjectSpace(home.Position)
+			if math.abs(l.X) < 0.9 and l.Z < 0.05 and l.Z > -0.7 and math.abs(l.Y) < d.Size.Y / 2 then
+				local dd = math.abs(l.X) + math.abs(l.Z)
+				if dd < bestD then
+					best, bestD = d, dd
+				end
+			end
+		end
+	end
+	return best
+end
+Controller.rackDoor = rackDoor
+
+-- Beacon + label of a rack: the beacon sits on the rack top near the front edge (above a garage cabinet,
+-- not inside it), the label 1.4 studs above the beacon, so the rack body never hides them.
+local function faultBeacon(blade: BasePart, door: BasePart?): (Part, BillboardGui, TextLabel, TextLabel, PointLight, TextLabel)
+	local d = door or rackDoor(blade)
+	local top
+	if d then
+		local home = if props[d] then props[d].pivot else d.CFrame
+		top = home.Position.Y + d.Size.Y / 2 + 0.1
+	else
+		top = blade.Position.Y + blade.Size.Y / 2
+	end
+	local back = blade.CFrame.LookVector * -0.6 -- from the blade face into the rack (front = -Z)
 	local beacon = Instance.new("Part")
 	beacon.Name = "RackFaultBeacon"
 	beacon.Shape = Enum.PartType.Ball
@@ -485,7 +570,7 @@ local function faultBeacon(blade: BasePart): (Part, BillboardGui, TextLabel, Tex
 	beacon.CastShadow = false
 	beacon.Material = Enum.Material.Neon
 	beacon.Color = FAULT_RED
-	beacon.CFrame = blade.CFrame * CFrame.new(0, blade.Size.Y / 2 + 1.75, 1.94)
+	beacon.CFrame = CFrame.new(Vector3.new(blade.Position.X + back.X, top + 0.35, blade.Position.Z + back.Z))
 	local light = Instance.new("PointLight")
 	light.Color = FAULT_RED
 	light.Range = 10
@@ -494,7 +579,7 @@ local function faultBeacon(blade: BasePart): (Part, BillboardGui, TextLabel, Tex
 	light.Parent = beacon
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "RackFaultLabel"
-	gui.Size = UDim2.fromOffset(240, 52)
+	gui.Size = UDim2.fromOffset(270, 72)
 	gui.StudsOffset = Vector3.new(0, 1.4, 0)
 	gui.MaxDistance = 60
 	gui.LightInfluence = 0
@@ -514,33 +599,86 @@ local function faultBeacon(blade: BasePart): (Part, BillboardGui, TextLabel, Tex
 	stroke.Color = FAULT_RED
 	stroke.Thickness = 2
 	stroke.Parent = frame
-	local title = Instance.new("TextLabel")
-	title.Name = "Title"
-	title.BackgroundTransparency = 1
-	title.Position = UDim2.new(0, 10, 0, 5)
-	title.Size = UDim2.new(1, -20, 0, 22)
-	title.Font = Enum.Font.BuilderSansBold
-	title.TextSize = 16
-	title.TextColor3 = Color3.fromRGB(255, 214, 208)
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextTruncate = Enum.TextTruncate.AtEnd
-	title.Parent = frame
-	local sub = Instance.new("TextLabel")
-	sub.Name = "Status"
-	sub.BackgroundTransparency = 1
-	sub.Position = UDim2.new(0, 10, 0, 27)
-	sub.Size = UDim2.new(1, -20, 0, 20)
-	sub.Font = Enum.Font.BuilderSans
-	sub.TextSize = 14
-	sub.TextColor3 = Color3.fromRGB(255, 160, 150)
-	sub.TextXAlignment = Enum.TextXAlignment.Left
-	sub.TextTruncate = Enum.TextTruncate.AtEnd
-	sub.Parent = frame
+	local function line(name: string, y: number, h: number, size: number, font: Enum.Font, color: Color3): TextLabel
+		local t = Instance.new("TextLabel")
+		t.Name = name
+		t.BackgroundTransparency = 1
+		t.Position = UDim2.new(0, 10, 0, y)
+		t.Size = UDim2.new(1, -20, 0, h)
+		t.Font = font
+		t.TextSize = size
+		t.TextColor3 = color
+		t.TextXAlignment = Enum.TextXAlignment.Left
+		t.TextTruncate = Enum.TextTruncate.AtEnd
+		t.Parent = frame
+		return t
+	end
+	local title = line("Title", 5, 22, 16, Enum.Font.BuilderSansBold, Color3.fromRGB(255, 214, 208))
+	local sub = line("Status", 27, 19, 14, Enum.Font.BuilderSans, Color3.fromRGB(255, 160, 150))
+	local who = line("Worker", 46, 19, 14, Enum.Font.BuilderSansMedium, Color3.fromRGB(255, 236, 200))
 	gui.Parent = beacon
 	beacon.Parent = localFolder()
-	return beacon, gui, title, sub, light
+	return beacon, gui, title, sub, light, who
 end
 Controller.faultBeacon = faultBeacon
+
+-- One overlay (beacon, light, label) per rack, shared by its broken blades (garage: up to 3 in one cabinet).
+type Overlay = { key: Instance, beacon: Part, gui: BillboardGui, title: TextLabel, sub: TextLabel, who: TextLabel, light: PointLight, members: { [Prop]: boolean }, textAt: number }
+local racks: { [Instance]: Overlay } = {}
+local function joinRack(p: Prop, blade: BasePart): Overlay
+	local key: any = p.rackKey
+	if key == nil then
+		key = rackDoor(blade) or blade
+		p.rackKey = key
+	end
+	local found = racks[key]
+	local ov: Overlay
+	if found and found.beacon.Parent then
+		ov = found
+	else
+		local beacon, gui, title, sub, light, who = faultBeacon(blade, if key ~= blade and key:IsA("BasePart") then key else nil)
+		ov = { key = key, beacon = beacon, gui = gui, title = title, sub = sub, who = who, light = light, members = {}, textAt = 0 }
+		racks[key] = ov
+	end
+	ov.members[p] = true
+	ov.textAt = 0
+	return ov
+end
+local function leaveRack(p: Prop, o: Overlay)
+	o.members[p] = nil
+	if next(o.members) == nil then
+		if racks[o.key] == o then
+			racks[o.key] = nil
+		end
+		o.beacon:Destroy()
+	else
+		o.textAt = 0
+	end
+end
+local function rackLabel(o: Overlay, now: number)
+	if now < o.textAt then
+		return
+	end
+	o.textAt = now + 0.5
+	local list: { FaultInfo } = {}
+	for member in o.members do
+		local r = member.root
+		local slot, untilTime, worker, fix = r:GetAttribute("FaultSlot"), r:GetAttribute("FaultUntil"), r:GetAttribute("FaultWorker"), r:GetAttribute("FaultFix")
+		table.insert(list, {
+			slot = if typeof(slot) == "number" then slot else nil,
+			untilTime = if typeof(untilTime) == "number" then untilTime else nil,
+			worker = if typeof(worker) == "string" then worker else nil,
+			fix = if typeof(fix) == "string" then fix else nil,
+		})
+	end
+	local title, status, who = Controller.rackText(list, now)
+	o.title.Text = title
+	o.sub.Text = status
+	o.who.Text = who
+end
+function Controller.rackOverlays(): { [Instance]: any }
+	return racks
+end
 
 -- "R3 · FAULT" banner across the top of the rack door's surface (above the LED column).
 local function faultBanner(gui: SurfaceGui, slot: number?): Frame
@@ -573,22 +711,28 @@ local function faultBanner(gui: SurfaceGui, slot: number?): Frame
 end
 Controller.faultBanner = faultBanner
 
--- Turns the fault effects off and restores the blade colour / LED colours.
+-- Turns the fault effects off and restores the blade's CURRENT server colour (captured when the fault
+-- started and refreshed whenever the server recoloured the blade meanwhile, e.g. a GPU bought: Lit) and
+-- the LED colours.
 function Controller.clearFault(p: Prop)
 	local f: any = p.fault
 	if not f then
 		return
 	end
 	p.fault = nil
-	if f.beacon then
-		f.beacon:Destroy()
+	if f.overlay then
+		leaveRack(p, f.overlay)
 	end
 	if f.banner then
 		f.banner:Destroy()
 	end
 	if p.breathe and p.breathe.part.Parent then
-		p.breathe.part.Color = p.breathe.color
-		p.breathe.part.Material = p.breathe.material
+		local part = p.breathe.part
+		if f.wrote and part.Color ~= f.wrote then
+			f.color = part.Color -- the server changed the colour after our last blink write
+		end
+		part.Color = f.color or p.breathe.color
+		part.Material = f.material or p.breathe.material
 	end
 	for led, color in f.leds do
 		if led.Parent then
@@ -602,11 +746,12 @@ function Controller.fault(p: Prop, now: number)
 	local root = p.root
 	local f: any = p.fault
 	if not f then
-		f = { leds = {}, on = nil, textAt = 0 }
+		f = { leds = {}, on = nil }
 		p.fault = f
 		local slot = root:GetAttribute("FaultSlot")
 		if p.kinds.breathe and root:IsA("BasePart") then
-			f.beacon, f.gui, f.title, f.sub, f.light = faultBeacon(root)
+			f.color, f.material = root.Color, root.Material
+			f.overlay = joinRack(p, root)
 		end
 		if p.kinds.leds then
 			for _, led in p.leds do
@@ -621,28 +766,28 @@ function Controller.fault(p: Prop, now: number)
 	if f.on ~= on then
 		f.on = on
 		if p.breathe and p.breathe.part.Parent then
-			p.breathe.part.Color = if on then FAULT_RED else FAULT_DIM
-			p.breathe.part.Material = if on then Enum.Material.Neon else p.breathe.material
+			local part = p.breathe.part
+			if f.wrote and part.Color ~= f.wrote then
+				f.color = part.Color -- recoloured by the server while broken: restore that one later
+			end
+			local c = if on then FAULT_RED else FAULT_DIM
+			part.Color = c
+			f.wrote = c
+			part.Material = if on then Enum.Material.Neon else (f.material or p.breathe.material)
 		end
 		for led in f.leds do
 			if led.Parent then
 				led.BackgroundColor3 = if on then FAULT_RED else FAULT_DIM
 			end
 		end
-		if f.light then
-			f.light.Enabled = on
-		end
-		if f.beacon then
-			f.beacon.Color = if on then FAULT_RED else FAULT_DIM
+		local o = f.overlay
+		if o then
+			o.light.Enabled = on
+			o.beacon.Color = if on then FAULT_RED else FAULT_DIM
 		end
 	end
-	if f.title and now >= f.textAt then
-		f.textAt = now + 0.5
-		local slot = root:GetAttribute("FaultSlot")
-		local untilTime = root:GetAttribute("FaultUntil")
-		local title, sub = Controller.faultText(if typeof(slot) == "number" then slot else nil, if typeof(untilTime) == "number" then untilTime else nil, now)
-		f.title.Text = title
-		f.sub.Text = sub
+	if f.overlay then
+		rackLabel(f.overlay, now)
 	end
 end
 
@@ -885,7 +1030,7 @@ function Controller.scan(camera: Vector3, parts: { BasePart }?, cframes: { CFram
 		end
 		local delta = p.position - camera
 		local distance = delta.Magnitude
-		local active = distance < FAR and math.abs(delta.Y) < VERTICAL
+		local active = distance < p.far and math.abs(delta.Y) < p.vertical
 		if not active and p.active then
 			Controller.reset(p, parts, cframes)
 		end

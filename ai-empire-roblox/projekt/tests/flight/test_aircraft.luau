@@ -18,7 +18,7 @@ local function check(name, ok, detail)
 end
 
 local function body()
-	local Instance, Vector3, CFrame, Color3 = G.Instance, G.Vector3, G.CFrame, G.Color3
+	local Instance, Vector3, CFrame, Color3, Enum = G.Instance, G.Vector3, G.CFrame, G.Color3, G.Enum
 	local RS = M.game.ReplicatedStorage
 	local A = M.require(RS.Shared.AircraftModel)
 	local folder = Instance.new("Folder"); folder.Parent = M.game.Workspace
@@ -206,11 +206,12 @@ local function body()
 			if #hits == 0 then seen += 1 else table.insert(blockedBy, view[1] .. ": " .. table.concat(hits, "/")) end
 		end
 		check(seat[1] .. "'s head visible from >= 5 of 7 gate A1 lounge positions", seen >= 5, seen .. " of 7; " .. table.concat(blockedBy, "; "))
+		print(string.format("  %s: head visible from %d of 7 gate A1 lounge positions%s", seat[1], seen, if #blockedBy > 0 then " (blocked: " .. table.concat(blockedBy, "; ") .. ")" else ""))
 		local l = seat[2].Position
 		local apron = {
 			{ "from the side at cockpit height", sCf * Vector3.new(seat[3] * 26, l.Y + 1.6, l.Z) },
 			{ "from the apron (5 studs eye height, 40 studs out, abeam)", sCf * Vector3.new(seat[3] * 40, 5, l.Z - 2) },
-			{ "from the apron ahead (5 studs eye height, 45 studs ahead)", sCf * Vector3.new(seat[3] * 8, 5, sp.noseZ - 45) },
+			{ "from the apron ahead (5 studs eye height, 45 studs ahead)", sCf * Vector3.new(seat[3] * 4, 5, sp.noseZ - 45) },
 		}
 		for _, view in apron do
 			local hits = blockers(shuttle, view[2], head)

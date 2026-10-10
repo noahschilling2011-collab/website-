@@ -1,7 +1,9 @@
 --!nocheck
 -- guiprev scene of the staffops package (approximate previews from the REAL client code):
---   rack          world GUIs of a rack fault (PropFxController.faultBeacon label + the rack-door banner), garage
---                 (slot 1, 300 s repair without IT) and data hall (slot 3, IT on duty)
+--   rack          world GUIs of rack faults through the real PropFx path (register + animate): HQ racks R48 (IT
+--                 remote fix), R7 (engineer at the rack), R12 (IT on the way), the rack-door banner, and the
+--                 garage cabinet with R1 + R3 down in one label
+--   badges        employee badges: apprentices (dressApprentice, long names) next to a regular hire
 --   talk_garage   the TalkPanel with a garage engineer repairing the mini rack (Dialogue from real state)
 --   talk_rich     stage 5: the receptionist answers "Who's away today?" (CompanyOps.presence of 240 staff)
 --   talk_trainer  stage 3: the Training Lead at a tour stop, then "How are the apprentices doing?"
@@ -36,25 +38,58 @@ local function body()
 	local Ops = M.require(RS.Shared.CompanyOps)
 	if STATE == "rack" then
 		local Fx = M.require(Client.Controllers.PropFxController)
-		local holder = Instance.new("Folder"); holder.Name = "RackPreview"; holder.Parent = G.workspace
+		local Collection = game:GetService("CollectionService")
+		local holder = Instance.new("Model"); holder.Name = "Office"; holder.Parent = G.workspace
 		local roots = {}
-		for _, case in { { slot = 1, left = 263 }, { slot = 3, left = 42 } } do
-			local blade = Instance.new("Part"); blade.Name = "RackBlade"; blade.Size = Vector3.new(1.4, 4.4, 0.08); blade.CFrame = CFrame.new(case.slot * 10, 3.8, 0); blade.Anchored = true; blade.Parent = holder
-			local beacon, gui, title, sub = Fx.faultBeacon(blade)
-			local t1, t2 = Fx.faultText(case.slot, G.workspace:GetServerTimeNow() + case.left, G.workspace:GetServerTimeNow())
-			title.Text = t1; sub.Text = t2
-			table.insert(roots, beacon)
-			-- the rack door's surface (ArchKit.serverRack "Mesh" gui: perforation + LED column) with the banner
-			local door = Instance.new("Part"); door.Name = "RackDoor_R" .. case.slot; door.Size = Vector3.new(2, 7.3, 0.08); door.Anchored = true; door.Parent = holder
+		local now = G.workspace:GetServerTimeNow()
+		-- HQ data-hall racks (ArchKit.serverRack): one blade per rack, the perforated door in front of it
+		for k, case in { { slot = 48, left = 290, worker = "IT Support", fix = "remote" }, { slot = 7, left = 42, worker = "ML Engineer", fix = "rack" }, { slot = 12, left = 263, worker = "IT Support", fix = "walk" } } do
+			local x = k * 12
+			local blade = Instance.new("Part"); blade.Name = "RackBlade"; blade.Size = Vector3.new(1.4, 4.4, 0.08); blade.CFrame = CFrame.new(x, 3.8, 0); blade.Anchored = true; blade.Parent = holder
+			blade:SetAttribute("Fx", "breathe"); Collection:AddTag(blade, "PropFx")
+			local door = Instance.new("Part"); door.Name = "RackDoor"; door.Size = Vector3.new(2, 7.3, 0.08); door.CFrame = CFrame.new(x, 3.75, -0.18); door.Anchored = true; door.Parent = holder
+			door:SetAttribute("Fx", "hinge,leds"); Collection:AddTag(door, "PropFx")
 			local mesh = Instance.new("SurfaceGui"); mesh.Name = "Mesh"; mesh.Face = Enum.NormalId.Front; mesh.CanvasSize = Vector2.new(200, 730); mesh.Parent = door
 			local perforation = Instance.new("Frame"); perforation.Name = "Perforation"; perforation.BorderSizePixel = 0; perforation.Position = UDim2.fromOffset(16, 40); perforation.Size = UDim2.fromOffset(168, 650)
 			perforation.BackgroundColor3 = Color3.fromRGB(60, 64, 70); perforation.BackgroundTransparency = 0.2; perforation.Parent = mesh
 			for i = 1, 8 do
 				local led = Instance.new("Frame"); led.Name = "LED" .. i; led.BorderSizePixel = 0; led.Position = UDim2.fromOffset(176, 120 + i * 50); led.Size = UDim2.fromOffset(10, 10)
-				led.BackgroundColor3 = if i % 2 == 0 then Color3.fromRGB(235, 52, 44) else Color3.fromRGB(96, 20, 18); led.Parent = mesh
+				led.BackgroundColor3 = Color3.fromRGB(80, 200, 120); led.Parent = mesh
 			end
-			Fx.faultBanner(mesh, case.slot)
-			table.insert(roots, door)
+			local pb, pd = Fx.register(blade), Fx.register(door)
+			blade:SetAttribute("FxState", "broken"); blade:SetAttribute("FaultSlot", case.slot); blade:SetAttribute("FaultUntil", now + case.left)
+			blade:SetAttribute("FaultWorker", case.worker); blade:SetAttribute("FaultFix", case.fix)
+			door:SetAttribute("FxState", "broken"); door:SetAttribute("FaultSlot", case.slot)
+			Fx.animate(pb, now, 0.1, {}, {}); Fx.animate(pd, now, 0.1, {}, {})
+			table.insert(roots, pb.fault.overlay.beacon)
+			if k == 1 then table.insert(roots, door) end
+		end
+		-- the garage cabinet (RoomKitsGarage.gpuRack): blades R1 + R3 down behind one door, nobody on it yet
+		local at = CFrame.new(80, 0, 0)
+		local gdoor = Instance.new("Part"); gdoor.Name = "RackDoor"; gdoor.Size = Vector3.new(2.6, 6.8, 0.08); gdoor.CFrame = at * CFrame.new(0, 3.5, -2.52); gdoor.Anchored = true; gdoor.Parent = holder
+		gdoor:SetAttribute("Fx", "hinge"); Collection:AddTag(gdoor, "PropFx"); Fx.register(gdoor)
+		local gp = {}
+		for i = 1, 3 do
+			local b = Instance.new("Part"); b.Name = "RackBlade"; b.Size = Vector3.new(2.0, 0.6, 0.08); b.CFrame = at * CFrame.new(0, 1.0 + (i - 1) * 0.85, -2.44); b.Anchored = true; b.Parent = holder
+			b:SetAttribute("Fx", "breathe"); Collection:AddTag(b, "PropFx"); gp[i] = Fx.register(b)
+		end
+		for _, i in { 1, 3 } do gp[i].root:SetAttribute("FxState", "broken"); gp[i].root:SetAttribute("FaultSlot", i); gp[i].root:SetAttribute("FaultUntil", now + 288 + i) end
+		for _, i in { 1, 3 } do Fx.animate(gp[i], now, 0.1, {}, {}) end
+		table.insert(roots, gp[1].fault.overlay.beacon)
+		GuiDump.dump(roots, { scene = "staffops", state = STATE })
+		return
+	end
+	if STATE == "badges" then
+		-- employee badges (EmployeeRigDesign) of a regular hire and of apprentices (StaffAssignment.dressApprentice)
+		local Rig = M.require(Server.Services.EmployeeRigDesign)
+		local Assignment = M.require(Server.Services.StaffAssignment)
+		local folder = Instance.new("Folder"); folder.Name = "Employees"; folder.Parent = G.workspace
+		local roots = {}
+		local cases = { { role = "marketer", name = "Maximilian Okonkwo-Schulz", appr = true }, { role = "curator", name = "Mia Weber", appr = true }, { role = "marketer", name = "Jonas Klein", appr = false }, { role = "engineer", name = "Alexandra Petrovic", appr = true } }
+		for i, c in cases do
+			local m = Rig.build(folder, 1001, i, c.role, CFrame.new(i * 6, 3, 0), { n = c.name, s = 1000 + i * 37, k = if c.appr then 1 else 3 })
+			if c.appr then Assignment.dressApprentice(m, true) end
+			table.insert(roots, m.Head)
 		end
 		GuiDump.dump(roots, { scene = "staffops", state = STATE })
 		return
@@ -72,7 +107,26 @@ local function body()
 	local d = Template.new()
 	d.company = { name = "Nimbus Labs", logo = "N", color = "cyan", spec = "general", reputation = 10, foundedAt = 0 }
 	local subject, ask
-	if STATE == "talk_garage" then
+	local HOUR = 10.4
+	if STATE == "talk_night" then
+		d.empire.office = 3
+		d.empire.employees = { researcher = 30, engineer = 14, curator = 10, marketer = 10 }
+		EmpireMath.syncProfiles(d.empire, 1001)
+		d.empire.nightShift = { research = true }
+		local p = d.empire.staffProfiles.researcher[29]
+		subject = { name = p.n, roleId = "researcher", job = "AI Researcher", seed = p.s, index = 29, activity = "RESEARCH", task = "RunExperiment", room = "Research Lab", level = "1", levelNumber = 1, shiftStart = 22, shiftEnd = 6 }
+		ask = "work"
+		HOUR = 23.2
+	elseif STATE == "talk_itremote" then
+		d.empire.office = 3
+		d.empire.employees = { researcher = 12, engineer = 12, curator = 10, marketer = 10 }
+		EmpireMath.syncProfiles(d.empire, 1001)
+		d.gpus.accelerator = 3
+		Ops.faultStep(d.empire, d.gpus, 1001, 0, 0)
+		table.insert(Ops.faults(d.empire), { slot = 2, gpu = "accelerator", throughput = 1, left = 1, since = 0 })
+		subject = { name = "Ivo Lang", roleId = "support", job = "IT Support", seed = 4242, index = 306, activity = "SERVER_CHECK", task = "RackRepair", pose = "typeStand", level = "1", levelNumber = 1 }
+		ask = "work"
+	elseif STATE == "talk_garage" then
 		d.empire.office = 1
 		d.empire.employees = { researcher = 1, engineer = 2, curator = 1, marketer = 0 }
 		EmpireMath.syncProfiles(d.empire, 1001)
@@ -107,7 +161,7 @@ local function body()
 	end
 	local facts = Dialogue.facts(d, { users = 0, revenue = 0, cost = 0 })
 	local tier = math.max(0, d.empire.office - 1)
-	local lines = Dialogue.lines(subject, { viewer = "owner", viewerName = "Noah", day = d.empire.calendar.day or 1, hour = 10.4, tier = tier, facts = facts, company = "Nimbus Labs" })
+	local lines = Dialogue.lines(subject, { viewer = "owner", viewerName = "Noah", day = d.empire.calendar.day or 1, hour = HOUR, tier = tier, facts = facts, company = "Nimbus Labs" })
 	local asked = {}
 	local function call(p)
 		if p.action == "say" then

@@ -3,7 +3,10 @@
 --   * Check-in counters (prompt CityAction="checkin", FlightTo): while the scheduled Port Meridian shuttle
 --     runs (ReplicatedStorage.Shuttle, Enabled) the counter sells a boarding pass and ShuttleController takes
 --     over (gate, boarding prompt CityAction="board", the visible ride with two pilots, arrival); air traffic
---     and the VIP helicopter are AirTrafficController's. Fallback when the shuttle is off: fade to black,
+--     and the VIP helicopter are AirTrafficController's. When the next boarding is more than
+--     FlightPlan.CONFIG.charterAfter seconds away the counter offers a choice: the shuttle (boarding pass) or
+--     the express flight that leaves now (the instant flight below, same ticket price; a held shuttle ticket
+--     is used for it). Fallback when the shuttle is off: fade to black,
 --     TravelAction {action="flight"}; while the server streams the arrival hall and moves the character, a
 --     short client-only cutscene plays (a plane over a client-side sea and clouds, camera following it), then
 --     the screen fades back in at the arrival hall.
@@ -20,6 +23,7 @@ local ProximityPromptService=game:GetService("ProximityPromptService")
 local CityPlan=require(ReplicatedStorage.Shared.Config.CityPlan)
 local Format=require(ReplicatedStorage.Shared.Format)
 local Aircraft=require(ReplicatedStorage.Shared.AircraftModel)
+local FP=require(ReplicatedStorage.Shared.FlightPlan)
 local State=require(script.Parent.StateController)
 local Shuttle=require(script.Parent.ShuttleController)
 local AirTraffic=require(script.Parent.AirTrafficController)
@@ -152,6 +156,37 @@ function Travel.fly(to: string)
 	end
 end
 
+------------------------------------------------------------------------------------------------ check-in choice
+-- Shuttle or express flight: a small panel at the counter when the next boarding is far away.
+local choice: ScreenGui?=nil
+local function closeChoice() if choice then choice:Destroy();choice=nil end end
+function Travel.choice(): ScreenGui? return choice end
+function Travel.checkIn(to: string)
+	local dir=if to=="abroad" then "out" else "back"
+	local t=workspace:GetServerTimeNow()
+	local wait=FP.boardingIn(dir,t)
+	if wait<=FP.CONFIG.charterAfter then closeChoice();task.spawn(Shuttle.checkIn,to);return end
+	closeChoice()
+	local gui=Instance.new("ScreenGui");gui.Name="FlightChoice";gui.ResetOnSpawn=false;gui.DisplayOrder=40
+	local box=Kit.panel(gui,UDim2.fromOffset(380,156),UDim2.new(0.5,-190,0.62,-78))
+	Kit.padding(box,12)
+	Kit.list(box,8)
+	local flight=FP.CONFIG.flights[dir] or ""
+	local title=Kit.text(box,"Fly to "..(if to=="abroad" then "Port Meridian" else "City Airport"),18,Theme.font.bold)
+	title.LayoutOrder=1
+	local note=Kit.text(box,"Next shuttle "..flight.." boards in "..Shuttle.clock(wait)..".",14)
+	note.LayoutOrder=2
+	local price=if to=="abroad" then " · "..Format.money(CityPlan.TRAVEL.ticket) else ""
+	local a=Kit.button(box,"Shuttle "..flight.." (boarding pass)"..price,"secondary",UDim2.new(1,0,0,36));a.LayoutOrder=3;a.TextSize=14
+	local b=Kit.button(box,"Express flight - leaves now"..price,"primary",UDim2.new(1,0,0,36));b.LayoutOrder=4;b.TextSize=14
+	Kit.onClick(a,function() closeChoice();task.spawn(Shuttle.checkIn,to) end)
+	Kit.onClick(b,function() closeChoice();task.spawn(Travel.fly,to) end)
+	gui.Parent=player:WaitForChild("PlayerGui")
+	choice=gui
+	-- walking away / waiting closes it
+	task.delay(25,function() if choice==gui then closeChoice() end end)
+end
+
 ------------------------------------------------------------------------------------------------ GPS guide
 local guideFolder: Folder?=nil
 local guideTarget: Vector3?=nil
@@ -282,7 +317,7 @@ function Travel.init()
 		if action=="checkin" then
 			local to=prompt:GetAttribute("FlightTo")
 			if typeof(to)=="string" then
-				if Shuttle.active() then ensureOverlay();task.spawn(Shuttle.checkIn,to) else task.spawn(Travel.fly,to) end
+				if Shuttle.active() then ensureOverlay();Travel.checkIn(to) else task.spawn(Travel.fly,to) end
 			end
 		elseif action=="board" then
 			task.spawn(Shuttle.board)

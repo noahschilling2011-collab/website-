@@ -1296,8 +1296,10 @@ end
 -- Guest house (hotel annex, Plan.hasHotel): two storeys in the HQ language (stone piers, cornice and
 -- parapet, glazing with oak louvres), green roof behind a glass rail, built neon "GUEST HOUSE" letters on
 -- the south and west parapets, entrance canopy over the WestPath with a lit approach from the colonnade,
--- a terrace towards the garden. Rooms, walls and interior doors come from the plan pipeline
--- (InteriorDesign / RoomKitsHotel); the slabs from Layout.slabs (structure()).
+-- a terrace towards the garden. The district side (west) is a clay-render wall with one French window per
+-- room (balcony railings and flower boxes), the room ends on the north side are closed render walls.
+-- Rooms, walls and interior doors come from the plan pipeline (InteriorDesign / RoomKitsHotel); the slabs
+-- from Layout.slabs (structure()).
 ---------------------------------------------------------------------------------------------
 local function guestHouse(ctx: any)
 	local tier: number = ctx.tier
@@ -1345,8 +1347,10 @@ local function guestHouse(ctx: any)
 		fsolid(f, "CornerPier", a2 - 3, a2, 0, 33.2, 0, PD, C.stone, M.stone)
 		local g1, g2 = a1 + 3, a2 - 3
 		fsolid(f, "BaseCourse", g1, g2, 0, 0.9, 0, 1.0, C.stoneDeep, M.stone)
-		storey(f, g1, g2, 0.9, 15, { tier = tier, level = 0, grid = 0, skip = pil, skipW = 2, transom = 10.8, louvres = louvres, vy1 = 0.9, vy2 = 15 })
-		storey(f, g1, g2, 16.6, 30, { tier = tier, level = 1, grid = 0, skip = pil, skipW = 2, louvres = louvres, vy1 = 15, vy2 = 30 })
+		-- the west face gets no grid mullions (pitch beyond the face): its windows bring their own (below)
+		local pitch = if f == west then 1000 else nil
+		storey(f, g1, g2, 0.9, 15, { tier = tier, level = 0, grid = 0, pitch = pitch, skip = pil, skipW = 2, transom = 10.8, louvres = louvres, vy1 = 0.9, vy2 = 15 })
+		storey(f, g1, g2, 16.6, 30, { tier = tier, level = 1, grid = 0, pitch = pitch, skip = pil, skipW = 2, louvres = louvres, vy1 = 15, vy2 = 30 })
 		for _, a in pil do
 			fsolid(f, "Pier", a - 1, a + 1, 0, 30, 0.2, PD, C.stone, M.stone)
 		end
@@ -1449,31 +1453,49 @@ local function guestHouse(ctx: any)
 	end
 	parapetSign(south, -119.2, 4.0, 0.85, 1.3, 0.76, true)
 	parapetSign(west, 124, 4.6, 0.8, 0.98, 0.71, false)
-	-- west facade (rooms facing the district path): a window box under every room window, on the base
-	-- course under the ground floor (front office, rooms 101-104) and standing on the cornice under the
-	-- first floor (rooms 201-205), where it shows from the path: dark oak box, a row of flowers standing on
-	-- its front edge (above the box top, so the path below sees them) and green foliage behind and above
-	-- them. Everything stays between the glass (depth 0.2) and the site edge (depth 1.0).
+	-- west facade (the district side): a rendered wall with tall French windows instead of a curtain wall.
+	-- Warm clay-render wall panels on the glass line (depth 0.2..0.5, both storeys in one part, behind the
+	-- stone piers and cornice) leave one HotelKit.WEST_WINDOW wide window per room (centred on the room,
+	-- where the drapes inside frame it) and two on the stair; each window has a centre mullion (two leaves).
+	-- Flower boxes on the base course under every ground-floor window (stair, front office, rooms 101-104);
+	-- on the first floor every room window (rooms 201-205) has a box standing on the cornice behind a
+	-- two-bar French balcony railing (top rail and middle bar, ends against the wall panels). Everything
+	-- stays between the glass (depth 0.2) and the site edge (depth 1.0).
+	local WIN = HotelKit.WEST_WINDOW
 	local wpiers = piers[west]
-	local blooms = { C.statusBad, C.statusBusy, C.terracotta }
+	local roomWins: { number } = {}
 	for i = 1, #wpiers do
-		local b1 = wpiers[i] + 1.2
-		local b2 = (if i < #wpiers then wpiers[i + 1] else h.z2 - 3) - 1.2
-		local zc, bloom = (b1 + b2) / 2, blooms[i % #blooms + 1]
-		fsolid(west, "FlowerBox", b1, b2, 0.9, 1.9, 0.25, 0.95, C.stoneDeep, M.stone, DETAIL)
-		Kit.cylinder(west.model, B, "FlowerHedge", "z", b2 - b1 - 0.4, 0.7, CF(h.x1 - 0.6, 2.05, zc), if i % 2 == 0 then C.foliage else bloom, if i % 2 == 0 then M.leafy else M.fabric, DETAIL)
-		fsolid(west, "WindowBox", b1, b2, 16.6, 17.6, 0.25, 0.95, C.oakDark, M.wood, DETAIL)
-		Kit.cylinder(west.model, B, "WindowBoxGreen", "z", b2 - b1 - 0.3, 0.66, CF(h.x1 - 0.55, 17.95, zc), C.foliage, M.leafy, DETAIL)
-		Kit.cylinder(west.model, B, "WindowBoxBloom", "z", b2 - b1 - 0.9, 0.48, CF(h.x1 - 0.75, 17.84, zc), bloom, M.fabric, DETAIL)
+		table.insert(roomWins, (wpiers[i] + (if i < #wpiers then wpiers[i + 1] else h.z2)) / 2)
 	end
-	-- the same window boxes round the corner on the north cornice (2.2 deep), under the first-floor rooms
-	-- 205 (x -141..-124) and suite 208 (x -116..-98) that look onto the garden
-	for i, span in { { -138.8, -125.0 }, { -115.0, -99.6 } } do
-		local xc, bloom = (span[1] + span[2]) / 2, blooms[(i + 1) % #blooms + 1]
-		fsolid(north, "WindowBox", span[1], span[2], 16.6, 17.6, 0.3, 1.0, C.oakDark, M.wood, DETAIL)
-		Kit.cylinder(north.model, B, "WindowBoxGreen", "x", span[2] - span[1] - 0.3, 0.66, CF(xc, 17.95, h.z2 + 0.6), C.foliage, M.leafy, DETAIL)
-		Kit.cylinder(north.model, B, "WindowBoxBloom", "x", span[2] - span[1] - 0.9, 0.48, CF(xc, 17.84, h.z2 + 0.8), bloom, M.fabric, DETAIL)
+	local stairWins = { h.z1 + 8.5, h.z1 + 19.5 } -- two windows in the stair bay (z 79..101)
+	local wins = table.clone(stairWins)
+	table.move(roomWins, 1, #roomWins, #wins + 1, wins)
+	local RENDER = C.stone:Lerp(C.terracotta, 0.45)
+	local from = h.z1 + 3 -- inner face of the south-west corner pier
+	for _, c in wins do
+		fsolid(west, "WallPanel", from, c - WIN / 2, 0.9, 30, 0.2, 0.5, RENDER, M.plaster)
+		fsolid(west, "Mullion", c - 0.075, c + 0.075, 0.9, 30, 0, 0.45, C.metal, M.metal, DETAIL)
+		from = c + WIN / 2
 	end
+	fsolid(west, "WallPanel", from, h.z2 - 3, 0.9, 30, 0.2, 0.5, RENDER, M.plaster)
+	local blooms = { C.statusBad, C.statusBusy, C.terracotta }
+	for i, c in wins do
+		local bloom = blooms[i % #blooms + 1]
+		fsolid(west, "FlowerBox", c - WIN / 2 - 0.2, c + WIN / 2 + 0.2, 0.9, 1.9, 0.5, 0.98, C.stoneDeep, M.stone, DETAIL)
+		Kit.cylinder(west.model, B, "FlowerHedge", "z", WIN, 0.5, CF(h.x1 - 0.74, 2.1, c), if i % 2 == 0 then C.foliage else bloom, if i % 2 == 0 then M.leafy else M.fabric, DETAIL)
+	end
+	for i, c in roomWins do
+		local bloom = blooms[(i + 1) % #blooms + 1]
+		fsolid(west, "WindowBox", c - WIN / 2, c + WIN / 2, 16.6, 17.7, 0.5, 0.78, C.oakDark, M.wood, DETAIL)
+		Kit.cylinder(west.model, B, "WindowBoxBloom", "z", WIN - 0.4, 0.46, CF(h.x1 - 0.66, 17.9, c), bloom, M.fabric, DETAIL)
+		fsolid(west, "JulietBar", c - WIN / 2 - 0.3, c + WIN / 2 + 0.3, 18.35, 18.47, 0.5, 0.92, C.metal, M.metal, DETAIL)
+		fsolid(west, "JulietRail", c - WIN / 2 - 0.3, c + WIN / 2 + 0.3, 19.2, 19.4, 0.5, 0.95, C.metal, M.metal, DETAIL)
+	end
+	-- north side: the ends of rooms 104 / 205 (x -141..-124: bathroom, wardrobe and TV against the facade)
+	-- and of suite 208 (x -116..-98, upper floor: headboard and print) are closed walls on the glass line
+	-- in the same clay render; the corridor end keeps its window over the terrace door
+	fsolid(north, "WallPanel", h.x1 + 2, -124.5, 0.9, 30, 0.2, 0.5, RENDER, M.plaster)
+	fsolid(north, "WallPanel", -116.1, h.x2 - 1.4, 16.6, 30, 0.2, 0.5, RENDER, M.plaster)
 	-- terrace towards the garden (emergency exit of the corridor), benches and planters, a small canopy
 	-- with a wall light over the terrace door
 	box(grounds, "HotelTerrace", -138, -96, 0, 0.14, h.z2, h.z2 + 9, C.stonePave, M.pave)

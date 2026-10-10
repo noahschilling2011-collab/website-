@@ -124,6 +124,14 @@ local LEDGER_NAMES: {[string]:string}={market="AI products",b2b="retainers",pilo
  b2bserve="client serving",jet="jet",jetbuy="jet purchase",hire="hiring fees",research="research",lab="Lab levels",office="office move",gpu="GPUs",
  data="data",training="training",refine="refinement",marketing="marketing",campus="campus",shop="shop",other="other"}
 local function dollars(n: number): string return Ops.money(n) end
+-- a countdown in play time that never looks like a clock time ("45 s", "4 min 30 s", "~32 min"; Client/UI/Kit.countdown)
+local function countdown(seconds: number): string
+ local t=math.max(0,math.floor((if seconds==seconds then seconds else 0)+0.5))
+ if t<60 then return t.." s" end
+ if t<600 then local m,r=t//60,t%60;return if r==0 then m.." min" else string.format("%d min %d s",m,r) end
+ if t<5400 then return (if t%60==0 then "" else "~")..math.floor(t/60+0.5).." min" end
+ return string.format("~%.1f h",t/3600)
+end
 -- top n categories of one ledger side: "wages $31,600 · research $12,000"
 local function topLines(map: any,n: number): (string,number)
  local list,total={},0
@@ -133,17 +141,20 @@ local function topLines(map: any,n: number): (string,number)
  for i=1,math.min(n,#list) do table.insert(parts,(LEDGER_NAMES[list[i].cat] or list[i].cat).." "..dollars(list[i].v)) end
  return table.concat(parts," · "),total
 end
--- when a trip that is back at play second `back` returns, on the visible clock: "14:20", "tomorrow 08:10", "day 12 09:00"
+-- when a trip that is back at play second `back` returns, on the visible clock: "14:20", "tonight 02:10", "day 12 09:00".
+-- A game day runs 08:00 -> 08:00, so a return shortly after 08:00 is a new company day although it is only minutes
+-- away: anything within SOON game hours is just the time ("08:39" at 07:58), never "tomorrow".
+local SOON_HOURS=2
 local function backText(e: any,back: number,clock: number): string
  local at=clock+math.max(0,back-(tonumber(e.seconds) or 0))
  local h=Ops.hour(at);local days=math.floor(at/Ops.DAY)-math.floor(clock/Ops.DAY)
  local hm=string.format("%02d:%02d",math.floor(h),math.floor((h%1)*60))
- -- a game day runs 08:00 -> 08:00: hours before 08:00 are that day's night
- local night=h<8
- if days<=0 then return if night then "tonight "..hm else hm end
- if days==1 then return if night then "tomorrow night "..hm else "tomorrow "..hm end
+ local ahead=(h-Ops.hour(clock))%24 -- game hours until the return on the visible clock
+ if at-clock<Ops.DAY and ahead<SOON_HOURS then return hm end
+ if days<=0 then return if h<8 then "tonight "..hm else hm end
  return "day "..(Ops.day(e)+days).." "..hm
 end
+Assistant._backText=backText -- tests
 local function tripLine(e: any,t: any,clock: number): string
  local c=Ops.client(t.client);local name=if c then c.name else tostring(t.client)
  local tier=t.tier or (if c then c.trip else "city")
@@ -156,9 +167,84 @@ local function tripLine(e: any,t: any,clock: number): string
  end
  return string.format("%s (%s, back %s%s)",who,if t.kind=="renew" then "check-in" else "pilot",backText(e,tonumber(t.back) or 0,clock),stay)
 end
-local function lineName(target: string?): string
- for _,def in ModelConfig.LINES do if def.target==(target or "general") then return def.label end end
- return "Consumer Chat"
+-- What helps a waitlist (CORE_SPEC 8.2), checked against free rack slots and the cooling cap. Same decisions as the
+-- Hardware app (Client/UI/Apps/ComputeApp.advice; tests/apps checks both agree): "cooling" (heat-limited, cooling < 8),
+-- "maxed" (heat-limited at 8/8), "rack" (no free slot: next office / Distributed Cluster / swap the weakest GPU),
+-- "buy" (a free slot: the GPU that adds the most users among those the company can pay, else the cheapest).
+local COOLING_MAX=8
+local function capacityWith(data: any,gpus: any): number
+ local copy=table.clone(data);copy.gpus=gpus
+ return Ops.capacity(copy)
+end
+local function computeAdvice(data: any,cash: number,live: any?): any
+ local e=data.empire;local fleet=ModelMath.fleet(data.gpus)
+ local slots=HardwareConfig.slots(e);local cooling=math.floor(tonumber(e.infrastructure and e.infrastructure.cooling) or 1)
+ local stage=Ops.stageIndex(e);local nextDef=EmpireConfig.OFFICES[stage+1]
+ local nextE=if nextDef then table.clone(e) else nil
+ if nextE then nextE.office=stage+1 end
+ local research=if typeof(e.research)=="table" then e.research else {}
+ local a={kind="buy",gpu=nil :: string?,weakest=nil :: string?,extra=0,used=fleet.slotsUsed,slots=slots,cooling=cooling,cost=math.floor(8000*1.7^(cooling-1)),
+  cools=HardwareConfig.thermal(e,1e9)*1e9,nextOffice=if nextDef then nextDef.name else nil,nextSlots=if nextE then HardwareConfig.slots(nextE) else nil,
+  nextCools=if nextE then HardwareConfig.thermal(nextE,1e9)*1e9 else nil,cluster=research.cluster~=true and EmpireConfig.find(EmpireConfig.RESEARCH,"cluster")~=nil,
+  -- capacity counts 500M-model user equivalents: real users per unit for today's mix = demand / load (MarketMath)
+  perUnit=if live and (tonumber(live.load) or 0)>0 and (tonumber(live.demand) or 0)>0 then live.demand/live.load else 1}
+ local base=Ops.capacity(data)
+ if HardwareConfig.thermal(e,fleet.throughput)<1 then a.kind=if cooling<COOLING_MAX then "cooling" else "maxed";return a end
+ if fleet.slotsUsed<slots then
+  local cheapest=math.huge
+  for _,gpu in HardwareConfig.GPUS do if not gpu.starter then cheapest=math.min(cheapest,gpu.price) end end
+  for _,gpu in HardwareConfig.GPUS do
+   if not gpu.starter and gpu.price<=math.max(cash,cheapest) then
+    local g=table.clone(data.gpus);g[gpu.id]=(g[gpu.id] or 0)+1
+    local extra=math.max(0,capacityWith(data,g)-base)
+    if extra>a.extra then a.extra=extra;a.gpu=gpu.id end
+   end
+  end
+  return a
+ end
+ a.kind="rack"
+ local weakest=nil
+ for _,gpu in HardwareConfig.GPUS do if not gpu.starter and (data.gpus[gpu.id] or 0)>0 and (weakest==nil or gpu.throughput<weakest.throughput) then weakest=gpu end end
+ if weakest then
+  a.weakest=weakest.id
+  local budget=cash+weakest.price*HardwareConfig.SELL_REFUND;local cheapest=math.huge
+  for _,gpu in HardwareConfig.GPUS do if not gpu.starter and gpu.throughput>weakest.throughput then cheapest=math.min(cheapest,gpu.price) end end
+  for _,gpu in HardwareConfig.GPUS do
+   if not gpu.starter and gpu.throughput>weakest.throughput and gpu.price<=math.max(budget,cheapest) then
+    local g: {[string]:number}=table.clone(data.gpus);g[weakest.id]-=1;g[gpu.id]=(g[gpu.id] or 0)+1
+    local extra=math.max(0,capacityWith(data,g)-base)
+    if extra>a.extra then a.extra=extra;a.gpu=gpu.id end
+   end
+  end
+ end
+ return a
+end
+Assistant._computeAdvice=computeAdvice -- tests
+local function gpuName(id: string?): string
+ local def=if id then HardwareConfig.getGPU(id) else nil
+ return if def then def.label else tostring(id)
+end
+local function withArticle(label: string): string
+ local vowel=string.find("AEIOU",string.sub(label,1,1),1,true)~=nil or string.sub(label,1,3)=="HBM"
+ return (if vowel then "an " else "a ")..label
+end
+-- short form for the briefing ("rack full (12 / 12): move to the Innovation Campus (24 slots) ...")
+local function adviceText(a: any): string
+ if a.kind=="cooling" then return string.format("cooling is the limit: upgrade cooling first (level %d / %d, %s) in Hardware",a.cooling,COOLING_MAX,Format.money(a.cost))
+ elseif a.kind=="maxed" then
+  if a.nextOffice then return string.format("cooling is maxed (%d / %d), more GPUs add no capacity here: move to the %s (cools %s units) or raise prices",a.cooling,COOLING_MAX,a.nextOffice,Format.int(a.nextCools or 0)) end
+  return string.format("cooling is maxed (%d / %d) in your largest office: raise prices so demand fits your servers",a.cooling,COOLING_MAX)
+ elseif a.kind=="rack" then
+  local options={}
+  if a.nextOffice and a.nextSlots then table.insert(options,string.format("move to the %s (%d slots)",a.nextOffice,a.nextSlots)) end
+  if a.cluster then table.insert(options,"research Distributed Cluster (×1.5 slots)") end
+  if a.gpu and a.weakest and a.extra>=1 then table.insert(options,string.format("swap %s for %s (+%s users)",withArticle(gpuName(a.weakest)),withArticle(gpuName(a.gpu)),Format.int(a.extra*a.perUnit))) end
+  if #options==0 then return string.format("rack full (%d / %d) in your largest office: raise prices so demand fits your servers",a.used,a.slots) end
+  local list=if #options==1 then options[1] else table.concat(options,", ",1,#options-1).." or "..options[#options]
+  return string.format("rack full (%d / %d): %s",a.used,a.slots,list)
+ end
+ if a.gpu and a.extra>=1 then return string.format("buy GPUs in Hardware: one more %s serves %s more users",gpuName(a.gpu),Format.int(a.extra*a.perUnit)) end
+ return "business clients reserve your compute right now: buy GPUs in Hardware"
 end
 -- the goal of the HUD bar as a recommendation with its concrete next step
 local function goalRecommendation(s: any,goal: any,stock: any,journey: any,unreleased: any): (string,string?,string?)
@@ -176,7 +262,10 @@ local function goalRecommendation(s: any,goal: any,stock: any,journey: any,unrel
   local trip=nil
   for _,t in (if typeof(e.deals)=="table" and typeof(e.deals.tripList)=="table" then e.deals.tripList else {}) do if t.client==c.id then trip=t end end
   if trip then return goal.text..": you are on the way for the pilot visit.","empire","clients" end
+  if best<=0 then return string.format("%s: %s needs %s %d. No model is live: release one first.",goal.text,c.name,c.stat,c.minimum),"lab","release" end
   if best<c.minimum then return string.format("%s: %s needs %s %d (your best live model: %d).",goal.text,c.name,c.stat,c.minimum,math.floor(best)),"lab",nil end
+  local h=Ops.hour(workspace:GetServerTimeNow())
+  if h<Ops.DEPART.from or h>=Ops.DEPART.to then return goal.text..": visits start 08:00–15:00, you drive over at 08:00.","empire","clients" end
   return goal.text..": the pilot visit starts by itself as soon as cash covers the trip.","empire","clients"
  elseif goal.etaMinutes~=nil or string.match(id,"^office") or id=="jet" then
   local eta=goal.etaMinutes
@@ -185,6 +274,11 @@ local function goalRecommendation(s: any,goal: any,stock: any,journey: any,unrel
  elseif id=="lines2" then return goal.text..": release a model into another product line.","lab",if unreleased then "release" else nil
  elseif id=="region" then return goal.text..": Growth & Sales field reps visit region clients (City Hotel night).","empire","clients"
  elseif id=="frontier" then return goal.text..": research Frontier Architecture.","empire","research"
+ elseif id=="lines90" then
+  return string.format("%s: %d of %d lines are there. Train stronger versions (bigger size, better data) in the Lab.",goal.text,math.floor(tonumber(goal.have) or 0),math.floor(tonumber(goal.need) or 4)),"lab",nil
+ elseif id=="lab" then
+  local level=math.floor(tonumber(goal.have) or 0);local pts,cost=Ops.labCost(level)
+  return string.format("%s: level %d now, the next one costs %s research points + %s in Models.",goal.text,level,Format.int(pts),dollars(cost)),"lab",nil
  end
  return string.format("%s (%d / %d).",goal.text,math.floor(tonumber(goal.have) or 0),math.floor(tonumber(goal.need) or 0)),"lab",nil
 end
@@ -210,6 +304,15 @@ function Assistant.briefing(s: any,name: string?): any
  for _,t in trips do if not t.hosted and not t.founder then repsAway+=1 end end
  away+=repsAway
  local todayRows={row("Company day",Format.dayClock(Ops.day(e),Ops.hour(clock)))}
+ -- safety rules (CORE_SPEC 8.3): broke for a whole day pauses trips and night crews; deep debt sends the newest
+ -- hires on unpaid leave until cash covers a day of payroll
+ local leaveN=math.max(0,math.floor(tonumber(e.unpaidLeave) or 0))
+ local paused=ops.paused==true
+ local warnings={}
+ if paused then table.insert(warnings,"Cash has been below $0 for a whole day: trips and night shifts are paused")
+ elseif data.money<0 then table.insert(warnings,"Cash is below $0: trips and night shifts pause after a whole day like this") end
+ if leaveN>0 then table.insert(warnings,string.format("%d newest hire%s on unpaid leave until cash is above %s",leaveN,if leaveN==1 then " is" else "s are",dollars(Ops.dailyPayroll(e)))) end
+ if #warnings>0 then table.insert(todayRows,row("Warning",table.concat(warnings,". ").."." )) end
  if total==0 then table.insert(todayRows,row("Team","Nobody hired yet: you run the company alone."))
  else
   local parts={}
@@ -284,7 +387,7 @@ function Assistant.briefing(s: any,name: string?): any
  table.insert(sections,{title="Money",rows={row("Cash",Format.money(data.money)),
   row("Today",if income+costs==0 then "Nothing booked yet today." else string.format("income %s · costs %s · net %s",dollars(income),dollars(costs),dollars(income-costs))),
   row("Income",if incomeText~="" then incomeText else "none yet"),row("Costs",if costText~="" then costText else "none yet"),
-  row("Running now",Format.perDay(live.revenue-live.cost).." net"),row("Profit trend",trendText)}})
+  row("Running now",if (tonumber(live.revenue) or 0)==0 and (tonumber(live.cost) or 0)==0 then "no income or costs yet" else Format.perDay(live.revenue-live.cost).." net"),row("Profit trend",trendText)}})
  -- Models: live lines, servers, ageing, growth
  local best: any,liveCount,unreleased: any=nil,0,nil
  for _,id in data.modelOrder do
@@ -309,17 +412,8 @@ function Assistant.briefing(s: any,name: string?): any
   row("Users",Format.compact(live.users))}
  local capacity=tonumber(live.capacity) or 0;local load=tonumber(live.load) or 0;local waiting=tonumber(live.waitlist) or 0
  if liveCount>0 and capacity>0 then
-  local extra,gpuName=0,nil
-  for _,gpu in HardwareConfig.GPUS do
-   if not gpu.starter and gpu.price<=math.max(data.money,2500) then
-    local g=table.clone(data.gpus);g[gpu.id]=(g[gpu.id] or 0)+1
-    local copy=table.clone(data);copy.gpus=g
-    local add=Ops.capacity(copy)-Ops.capacity(data)
-    if add>extra then extra=add;gpuName=gpu.label end
-   end
-  end
-  local text=string.format("%d %% full",math.floor(load/capacity*100+0.5))
-  if waiting>0 then text..=string.format(", %s waiting",Format.int(waiting))..(if gpuName and extra>=1 then string.format(" — a %s serves %s more.",gpuName,Format.int(extra)) else " — upgrade cooling first.") end
+  local text=if load>capacity then string.format("full (demand %d %%)",math.floor(load/capacity*100+0.5)) else string.format("%d %% full",math.floor(load/capacity*100+0.5))
+  if waiting>0 then text..=string.format(", %s waiting — %s.",Format.int(waiting),adviceText(computeAdvice(data,data.money,live))) end
   table.insert(modelRows,row("Servers",text))
  end
  if oldest then
@@ -342,7 +436,7 @@ function Assistant.briefing(s: any,name: string?): any
   local rate=EmpireMath.trainingRate(data.gpus,training.workTotal,e)
   local progress=if training.workTotal>0 then training.workDone/training.workTotal else 0
   local rows={row("Model",if model then model.name else "Unnamed run"),row("Progress",Format.percent(progress,0)),
-   row("Time left",if rate>0 then Format.duration((training.workTotal-training.workDone)/rate) else "Waiting for compute")}
+   row("Time left",if rate>0 then countdown((training.workTotal-training.workDone)/rate) else "Waiting for compute")}
   local event=training.event
   if event and event.pending then
    local def=ModelConfig.getEvent(event.id)
@@ -416,11 +510,17 @@ function Assistant.briefing(s: any,name: string?): any
   local text,app,section=goalRecommendation(s,goal,stock,journey,unreleased)
   recommend(text,app,section)
  end
+ -- the safety rules come right after the goal (CORE_SPEC 8.2 keeps the goal first)
+ if paused or leaveN>0 or data.money<0 then
+  local net=((tonumber(live.revenue) or 0)-(tonumber(live.cost) or 0))*Ops.DAY
+  recommend(string.format("Cash is %s%s: raise prices in Models, lower the HR budget or pause HR in Company → Settings.",Format.money(data.money),
+   if net<0 then string.format(" and falling by %s/day",Format.money(-net)) else ""),"empire","settings")
+ end
  if unreleased and not (goal and goal.id=="release") then recommend("Release "..unreleased.name.." in Deployment. It isn't earning anything yet.","lab","release") end
  if recent and delta and recent<0 and delta<=0 then recommend("Profit is negative and not improving. Reduce staff or raise prices.","market") end
  if waiting>0 then
-  local cooled=HardwareConfig.thermal(e,ModelMath.fleet(data.gpus).throughput)>=1
-  recommend(string.format("%s users are waiting for server capacity: %s in Hardware.",Format.int(waiting),if cooled then "buy GPUs" else "upgrade cooling first, more GPUs would only run hotter"),"compute")
+  local advice=computeAdvice(data,data.money,live)
+  recommend(string.format("%s users are waiting for server capacity: %s.",Format.int(waiting),adviceText(advice)),if advice.kind=="rack" and advice.extra<1 and advice.nextOffice then "empire" else "compute",if advice.kind=="rack" and advice.extra<1 and advice.nextOffice then "office" else nil)
  end
  if not training and journey.missingVram>0 and (data.stats.modelsReleased or 0)==0 then recommend("Buy GPUs in Hardware or pick a smaller size: "..journey.hint..".","compute") end
  if counts.waiting>0 then recommend(string.format("%d candidate%s waiting in the visitor lounge.",counts.waiting,if counts.waiting==1 then " is" else "s are"),"empire","team") end

@@ -1,0 +1,55 @@
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+layout                 rc=0  layout tests: 50 passed, 0 failed
+door_service           rc=0  door_service_test: 72 passed, 0 failed
+lift_logic             rc=0  lift_logic: 70 passed, 0 failed
+lift_service           rc=0  lift_service: 87 passed, 0 failed
+lift_ui                rc=0  lift_ui: 19 passed, 0 failed
+snapshot               rc=0  snapshot test: 13 passed, 0 failed
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+net_patch              rc=0  net patch tests: 32 passed, 0 failed
+net                    rc=0  net tests: 90 passed, 0 failed
+net_e2e                rc=0  net e2e tests: 9 passed, 0 failed
+people                 rc=0  people tests: 2146 passed, 0 failed
+people_client          rc=0  people client tests: 45 passed, 0 failed
+people_real            rc=0  people real-building tests (tier 2): 9 passed, 0 failed
+staff_t1               rc=0  staff tests: 457 passed, 0 failed
+staff_t2               rc=0  staff tests: 817 passed, 0 failed
+staff_t3               rc=0  staff tests: 1394 passed, 0 failed
+staff_t4               rc=0  staff tests: 2416 passed, 0 failed
+staff_sim              rc=0  staff sim: 200484 passed, 0 failed
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+screens_fake           rc=0  [print] SUMMARY problems=0 tickOk=true
+screens_real           rc=0  [print] SUMMARY problems=0 tickOk=true
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+talk_dialogue          rc=0  talk dialogue tests: 1810 passed, 0 failed
+talk                   rc=0  talk service tests: 113 passed, 0 failed
+talk_client            rc=0  talk client tests: 31 passed, 0 failed
+talk_real              rc=0  talk real-building tests (tier 2): 162 passed, 0 failed
+life_props             rc=0  life props: 17711 passed, 0 failed
+life_client            rc=0  life client: 1106 passed, 0 failed
+life_t1                rc=0  life staff: 57 passed, 0 failed
+life_t2                rc=0  life staff: 57 passed, 0 failed
+life_t3                rc=0  life staff: 57 passed, 0 failed
+life_t4                rc=0  life staff: 57 passed, 0 failed
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+shop                   rc=0  shop tests: 146 passed, 0 failed
+shop_client            rc=0  shop client tests: 46 passed, 0 failed
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+world_cityplan         rc=0  world_cityplan: 143 passed, 0 failed
+world_build            rc=0  world_build: 27 passed, 0 failed
+world_travel           rc=0  world_travel: 51 passed, 0 failed
+world_vehicle          rc=0  world_vehicle: 27 passed, 0 failed
+world_client           rc=0  world_client: 22 passed, 0 failed
+buildings_tier0        rc=0  buildings tier0 runtime: 34 passed, 0 failed
+buildings_build        rc=0  buildings build tests: 154 passed, 0 failed
+buildings_admin        rc=0  buildings admin: 24 passed, 0 failed
+manifest: 153 entries, 141 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/snap1655/sandbox/work/src
+econ_ops               rc=0  econ ops tests: 173 passed, 0 failed
+econ_b2b               rc=0  econ b2b tests: 61 passed, 0 failed
+econ_service           rc=0  econ service tests: 83 passed, 0 failed
+econ_migration         rc=0  econ migration tests: 89 passed, 0 failed
+econ_net               rc=0  econ net tests: 18 passed, 0 failed
+corefix                rc=0  corefix server tests: 52 passed, 0 failed
+corefix_ui             rc=0  corefix ui tests: 8 passed, 0 failed
+models                 rc=0  models_ui_full: 42 passed, 0 failed

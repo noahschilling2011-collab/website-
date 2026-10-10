@@ -18,8 +18,11 @@
 --  * Apprentices (empire.apprentices, CORE_SPEC 11.1) look young: no facial hair, no grey hair, a green
 --    "Apprentice" lanyard and badge, a slightly smaller build (Model:ScaleTo, within the existing body-size
 --    spread). dressApprentice also undoes the lanyard / badge / size at graduation (StaffService).
---  * The Training Lead (OPERATIONS_JOBS[17]) is placed only while the company has apprentices, at a free
---    desk in the People & Company (HR) room, else another free operations desk, else at the reception.
+--  * The Training Lead (OPERATIONS_JOBS[17]) is placed only while the company has apprentices (the same rule
+--    as StaffRota: an empire.apprentices entry whose seed belongs to a current profile), at a free desk in the
+--    People & Company (HR) room, else another free operations desk, else at the reception.
+--  * The stage-5 night rota (OPERATIONS_JOBS[18] / [19], EmployeeConfig.NIGHT_ROTA): a second guard and a
+--    second IT person at the station of post 3 / post 6, only in the stage-5 building (plan tier 4).
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local EmpireConfig=require(ReplicatedStorage.Shared.Config.EmpireConfig)
 local EmployeeConfig=require(ReplicatedStorage.Shared.Config.EmployeeConfig)
@@ -116,7 +119,20 @@ function Assignment.dressApprentice(model: Model,on: boolean,_empire: any?)
     elseif HAIR_PARTS[p.Name] and GREY_HAIR[hex(p.Color)] then p.Color=young end
    elseif p:IsA("Frame") and p.Name=="Brow" and GREY_HAIR[hex(p.BackgroundColor3)] then p.BackgroundColor3=young end
   end
-  if label then label.Text=name.."\nApprentice · "..title end
+  if label then
+   label.Text=name.."\nApprentice · "..title
+   -- "Apprentice · Growth Manager" is wider than the regular 150 px badge: a wider badge, and the text
+   -- shrinks below 12 px only if a long name still does not fit
+   local badge=label.Parent
+   if badge and badge:IsA("BillboardGui") then
+    if model:GetAttribute("BadgeWidth")==nil then model:SetAttribute("BadgeWidth",badge.Size.X.Offset) end
+    badge.Size=UDim2.fromOffset(EmployeeConfig.APPRENTICE.badgeWidth,badge.Size.Y.Offset)
+   end
+   label.TextScaled=true
+   if not label:FindFirstChild("ApprenticeFit") then
+    local fit=Instance.new("UITextSizeConstraint");fit.Name="ApprenticeFit";fit.MaxTextSize=12;fit.MinTextSize=8;fit.Parent=label
+   end
+  end
   local scale=EmployeeConfig.APPRENTICE.scale
   if math.abs(model:GetScale()-1)<1e-3 and scale<1 then model:ScaleTo(scale) end
  else
@@ -130,7 +146,14 @@ function Assignment.dressApprentice(model: Model,on: boolean,_empire: any?)
    end
   end
   model:SetAttribute("LanyardColor",nil)
-  if label then label.Text=name.."\n"..title end
+  if label then
+   label.Text=name.."\n"..title
+   label.TextScaled=false
+   local fit=label:FindFirstChild("ApprenticeFit");if fit then fit:Destroy() end
+   local badge=label.Parent;local width=model:GetAttribute("BadgeWidth")
+   if badge and badge:IsA("BillboardGui") and typeof(width)=="number" then badge.Size=UDim2.fromOffset(width,badge.Size.Y.Offset) end
+  end
+  model:SetAttribute("BadgeWidth",nil)
   if math.abs(model:GetScale()-1)>1e-3 then model:ScaleTo(1) end
  end
 end
@@ -144,18 +167,41 @@ local function dressTrainer(model: Model)
   end
  end
 end
--- Active apprentices of a save (CompanyOps.apprentice on today's company day): seed -> true
+-- Active apprentices of a save: the seeds of the CURRENT profiles (employees[role] of them, the rule of
+-- StaffRota / Dialogue.facts) that CompanyOps.apprentice calls an apprentice on today's company day. An
+-- empire.apprentices entry without a profile (a stale save) places no Training Lead.
 local function apprenticeSeeds(e: any): {[number]:boolean}
  local out: {[number]:boolean}={}
  if typeof(e.apprentices)~="table" or next(e.apprentices)==nil then return out end
  local day=Ops.day(e)
- for k in e.apprentices do
-  local seed=tonumber(k)
-  if seed and Ops.apprentice(e,seed,day) then out[seed]=true end
+ local profiles=if typeof(e.staffProfiles)=="table" then e.staffProfiles else {}
+ for _,role in EmpireConfig.ROLES do
+  local n=math.max(0,math.floor(tonumber(e.employees and e.employees[role.id]) or 0))
+  local list=profiles[role.id]
+  for i=1,n do
+   local p=if typeof(list)=="table" then list[i] else nil
+   local s=if typeof(p)=="table" then p.s else nil
+   local seed=if typeof(s)=="number" and s==s then math.floor(math.abs(s))%2147483647 else i
+   if Ops.apprentice(e,seed,day) then out[seed]=true end
+  end
  end
  return out
 end
 Assignment.apprenticeSeeds=apprenticeSeeds
+-- Name of an operations person without a post of their own (Training Lead, night rota): the index-based
+-- CampusMath name can repeat a hired person's name, so the next free name of the same presentation list is
+-- taken (the look stays EmployeeConfig.seed(index, owner); the name list keeps the presentation).
+local function uniqueOpsName(index: number,owner: number,used: {[string]:boolean}): string
+ local name=CampusMath.staffName(index,owner)
+ local j=0
+ while used[name] and j<64 do
+  j+=1
+  name=CampusMath.nameForSeed(EmployeeConfig.seed(index,owner)+j*7919,EmployeeConfig.isFeminine(index,owner))
+ end
+ used[name]=true
+ return name
+end
+Assignment.uniqueOpsName=uniqueOpsName
 function Assignment.assign(office: Model,cf: CFrame,session: any)
  local tierAttr=office:GetAttribute("OfficeTier")
  local tier: number=if typeof(tierAttr)=="number" then tierAttr else Plan.tierForOffice(session.data.empire.office)
@@ -279,8 +325,34 @@ function Assignment.assign(office: Model,cf: CFrame,session: any)
   if m:IsA("Model") and typeof(i)=="number" and not keepOps[i] then keepOps[i]=m else m:Destroy() end
  end
  local leadPost=(EmployeeConfig :: any).TRAINING_LEAD_POST or 17
+ local nightRota: {[number]:number}=(EmployeeConfig :: any).NIGHT_ROTA or {}
+ -- names in use: the hired team and every post holder (their generated names)
+ local usedNames: {[string]:boolean}={}
+ for _,person in people do usedNames[person.name]=true end
+ for i in EmployeeConfig.OPERATIONS_JOBS do if i~=leadPost and not nightRota[i] then usedNames[CampusMath.staffName(300+i,owner)]=true end end
  for i,job in EmployeeConfig.OPERATIONS_JOBS do
   local existingRig=keepOps[300+i];keepOps[300+i]=nil
+  local nightOf=nightRota[i]
+  if nightOf then
+   -- stage-5 night rota (CORE_SPEC 5.5): a second person who uses post `nightOf`'s station at night
+   local post=posts[nightOf];local work=if post then standing(post) else nil
+   if tier<4 or not post or not work then
+    if existingRig then existingRig:Destroy() end
+    continue
+   end
+   local r: Model
+   if existingRig and existingRig:GetAttribute("HomeWorkstation")==post:GetAttribute("WorkstationId") then r=existingRig
+   else
+    if existingRig then existingRig:Destroy() end
+    r=Rig.build(operations,owner,300+i,"support",work,{n=uniqueOpsName(300+i,owner,usedNames)})
+    if live then r:SetAttribute("OffDuty",true) end
+   end
+   usedNames[tostring(r:GetAttribute("EmployeeName"))]=true
+   set(r,"HomeWorkstation",post:GetAttribute("WorkstationId"));set(r,"WorkCFrame",work);set(r,"CampusCFrame",cf)
+   set(r,"StaffFloor",Plan.levelY(floor(post)));set(r,"NightRotaOf",nightOf)
+   local lp=cf:PointToObjectSpace(work.Position);set(r,"StaffX",lp.X);set(r,"StaffZ",lp.Z)
+   continue
+  end
   if i==leadPost then
    -- the Training Lead: only while there are apprentices, at a free HR desk (else reception)
    if next(apprentices)==nil or tier<1 then
@@ -301,7 +373,8 @@ function Assignment.assign(office: Model,cf: CFrame,session: any)
    end
    if desk then taken[desk]=true end
    local work=(if desk then standing(desk) else nil) or cf*CFrame.new(Plan.visitorRoute(tier).portal+Vector3.new(6,0,8))
-   local lead=existingRig or Rig.build(operations,owner,300+i,"support",work)
+   local lead=existingRig or Rig.build(operations,owner,300+i,"support",work,{n=uniqueOpsName(300+i,owner,usedNames)})
+   usedNames[tostring(lead:GetAttribute("EmployeeName"))]=true
    if not existingRig then
     dressTrainer(lead)
     if live then lead:SetAttribute("OffDuty",true) end

@@ -287,7 +287,8 @@ return function(M, genDir, state, vw, vh, insets, opt)
 			if load == 0 then load = live.users end
 			live.capacity = math.floor(cap)
 			live.load = math.floor(load)
-			live.demand = live.load
+			-- demand in users (MarketMath: users = demand x served, served = min(1, capacity / load))
+			live.demand = if load > cap then math.floor(live.users * load / cap) else live.users
 			live.waitlist = if load > cap then math.floor(live.users * (1 - cap / load)) else 0
 		end
 	end

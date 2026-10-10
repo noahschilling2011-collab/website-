@@ -40,7 +40,8 @@ local function body()
 	local function patch(cls, name, fn) M.IMPL[cls].methods[name] = fn; local ci = M.classInfo(cls); if ci.methods then ci.methods[name] = fn end end
 	patch("Workspace", "GetServerTimeNow", function() return T end)
 	local bulkCalls = 0
-	patch("Workspace", "BulkMoveTo", function(self, parts, cframes) bulkCalls += 1; for i, p in parts do p.CFrame = cframes[i] end end)
+	local bulkModels = {}
+	patch("Workspace", "BulkMoveTo", function(self, parts, cframes) bulkCalls += 1; if parts[1] then bulkModels[parts[1].Parent] = (bulkModels[parts[1].Parent] or 0) + 1 end; for i, p in parts do p.CFrame = cframes[i] end end)
 	local Design = M.require(S.HeadquartersDesign); Design.build = function() local m = Instance.new("Model"); m.Name = "Office"; return m end; Design.staff = function() end
 	local Plot = M.require(S.PlotService)
 	Plot.get = function(player) return { index = 3, cframe = CityPlan.plots()[3].cframe, owner = player } end
@@ -142,10 +143,33 @@ local function body()
 	frame(0.1)
 	check("nothing built far away", plane() == nil)
 
-	------------------------------------------------------------------ check-in + boarding pass
+	------------------------------------------------------------------ check-in: shuttle or express when boarding is far away
+	-- a second company with an abroad trip: its field rep flies on the next out leg (ShuttlePassengers)
+	local pf = F.player(9109, "Fiona", CFrame.new(0, 27.5, 0))
+	local sf = F.session(pf, 100000)
+	sf.data.company.name = "Helix Partners"
+	local ef = sf.data.empire
+	ef.office = 4; ef.employees = ef.employees or {}; ef.employees.marketer = 1; ef.employees.engineer = 0
+	ef.staffProfiles = { marketer = { { n = "Mia Chen", s = 1111 } } }
+	ef.deals = ef.deals or {}
+	ef.deals.tripList = { { client = "helix", kind = "sign", back = 1e12, founder = false, hosted = false, crew = 1, left = 4242 } }
+	table.insert(Session.sessions, sf)
 	local checkin
 	for _, d in game.Workspace.WorldCity:GetDescendants() do if d:IsA("ProximityPrompt") and d:GetAttribute("FlightTo") == "abroad" then checkin = d; break end end
 	check("check-in prompt exists", checkin ~= nil)
+	owner.Character:PivotTo(CFrame.new(counter.X, 27.5, counter.Z - 6))
+	local Tsave = T
+	T = ls("out", K) - FP.CONFIG.charterAfter - 60
+	local nCalls = #calls
+	M.fire(PPS.PromptTriggered, checkin, owner); M.settle(0.3)
+	local choiceGui = playerGui:FindFirstChild("FlightChoice")
+	check("boarding > 3 min away: the counter offers shuttle or express (no ticket bought yet)", choiceGui ~= nil and #calls == nCalls)
+	local btns = {}
+	if choiceGui then for _, d in choiceGui:GetDescendants() do if d:IsA("TextButton") then table.insert(btns, d.Text) end end end
+	check("choice: shuttle boarding pass and an express flight now", #btns == 2 and string.find(btns[1], "Shuttle", 1, true) ~= nil and string.find(btns[2], "Express", 1, true) ~= nil, table.concat(btns, " | "))
+	T = Tsave
+
+	------------------------------------------------------------------ check-in + boarding pass
 	owner.Character:PivotTo(CFrame.new(0, 27.5, 0))
 	M.fire(PPS.PromptTriggered, checkin, owner); M.settle(0.5)
 	check("check-in far from the counter refused (toast)", toastHas("check-in counter") and playerGui:FindFirstChild("ShuttlePass") == nil)
@@ -155,6 +179,7 @@ local function body()
 	local c = lastCall("TravelAction")
 	check("check-in buys a shuttle ticket (not the instant flight)", c and c.payload.action == "ticket" and c.result.ok == true and s.data.money == money0 - CityPlan.TRAVEL.ticket)
 	check("no cutscene", game.Workspace:FindFirstChild("FlightCutscene") == nil)
+	check("boarding soon: straight to the boarding pass, the choice panel closed", playerGui:FindFirstChild("FlightChoice") == nil)
 	check("boarding pass shown", playerGui:FindFirstChild("ShuttlePass") ~= nil and SC.ticket() ~= nil)
 	check("check-in toast names the flight and the gate", toastHas("Checked in: " .. FP.CONFIG.flights.out) and toastHas("gate A" .. CityPlan.AIRPORT.shuttleStand))
 	check("gate beacon placed", client():FindFirstChild("ShuttleGateBeacon") ~= nil)
@@ -168,9 +193,32 @@ local function body()
 	look(FP.HOME_GATES[1])
 	frame(0.3)
 	check("pass: boarding now", string.find(passText.Text, "BOARDING NOW", 1, true) ~= nil, passText.Text)
-	local board
-	for _, d in playerGui:GetChildren() do if d.Name == "ShuttleGateBoard" then local l = d:FindFirstChild("Text", true); if l and string.find(l.Text, "PORT MERIDIAN", 1, true) then board = l end end end
-	check("gate board shows the live status", board ~= nil and string.find(board.Text, "BOARDING", 1, true) ~= nil, board and board.Text)
+	local CS = game:GetService("CollectionService")
+	local gateText, doorText
+	for _, p in CS:GetTagged("FlightInfoBoard") do
+		local l = p:FindFirstChild("FlightText", true)
+		if l and p:GetAttribute("Board") == "gate" then gateText = l.Text end
+		if l and p:GetAttribute("Board") == "gatedoor" then doorText = l.Text end
+	end
+	check("the airport's gate sign shows the live status (FlightInfoBoard)", gateText ~= nil and string.find(gateText, "BOARDING", 1, true) ~= nil and string.find(gateText, FP.CONFIG.flights.out, 1, true) ~= nil, gateText)
+	check("gate door sign live too", doorText ~= nil and string.find(doorText, "BOARDING", 1, true) ~= nil, doorText)
+	check("no pixel-sized home gate board any more", (function() for _, d in playerGui:GetChildren() do if d.Name == "ShuttleGateBoard" and d.Enabled and d.Adornee and d.Adornee.Name == "GateBoardHome" then return false end end return true end)())
+	-- the field rep of the other company walks to the aircraft during boarding
+	T = ls("out", K) + 5 + 4; City.tick(0.1); frame(0.3)
+	local walkers = {}
+	for _, d in client():GetChildren() do if string.sub(d.Name, 1, 9) == "Passenger" then table.insert(walkers, d) end end
+	check("field staff passenger walking to the aircraft during boarding", #walkers == 1 and walkers[1]:GetAttribute("PassengerName") == "Mia Chen", #walkers)
+	local wr = walkers[1] and walkers[1]:FindFirstChild("HumanoidRootPart")
+	local wHead = walkers[1] and walkers[1]:FindFirstChild("Head")
+	check("passenger visible, between the gate and the aircraft door", wr ~= nil and wHead.LocalTransparencyModifier == 0 and wr.Position.Z > 2500 and wr.Position.Z < stand.Position.Z, wr and wr.Position)
+	T = ls("out", K) + 5 + 30; frame(0.3)
+	local still = 0
+	for _, d in client():GetChildren() do if string.sub(d.Name, 1, 9) == "Passenger" then still += 1 end end
+	check("passenger boarded (removed once inside)", still == 0, still)
+	T = ls("out", K) + walkStart + 6; frame(0.3)
+	local solidNow = 0
+	for _, d in plane():GetDescendants() do if d:IsA("BasePart") and d.CanCollide then solidNow += 1 end end
+	check("parked full shuttle collides (nobody walks through it)", solidNow >= 12, solidNow)
 	local cap = client():FindFirstChild("Captain"); local fo = client():FindFirstChild("FirstOfficer")
 	check("two pilots on the client", cap ~= nil and fo ~= nil)
 	local seatCap = Aircraft.points(FP.CONFIG.kind, FP.CONFIG.scale).captain
@@ -195,18 +243,47 @@ local function body()
 	frame(0.1)
 	check("scriptable camera in the cabin", camera.CameraType == Enum.CameraType.Scriptable and (camera.CFrame.Position - stand.Position).Magnitude < 60)
 	check("cabin window overlay visible", playerGui.ShuttleRide.CabinWindow.Visible == true)
+	local function nearCamHidden()
+		local n = 0
+		for _, d in plane():GetDescendants() do if d:IsA("BasePart") and (d.Name == "Window" or d.Name == "Outline") and d.LocalTransparencyModifier == 1 then n += 1 end end
+		return n
+	end
+	check("window seat: the thin window / outline plates at the camera hidden locally", nearCamHidden() >= 1, nearCamHidden())
 	local btn = playerGui.ShuttleRide:FindFirstChild("ViewButton", true)
 	M.fire(btn.Activated); frame(0.1)
 	check("view toggle: cockpit", string.find(btn.Text, "Cockpit", 1, true) ~= nil and playerGui.ShuttleRide.CabinWindow.Visible == false)
+	check("cockpit view: window plates shown again", nearCamHidden() == 0)
+	check("cockpit view: jump seat camera, FOV 56", camera.FieldOfView == 56)
+	local capArm = cap:FindFirstChild("Right Arm"); local foArm = fo:FindFirstChild("Left Arm")
+	check("cockpit view: the pilots' inner arms hidden locally (outer arms shown)", capArm.LocalTransparencyModifier == 1 and foArm.LocalTransparencyModifier == 1 and cap:FindFirstChild("Left Arm").LocalTransparencyModifier == 0)
 	M.fire(btn.Activated); frame(0.1)
 	check("view toggle: outside", string.find(btn.Text, "Outside", 1, true) ~= nil)
+	check("outside view: the arms are back", capArm.LocalTransparencyModifier == 0 and foArm.LocalTransparencyModifier == 0)
 	M.fire(btn.Activated); frame(0.1)
 	check("view toggle: back to the window", string.find(btn.Text, "Window", 1, true) ~= nil)
 
 	------------------------------------------------------------------ flight
 	T = ls("out", K) + out.phases.doors.t0 + 1; City.tick(0.1); frame(0.1)
+	local Ground = M.require(Client.Controllers.ShuttleGround)
+	local cabFloor
+	for _, p in Ground.bridgeParts() do if p.Name == "CabFloor" then cabFloor = p end end
+	local cab0 = cabFloor and cabFloor.Position
+	T = ls("out", K) + out.phases.doors.t1 - 0.1; City.tick(0.1); frame(0.1)
+	check("jet bridge retracts while the doors close", cabFloor ~= nil and (cabFloor.Position - cab0).Magnitude > 2, cabFloor and (cabFloor.Position - cab0).Magnitude)
+	local tugBody
+	for _, p in Ground.homeTugParts() do if p.Name == "Body" then tugBody = p end end
+	local tug0 = tugBody and tugBody.Position
 	T = ls("out", K) + out.phases.pushback.t0 + 0.5; City.tick(0.1); frame(0.1)
 	check("captain's announcement at pushback", toastHas("This is your captain") and toastHas(FP.CONFIG.flights.out))
+	T = ls("out", K) + out.phases.pushback.t0 + 6; frame(0.1)
+	local pushPose = FP.pose(T)
+	local noseGear = (pushPose.cf * CFrame.new(0, 0, Aircraft.points(FP.CONFIG.kind, FP.CONFIG.scale).noseGearZ)).Position
+	check("the stand's tug pushes the aircraft (moved, at the nose gear)", tugBody ~= nil and (tugBody.Position - tug0).Magnitude > 5 and (Vector3.new(tugBody.Position.X, 0, tugBody.Position.Z) - Vector3.new(noseGear.X, 0, noseGear.Z)).Magnitude < 14, tugBody and (tugBody.Position - tug0).Magnitude)
+	local movingSolid = 0
+	for _, d in plane():GetDescendants() do if d:IsA("BasePart") and d.CanCollide then movingSolid += 1 end end
+	check("moving shuttle never collides (nobody gets trapped inside)", movingSolid == 0, movingSolid)
+	T = ls("out", K) + out.phases.taxi.t0 + FP.TUG.home + 1; frame(0.1)
+	check("tug back in its parking spot after the pushback", tugBody and (tugBody.Position - tug0).Magnitude < 0.01)
 	local cr = out.phases.cruise
 	T = ls("out", K) + (cr.t0 + cr.t1) / 2; City.tick(0.1); frame(0.3)
 	local pose = FP.pose(T)
@@ -229,6 +306,26 @@ local function body()
 	check("character in the arrival hall", (owner.root.Position - CityPlan.ABROAD.arrival.Position).Magnitude < 0.01)
 	look(FP.PM_STAND.Position); frame(0.3)
 	check("airstairs at the Port Meridian stand", client():FindFirstChild("ShuttleAirstairs") ~= nil)
+	check("Port Meridian: local pushback tug at the nose", (not FP.PM_APRON) or Ground.pmTug() ~= nil)
+	check("arrived field staff walk off at Port Meridian", (not FP.PM_APRON) or (function()
+		T = ls("out", K) + out.phases.deboarding.t0 + 5 + 3; frame(0.3)
+		for _, d in client():GetChildren() do if string.sub(d.Name, 1, 9) == "Passenger" and d.Head.LocalTransparencyModifier == 0 then return true end end
+		return false end)())
+	T = ls("back", K) + FP.WALKAROUND_START + FP.WALKAROUND * 0.5; frame(0.3)
+	fo = client():FindFirstChild("FirstOfficer") -- the crew clones are rebuilt near the camera
+	local foRoot = fo:FindFirstChild("HumanoidRootPart")
+	local foSeat = Aircraft.points(FP.CONFIG.kind, FP.CONFIG.scale).firstOfficer
+	check("Port Meridian: the first officer's walkaround (outside, at the nose gear)", (foRoot.Position - (FP.PM_STAND * foSeat).Position).Magnitude > 8 and fo.Head.LocalTransparencyModifier == 0 and foRoot.Position.Y < FP.PM_STAND.Y + 5, foRoot.Position)
+	T = ls("back", K) + FP.WALKAROUND_START + FP.WALKAROUND + 1; frame(0.3)
+	check("... and back in the seat", (foRoot.Position - (FP.PM_STAND * foSeat).Position).Magnitude < 0.05)
+	local pmb = Ground.pmBoard()
+	check("Port Meridian gate board (studs-sized) shows the return flight", pmb ~= nil and pmb.Size.X.Offset == 0 and string.find(pmb:FindFirstChild("Text", true).Text, "CITY AIRPORT", 1, true) ~= nil)
+	if FP.PM_APRON then
+		local pmTug = Ground.pmTug()
+		local tb = pmTug and pmTug:FindFirstChild("Body"); local tb0 = tb and tb.Position
+		T = ls("back", K) + back.phases.pushback.t0 + 4; frame(0.3)
+		check("Port Meridian pushback by the local tug", tb ~= nil and (tb.Position - tb0).Magnitude > 4, tb and (tb.Position - tb0).Magnitude)
+	end
 	T = ls("back", K) + back.phases.climb.t0 + 2; frame(0.3)
 	check("airstairs gone once the shuttle left", client():FindFirstChild("ShuttleAirstairs") == nil)
 
@@ -245,7 +342,22 @@ local function body()
 		if tr then for _, d in tr:GetChildren() do if d.Name == "TrafficAircraft" then n += 1 end end end
 		check("ambient airliner visible during its movement", n >= 1, n)
 		local m = tr and tr:FindFirstChild("TrafficAircraft")
-		check("ambient airliner is light (medium LOD, no collision)", m and m:GetAttribute("AircraftLod") == "medium" and select(2, parts(m)) == 0)
+		local dist = m and (m.PrimaryPart.Position - camera.CFrame.Position).Magnitude
+		check("ambient airliner: distance LOD (full within 600, medium beyond 700), no collision", m and select(2, parts(m)) == 0
+			and ((dist < 600 and m:GetAttribute("AircraftLod") == "full") or (dist > 700 and m:GetAttribute("AircraftLod") == "medium") or (dist >= 600 and dist <= 700)), m and (tostring(m:GetAttribute("AircraftLod")) .. " at " .. math.floor(dist)))
+		-- the same aircraft parks on remote stand R2 between its landing and its departure
+		local park
+		for _, e in FP.ambient(K + 1) do if e.kind == "parked" then park = e end end
+		if park then
+			T = park.t0 + 10
+			look(FP.AMBIENT_STAND.Position + Vector3.new(0, 0, -200))
+			AT.step(0.1)
+			local pm = tr:FindFirstChild("TrafficAircraft")
+			check("visiting airliner parked on stand R2 (full LOD near the camera)", pm ~= nil and (pm.PrimaryPart.Position - FP.AMBIENT_STAND.Position).Magnitude < 0.05 and pm:GetAttribute("AircraftLod") == "full")
+			table.clear(bulkModels)
+			T += 5; AT.step(0.1)
+			check("a parked visitor costs no BulkMoveTo", bulkModels[pm] == nil, bulkModels[pm])
+		end
 		T = ev.t0 + ev.duration + 5
 		AT.step(0.1)
 		local left = 0
@@ -284,6 +396,22 @@ local function body()
 	local _, r1 = FP.heliTimes("hotel", start, padA, fold:GetAttribute("HeliToPad"))
 	T = r1 + 0.2; City.tick(0.1); M.settle(1); AT.step(0.1)
 	check("after landing: camera back, in the hotel lobby", camera.CameraType == Enum.CameraType.Custom and playerGui:FindFirstChild("HeliRide") == nil and (owner.root.Position - CityPlan.INTL_HOTEL.lobby.Position).Magnitude < 0.01)
+
+	------------------------------------------------------------------ express flight home from Port Meridian
+	local pmCheck
+	for _, d in game.Workspace.WorldCity:GetDescendants() do if d:IsA("ProximityPrompt") and d:GetAttribute("FlightTo") == "home" then pmCheck = d; break end end
+	local pc = CityPlan.ABROAD.checkin[1]
+	owner.Character:PivotTo(CFrame.new(pc.X, 27.5, pc.Z + 6))
+	local kb = math.floor((T - FP.CONFIG.epoch) / I)
+	T = FP.legStart("back", kb + 1) - FP.CONFIG.charterAfter - 40
+	M.fire(PPS.PromptTriggered, pmCheck, owner); M.settle(0.3)
+	local cg = playerGui:FindFirstChild("FlightChoice")
+	local express
+	if cg then for _, d in cg:GetDescendants() do if d:IsA("TextButton") and string.find(d.Text, "Express", 1, true) then express = d end end end
+	check("Port Meridian counter: choice offered when the shuttle is far away", cg ~= nil and express ~= nil)
+	if express then M.fire(express.Activated); M.settle(25) end
+	local fc = lastCall("TravelAction")
+	check("express flight = the instant flight (TravelAction flight), home again", fc and fc.payload.action == "flight" and fc.result.ok == true and City.state(owner) ~= "abroad", fc and fc.payload.action)
 
 	------------------------------------------------------------------ shuttle off -> legacy check-in
 	Shuttle.setEnabled(false)

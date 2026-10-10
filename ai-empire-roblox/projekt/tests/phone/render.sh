@@ -32,5 +32,12 @@ for vp in desktop phone; do
   shot "${vp}_rich_chat" rich $vp chat
   shot "${vp}_rich_thread" rich $vp thread
   shot "${vp}_rich_settings" rich $vp settings
+  shot "${vp}_rich_strip" rich $vp strip
+  shot "${vp}_rich_map" rich $vp map
+  shot "${vp}_rich_finance" rich $vp finance
+  shot "${vp}_rich_team" rich $vp team
+  shot "${vp}_garage_finance" garage $vp finance
+  shot "${vp}_garage_team" garage $vp team
 done
 shot "touch_rich_banner" rich phone banner touch=1
+shot "touch_rich_home" rich phone home touch=1

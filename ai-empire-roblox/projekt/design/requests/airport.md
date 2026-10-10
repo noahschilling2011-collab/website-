@@ -66,6 +66,22 @@ Request: run 20-30 walkers (`walk.walkers` = 24) in the terminal while the camer
 (x -300..300, z 2430..2530), client-only like the rest of CityLifeController; sitting walkers on `seats`.
 Note: decor luggage (parts `Suitcase` / `Trolley*`, non-colliding) stands in the check-in queue lanes; walkers
 may pass through it or treat it as obstacles.
+STATUS: done by metro (2026-10-10). CityLifeController has a third region "airport" = the terminal's x range
+(-300..300) from the forecourt to the jet bridges (z 2417..2560, so the hall is filled before a player reaches the
+doors or leaves a docked shuttle; camera below the roof line GROUND + 30): 30 walkers (top of the requested 20-30 - with 24
+the 600-stud hall read thin in the renders), no cars, on
+`MetroPlan.airportNet()` = your `CityPlan.AIRPORT.walk` read-only (links converted to edge ids) plus metro's seat
+spurs: the first row of gate A1 facing the concourse (8 pair nodes = 16 seats, spurs from the concourse line) and the
+north sides of the two landside seating islands (6 pair nodes from L-150 / L150); a spur node serves two seats like
+a bench (seat = pair centre at floor level). The A1 boarding point is a portal (walkers board / arrive through the
+jet bridge), the doors spawn / despawn; A2 / A3 boarding points carry no idle. Idle kinds queue / checkin /
+security / gate / shop / food / lounge / reclaim / wait are used as given (face = your face). Walkers keep within
+0.25 of your centre lines (your graph guarantees a radius-1 agent on the line). Client-only, deterministic, asleep
+outside the hall (forecourt, car park, apron, flight). Tests: tests/metro/test_life (30 walkers, 0 cars, on the
+graph, inside the hall, floor level, sitting + >= 3 idle kinds, recycling, PERF ~1.5 ms per step in the mock),
+test_plan (net connected, links consistent, >= 10 seat spurs, portals), test_paths (sweep vs the real terminal:
+metro's seat spurs clear at body radius 1.0; your graph clear at 0.75 except the PENDING items in
+design/requests/metro.md #7 - decor luggage exempt as you allowed).
 
 ## 6. Flight (ShuttleController) — live rows on the airport's flight information boards
 All airport flight information now shows only the one shuttle (FlightPlan.CONFIG.flights out / back, gate
@@ -75,6 +91,10 @@ attributes `Board` = "departures" | "arrivals" | "monitor" | "gate" | "gatedoor"
 is the fallback). Request: ShuttleController writes live rows into them client-side (as it does for
 GateBoardHome), e.g. departures "PM 101  PORT MERIDIAN  A1  BOARDING / DEPARTS IN 3:20", once per second at most,
 only for boards within ~150 studs; no server writes.
+STATUS: done by flight (ShuttleGround.boardText / writeBoards: every FlightInfoBoard within 150 studs of the camera,
+once per second, client-only; departures / monitor / gate / gatedoor rows = BOARDING / GATE CLOSED / DEPARTED / ON TIME
++ m:ss, arrivals / belt = EXPECTED / LANDED / ARRIVED / BAGGAGE ON BELT; the old pixel-sized GateBoardHome billboard is
+gone; checked in tests/flight/test_client).
 
 ## 7. Life (PropFxController) — per-prop activation range
 PropFxController only animates props within FAR = 120 / VERTICAL = 24 studs of the camera, so the control tower's
@@ -82,12 +102,16 @@ radar (spin, y ~ G+95) and beacon (blink, G+104, x = 820) never run for anyone o
 Both props now carry `FxFar = 900` and `FxVertical = 200`. Request: honour optional per-prop `FxFar` /
 `FxVertical` attributes in the scan (fallback to the defaults). Until then the report no longer claims they
 animate.
+STATUS: done by staffops (PropFxController.register reads FxFar / FxVertical, Controller.scan uses them per prop;
+defaults FAR 120 / VERTICAL 24; tests/staffops client suite: a spin prop with FxFar 900 / FxVertical 200 is active
+500 studs away, a normal prop there sleeps)
 
 ## 8. Lead — budgets and the old world check
 - Airport zone: real lights 40 / 40 (a later staff / polish package cannot add one without removing one).
-- Airport exterior sub-budget (tests/airport: old 222 + 1,500 = 1,722): 1,707 after this round (axle wheels are
+- Airport exterior sub-budget (tests/airport: old 222 + 1,500 = 1,722): 1,703 after this round (axle wheels are
   one cylinder per axle now, which freed ~130 parts for the west-apron GSE parking). Suggest raising it to
-  2,000 (zone total today 6,5xx / 7,000; terminal interior 2,9xx / 3,500).
-- agents/world/world_check.py still has the 10,000-part world total (the world is ~13,400 now) and fails if
+  2,000 (world check 2026-10-10: airport zone 6,489 / 7,000; terminal interior 2,988 / 3,500 in the world check,
+  3,145 / 3,500 in tests/airport, which also counts the hall structure).
+- agents/world/world_check.py still has the 10,000-part world total (the world is ~13,500 now) and fails if
   run; please retire it in favour of agents/airport/world_check.py (per-zone budgets, #1), which now also has
   a map-edge check (no slit along |x| = 1150 for z -800..3800 and along z = 3800).

@@ -40,6 +40,8 @@ STATUS: done by staffops (retail ticket income and the seller share book "retail
 ## 4. CityService (owner: world) — the player's own flight tickets in the ledger
 Ticket purchase / refund: `Economy.spend(session, ticket, "travel")` and `Economy.grant(session, ticket, "travel")`
 (the refund also subtracts from `stats.totalCost` as today). Optional, P&L only.
+STATUS: done by flight (CityService.flight and ShuttleService ticket / VIP helicopter: spend and refund on "travel";
+tests/flight/test_shuttle checks the refund line).
 
 ## 5. tests/lead/run_all.sh (lead) — add the econ suites
 ```
@@ -67,6 +69,7 @@ Expected: 173/0, 61/0, 83/0, 83/0, 11/0 (about 15 s together). Mutation proof: `
 - `Format.perDay(perSecond)` ("+$12,345/day") and `Format.dayClock(day, hour)` ("Day 8 · 11:54").
 - EmpireApp still shows the old "customers" card (lease auction, always empty now) and CONTRACTS (empty):
   replace with the B2B accounts / pipeline view.
+STATUS: done by apps (HUD Next goal + per-day money, Company app Clients / Money / Settings from deals, ledger, hr, saveMode, nightShift, apprentices, jet; Hardware app from live.compute / capacity / load / waitlist / ops; lease card removed)
 
 ## 7. Later visual package (servers, guest house, trips)
 - Office attributes written by EmpireService on change: `RackFaults` ("3,7" = failed blade slots; slot i =

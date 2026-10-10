@@ -113,8 +113,19 @@ if st: targets.append(("VipLimoStand", (st[0]["cframe"][0], st[0]["cframe"][2], 
 hp = [h for h in find(name="Helipad") if (h.get("attrs") or {}).get("Purpose") == "VIPAirport"]
 if hp: targets.append(("airport helipad", (hp[0]["cframe"][0], hp[0]["cframe"][2], 4)))
 targets.append(("lounge door", (-100, 7650, 2))); targets.append(("taxi rank", (-150, 7762, 3)))
+# apron (flight request #7): out through the ApronDoor to stand 1's airstair foot; heliport gate and VIP canopy
+ad = find(name="ApronDoor")
+if ad: targets.append(("apron door (outside)", (ad[0]["cframe"][0] + 3, ad[0]["cframe"][2], 2)))
+ss = find(name="ShuttleStand")
+if ss:
+    c = ss[0]["cframe"]; look = (-c[5], -c[11]); right = (c[3], c[9])
+    door = (c[0] + look[0] * 41.3 - right[0] * 6.24, c[2] + look[1] * 41.3 - right[1] * 6.24)
+    targets.append(("stand 1 airstair foot", (door[0], door[1] + 20, 3)))
+if hp:
+    targets.append(("heliport gate", (hp[0]["cframe"][0] - 28, hp[0]["cframe"][2] + 36, 2)))
+    targets.append(("VIP terminal canopy", (hp[0]["cframe"][0] + 42, hp[0]["cframe"][2] + 14, 3)))
 arr = (0, 7655)
-f1 = area(-170, 360, 7600, 7800, arr, targets, "arrival")
+f1 = area(-170, 700, 7590, 7800, arr, targets, "arrival")
 t2 = [("spire entrance", (0, 8584, 3)), ("kiosk", (24, 8592, 4)), ("promenade", (0, 8650, 3)), ("quay", (300, 8690, 3))]
 f2 = area(-120, 360, 8500, 8700, (0, 8620), t2, "waterfront")
 sys.exit(1 if f1 or f2 else 0)

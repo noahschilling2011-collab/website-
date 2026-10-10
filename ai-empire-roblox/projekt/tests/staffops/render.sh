@@ -12,7 +12,8 @@ shot() { # name state viewport [key=value...]
     && echo "out/staffops/$name.png" || { echo "FAILED $name"; tail -n 5 "out/staffops/.$name.log"; }
 }
 shot rack rack desktop
+shot badges badges desktop --ppstud 60
 for vp in desktop phone; do
-  for st in talk_garage talk_trainer talk_rich; do shot "${vp}_${st}" "$st" "$vp"; done
+  for st in talk_garage talk_trainer talk_rich talk_night talk_itremote; do shot "${vp}_${st}" "$st" "$vp"; done
   shot "${vp}_talk_apprentices" talk_trainer "$vp" ask=apprentices
 done

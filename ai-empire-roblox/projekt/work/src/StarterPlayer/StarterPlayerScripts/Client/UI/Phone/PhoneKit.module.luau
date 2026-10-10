@@ -22,6 +22,9 @@ PhoneKit.colors = {
 	calendar = Color3.fromRGB(226, 92, 84),
 	contacts = Color3.fromRGB(104, 126, 168),
 	settings = Color3.fromRGB(104, 114, 122),
+	map = Color3.fromRGB(64, 150, 226),
+	finance = Color3.fromRGB(214, 168, 52),
+	team = Color3.fromRGB(166, 112, 220),
 	accept = Color3.fromRGB(52, 186, 96),
 	decline = Color3.fromRGB(226, 84, 76),
 	badge = Color3.fromRGB(236, 72, 64),
@@ -30,7 +33,7 @@ local P = PhoneKit.colors
 
 export type Badge = { frame: Frame, set: (n: number) -> () }
 export type Tile = { button: TextButton, badge: Badge }
-export type Toggle = { frame: TextButton, set: (on: boolean) -> (), get: () -> boolean }
+export type Toggle = { frame: TextButton, set: (on: boolean) -> (), get: () -> boolean, flip: () -> () }
 
 -- a TextButton without the default look (the phone's tap targets)
 function PhoneKit.tap(parent: Instance?, size: UDim2?, position: UDim2?): TextButton
@@ -112,6 +115,33 @@ function PhoneKit.glyph(parent: Instance, kind: string, size: number, color: Col
 		hub.BackgroundTransparency = 0
 		hub.BackgroundColor3 = col
 		Kit.corner(hub, size)
+	elseif kind == "map" then -- location pin: round head with a hole, pointed foot
+		local head = Kit.frame(frame, UDim2.fromScale(0.56, 0.56), UDim2.fromScale(0.22, 0.06))
+		head.BackgroundTransparency = 0
+		head.BackgroundColor3 = col
+		Kit.corner(head, size)
+		block(0.42, 0.5, 0.16, 0.36, 3)
+		local hole = Kit.frame(frame, UDim2.fromScale(0.22, 0.22), UDim2.fromScale(0.39, 0.23))
+		hole.BackgroundTransparency = 0
+		hole.BackgroundColor3 = P.map:Lerp(C.black, 0.15)
+		Kit.corner(hole, size)
+		block(0.2, 0.88, 0.6, 0.08, 2)
+	elseif kind == "finance" then -- rising bars on a base line
+		block(0.12, 0.56, 0.18, 0.3, 2)
+		block(0.41, 0.38, 0.18, 0.48, 2)
+		block(0.7, 0.16, 0.18, 0.7, 2)
+		block(0.06, 0.88, 0.88, 0.08, 2)
+	elseif kind == "team" then -- two people
+		local h1 = Kit.frame(frame, UDim2.fromScale(0.28, 0.28), UDim2.fromScale(0.12, 0.14))
+		h1.BackgroundTransparency = 0
+		h1.BackgroundColor3 = col
+		Kit.corner(h1, size)
+		local h2 = Kit.frame(frame, UDim2.fromScale(0.28, 0.28), UDim2.fromScale(0.6, 0.14))
+		h2.BackgroundTransparency = 0
+		h2.BackgroundColor3 = col
+		Kit.corner(h2, size)
+		block(0.02, 0.5, 0.48, 0.38, math.floor(size * 0.16))
+		block(0.5, 0.5, 0.48, 0.38, math.floor(size * 0.16))
 	elseif kind == "signal" then
 		for i = 0, 3 do block(0.04 + i * 0.25, 0.7 - i * 0.2, 0.17, 0.3 + i * 0.2, 1) end
 	elseif kind == "battery" then
@@ -244,7 +274,8 @@ function PhoneKit.header(parent: Instance, title: string, onBack: (() -> ())?, r
 	bar.LayoutOrder = 0
 	local x = 14
 	if onBack then
-		local back = PhoneKit.tap(bar, UDim2.fromOffset(44, 40), UDim2.fromOffset(4, 0))
+		-- 52 x 44 tap target (2 px beyond the 40 px bar at the top and bottom), the chevron stays centred
+		local back = PhoneKit.tap(bar, UDim2.fromOffset(52, 44), UDim2.fromOffset(0, -2))
 		back.Name = "Back"
 		back.Selectable = true
 		local chev = Kit.text(back, "‹", 30, F.bold, Theme.accent)
@@ -259,29 +290,34 @@ function PhoneKit.header(parent: Instance, title: string, onBack: (() -> ())?, r
 	local label = Kit.text(bar, title, 20, F.display, C.text)
 	label.Name = "Title"
 	label.AutomaticSize = Enum.AutomaticSize.None
-	label.Size = UDim2.new(1, -x - (if right then 84 else 12), 1, 0)
+	label.Size = UDim2.new(1, -x - (if right then 96 else 12), 1, 0)
 	label.Position = UDim2.fromOffset(x, 0)
 	label.TextTruncate = Enum.TextTruncate.AtEnd
 	local action: TextButton? = nil
 	if right and onRight then
-		local b = PhoneKit.tap(bar, UDim2.fromOffset(76, 30), UDim2.new(1, -10, 0.5, 0))
+		-- an 88 x 44 tap target around the visible 80 x 36 pill (touch: never a small target)
+		local b = PhoneKit.tap(bar, UDim2.fromOffset(88, 44), UDim2.new(1, -4, 0.5, 0))
 		b.Name = "HeaderAction"
 		b.AnchorPoint = Vector2.new(1, 0.5)
-		b.BackgroundTransparency = 0
-		b.BackgroundColor3 = P.card2
-		b.Text = right
-		b.Font = F.bold
-		b.TextSize = 13
-		b.TextColor3 = C.text
 		b.Selectable = true
-		Kit.corner(b, 15)
+		local pill = Kit.frame(b, UDim2.fromOffset(80, 36), UDim2.fromScale(0.5, 0.5))
+		pill.Name = "Pill"
+		pill.AnchorPoint = Vector2.new(0.5, 0.5)
+		pill.BackgroundTransparency = 0
+		pill.BackgroundColor3 = P.card2
+		Kit.corner(pill, 18)
+		local t = Kit.text(pill, right, 14, F.bold, C.text)
+		t.Name = "ActionText"
+		t.AutomaticSize = Enum.AutomaticSize.None
+		t.Size = UDim2.fromScale(1, 1)
+		t.TextXAlignment = Enum.TextXAlignment.Center
 		Kit.onClick(b, onRight)
 		action = b
 	end
 	return bar, action
 end
 
--- on / off switch
+-- on / off switch (flip() = what a tap does; a whole settings row calls it too)
 function PhoneKit.toggle(parent: Instance, on: boolean, onChange: (on: boolean) -> ()): Toggle
 	local b = PhoneKit.tap(parent, UDim2.fromOffset(52, 30))
 	b.Name = "Toggle"
@@ -299,11 +335,12 @@ function PhoneKit.toggle(parent: Instance, on: boolean, onChange: (on: boolean) 
 		knob.Position = if state then UDim2.new(1, -27, 0.5, 0) else UDim2.new(0, 3, 0.5, 0)
 	end
 	paint()
-	Kit.onClick(b, function()
+	local function flip()
 		state = not state
 		paint()
 		onChange(state)
-	end)
+	end
+	Kit.onClick(b, flip)
 	return {
 		frame = b,
 		set = function(v: boolean)
@@ -311,6 +348,7 @@ function PhoneKit.toggle(parent: Instance, on: boolean, onChange: (on: boolean) 
 			paint()
 		end,
 		get = function(): boolean return state end,
+		flip = flip,
 	}
 end
 

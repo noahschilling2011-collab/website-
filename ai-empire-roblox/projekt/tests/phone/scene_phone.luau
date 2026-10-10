@@ -2,7 +2,8 @@
 -- guiprev scene of the phone package: the company phone in the states of ui_setup.luau.
 --   python3 tools/guiprev/guiprev.py --scene tests/phone/scene_phone.luau --gen harness/.gen_phone --state rich \
 --       --viewport desktop --out out/phone/home_rich.png screen=home
--- extra: screen=closed|banner|home|messages|message|calls|call|calendar|contacts|dial|chat|thread|settings (default home)
+-- extra: screen=closed|banner|home|messages|message|calls|call|calendar|contacts|dial|chat|thread|strip|map|finance|team|settings
+--        (default home)
 --        touch=1 (touch device: phone button left of the jump button)
 local M = require("../../harness/mock")
 local GuiDump = require("../../tools/guiprev/guidump")
@@ -54,6 +55,29 @@ local function body()
 		M.settle(5)
 		deps.sendChat(id, "Tell me a joke")
 		M.settle(5)
+	elseif SCREEN == "strip" then
+		-- a call rings while the player writes a chat message: the strip on top, the draft stays
+		local v = C.view()
+		local id = OPT.model or (v and v.models[1] and v.models[1].id) or "nova2"
+		Phone.hideBanner()
+		C.open("thread", id)
+		M.settle(0.2)
+		deps.sendChat(id, "Hi! Who are you?")
+		M.settle(5)
+		local gui = ui.playerGui:FindFirstChild("AIEmpire_Phone")
+		local box = gui and gui:FindFirstChild("ChatInput", true)
+		if box then box.Text = "Can you write a short poem about our" end
+		ui.PhoneService.ring(ui.session, { title = "We can move!", text = "x", kind = "office", accept = "Open Office", decline = "Later", open = "empire", section = "office" })
+		M.settle(0.5)
+	elseif SCREEN == "finance" then
+		local e = ui.session.data.empire
+		if STATE == "rich" then
+			e.ledger = { ["9"] = { i = { b2b = 63000, market = 4810, guest = 1800 }, o = { wages = 41800, trips = 2520, ops = 3600, market = 2900 } },
+				["8"] = { i = { b2b = 54000, market = 4200 }, o = { wages = 40100, trips = 1260, ops = 3600 } } }
+		end
+		ui.push()
+		Phone.hideBanner()
+		C.open("finance")
 	elseif SCREEN == "message" then
 		C.open("message", firstMessage())
 	elseif SCREEN == "call" then

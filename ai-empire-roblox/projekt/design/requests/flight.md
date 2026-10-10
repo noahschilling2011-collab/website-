@@ -75,11 +75,13 @@ tests/flight/clearance.py (exact hull sweep along every pose vs the built world)
 - `HoldSign` + `HoldSignPost` at x = conn + 23.75 (z 2923.6, y up to 29.4): brushes the nacelle (<= 0.1 stud)
   while the aircraft turns through the connector. Request: at least 32 studs from the connector centreline
   (x = conn +- 32 or more), both connectors.
-- FYI `Windsock` (620, z 2900, y up to 36.6) is 40 studs from the taxiway centreline: anything taxiing along the
-  east half of the taxiway hits it with the wing. Not on the shuttle's route; worth moving to z >= 2925 or x >= 1010
-  if the company jet ever uses the east taxiway.
-Until this is done the clearance test lists these three obstacles as PENDING (not counted as failures, printed
-on every run); any other obstacle fails the test.
+- `Windsock` / `WindsockPole` (620, z 2900, y up to 36.6) stand 40 studs from the taxiway centreline. Since round 4 the
+  visiting airliners (AirTrafficController: land east, east connector, taxiway west to remote stand R2 at (575, 2700),
+  later push back onto the taxiway and taxi east) pass it and the wing goes through it (tests/flight/clearance.py:
+  depth 1.3). Request: move it to z >= 2925 (between taxiway and runway, beyond 62 studs) or x >= 1010. The mast at
+  (650, 2836.6) and the east hold-short sign (x 973.8) are on that route too (same requests as above).
+Until this is done the clearance test lists these obstacles as PENDING (not counted as failures, printed on every
+run: 14 hits today - shuttle 6, visiting airliners 8); any other obstacle fails the test.
 
 ## 7. MetroBuilder / MetroPlan — Port Meridian airfield: obstacle-free strip and a real apron (owner: metro package)
 - The arrival hall's BackGlass (z 7610) and roof (z >= 7604) and the towers Tower_aw_* / Tower_ae_* (faces at
@@ -99,6 +101,32 @@ on every run); any other obstacle fails the test.
   `ApronDoor`) in the hall's apron-side wall. The flight package will then give the Port Meridian leg a real
   pushback and taxi (the phase names exist already: pushback / taxi are holds today) and walk crew and
   passengers through that door.
+STATUS: done by metro (apron, stands, door; the strip only where metro owns the obstacles) - 2026-10-10.
+- Apron `MetroPlan.APRON`: concrete, top = `APRON.top` (GROUND + 0.25), rects x 160..548 / z 7590..7688 and
+  x 204..548 / z 7688..7721.5 (132 studs deep east of x 204), fenced towards the city, open to the runway. Painted:
+  taxi line from the runway edge at x = `APRON.taxiX` (340) bending onto the stand centreline z 7664, stop bars at
+  pivot - 50, stand numbers, red safety boxes, a passenger walkway from the door to stand 1's forward left door.
+- Stand 1: part `ShuttleStand` under PortMeridian/Airfield (invisible, no collision; CFrame = `APRON.stand` =
+  pivot (252, GROUND + 0.25, 7664), LookVector = -X (nose west, ~x 192, towards the hall); attributes
+  Stand = "PM1", Purpose = "Shuttle", Door = Vector3 of the door). DoorL1 lands at (210.7, 7670.2); the airstair
+  foot (~z 7690) is on the apron and reachable from the hall (tests/metro/reach.py). The whole hull (measured
+  AircraftModel "320" bands at scale 1.8, fin top 42) is free of every visible part (tests/metro/test_build).
+- Stand 2: the decorative `ParkedAircraft` (pivot `APRON.stand2` = (480, GROUND + 0.25, 7664), facing west,
+  attribute Stand = "PM2") with an airstair, power unit, tug + baggage carts. 102 studs between stand 1's tail
+  (x 318) and stand 2's nose (x 420) for the pushback / turn; nothing stands on the runway any more.
+- `ApronDoor` (invisible, no collision, 12 wide x 11.5 high, LookVector = +X out to the apron) in the hall's east
+  wall at x 159.25, z 7655..7667 (between baggage claim and the news kiosk); the wall is cut with a lintel above
+  12 studs, the opening is free (test_build), "STAND 1 · SHUTTLE" over it and a docking board above.
+- The VIP airport helipad moved to the heliport east of the apron: `MetroPlan.HELIPADS.airport` = (604, GROUND + 1,
+  7670), fence gates south-west and east, VIP helicopter terminal x 652..688. Your clearance sweep (clearance_dump.sh
+  copied with a private gen dir + clearance.py) passes 18/0 on the new layout; only the 6 City Airport PENDING
+  items (flight.md #6) remain. `tests/flight/test_plan.luau` still uses the old pad (310, 7648) as a maths example -
+  harmless, but you may want the real `MetroPlan.HELIPADS.airport.cf` there.
+- Strip: the airport-district towers west of the hall now start at z 7632 (77 studs off the centreline) and face
+  south (no north awnings). Still inside 75 studs: the arrival hall (CityPlan.ABROAD.terminal z 7610, roof from
+  z 7604; owner airport - moving it means moving check-in, lounge, arrival point and plaza) and the parked wings on
+  the apron (z >= 7607.25, 52 off the centreline). Keep `PM_LINE` = 7544 while rolling past the apron: wingtip
+  clearance there 7607.25 - 7601.8 = 5.4 studs (hall roof edge 5.2 as you measured).
 
 ## 8. Lead — run_all: add the flight suites; tests/flight/world_client_patched retired
 Please add `bash tests/flight/run.sh` (or the loop below) to tests/lead/run_all.sh:
@@ -108,3 +136,32 @@ for t in plan shuttle client aircraft; do run "flight_$t" $L tests/flight/test_$
 ```
 and, for the geometry part (world dump ~35 s + sweep ~20 s), `bash tests/flight/run.sh --clearance-only`.
 `world_client_patched` is gone: flight.md #1 is merged into tests/world/test_client.luau.
+
+## 7b. Update (flight, round 4): the Port Meridian apron is in use
+FlightPlan reads `MetroPlan.APRON` (stand 1 = `stand`, `taxiX`, `door`): arrival roll-out on FlightPlan.PM_LINE to
+x = taxiX - 70, taxi north along the taxi line and nose-in onto stand 1; departure = pushback east along the stand line,
+nose swung north onto the taxi line (the tail reaches z ~7734, 13 studs past the apron's city edge at 7721.5, at
+~15 studs height - the clearance sweep finds nothing there today; keep that strip free of anything taller than 12
+studs), taxi north, left onto the runway, take-off roll west on PM_LINE. Boarding / passengers use the hall's apron
+door (FlightPlan.PM_DOOR) and the client airstairs at the forward left door; a local pushback tug serves stand 1.
+Nothing more is needed from metro for the shuttle; the runway's obstacle-free strip request above still stands for
+the roll-out / take-off on PM_LINE.
+
+## 9. Lead (FYI) — tests/flight/run.sh
+`bash tests/flight/run.sh` today: flight_plan 95/0, flight_shuttle 111/0, flight_client 90/0, flight_aircraft 45/0,
+flight_clearance 18/0 (14 pending, other packages). Request #8 (add it to run_all) still stands.
+
+
+## 10. Status (flight, round 5, 2026-10-10 ~16:00 UTC) - still open: #6 (airport) and #8 (lead)
+- #6 AirportBuilder (owner airport): unchanged in today's sources, re-measured with `bash tests/flight/run.sh`:
+  14 PENDING hits (shuttle 6: FloodMast x = -650 / -260 with the wing up to 1.03 deep, HoldSign x = -926.2 with the
+  nacelle up to 0.55; visiting airliners 8: FloodMast x = 650, Windsock / WindsockPole (620, 2900), HoldSign
+  x = 973.8). The fix is only in AirportBuilder (`runway()` HoldSign/HoldSignPost at x + 23.75 -> x +- 32 or more;
+  the four FloodMast/FloodFrame/FloodHead at z 2836 -> z <= 2720 between stands or |x| >= 1010; Windsock/Pole
+  at (620, rw.z1 - 40) -> z >= 2925 or x >= 1010). FlightPlan cannot route round them: the masts stand 3 studs
+  off the taxiway edge and the shuttle's half span is 57.8. The clearance suite turns each PENDING into a
+  failure as soon as the obstacle list changes, so a moved mast is verified automatically.
+- #8 tests/lead/run_all.sh (owner lead): still runs no flight suite (47 suites today). The block to add is in #8;
+  `bash tests/flight/run.sh` today: flight_plan 95/0, flight_shuttle 111/0, flight_client 90/0, flight_aircraft
+  45/0, flight_clearance 18/0 (+14 pending above), `--negative` 1/0.
+- metro #7 note taken: tests/flight/test_plan.luau now uses the real pads (MetroPlan.HELIPADS.airport / hotel).

@@ -105,6 +105,14 @@ local function body()
 	check("nightShift: unknown department", call("EmpireAction", s, { action = "nightShift", dept = "lobby", on = true }).err == "BAD_INPUT")
 	check("nightShift: on for research", call("EmpireAction", s, { action = "nightShift", dept = "research", on = true }).ok and s.data.empire.nightShift.research == true)
 	check("nightShift: off removes the key", call("EmpireAction", s, { action = "nightShift", dept = "research", on = false }).ok and s.data.empire.nightShift.research == nil)
+	-- integrate (apps request 5): one call per role sets every department of the role (atomic)
+	check("nightShift by role: unknown role / non-boolean refused", call("EmpireAction", s, { action = "nightShift", role = "pilot", on = true }).err == "BAD_INPUT" and call("EmpireAction", s, { action = "nightShift", role = "engineer", on = "yes" }).err == "BAD_INPUT")
+	local engDepts = Ops.ROLE_DEPTS.engineer
+	check("nightShift by role: on sets every department of the role", call("EmpireAction", s, { action = "nightShift", role = "engineer", on = true }).ok and #engDepts >= 1 and (function() for _, dpt in engDepts do if s.data.empire.nightShift[dpt] ~= true then return false end end return true end)())
+	check("nightShift by role: off clears them all", call("EmpireAction", s, { action = "nightShift", role = "engineer", on = false }).ok and (function() for _, dpt in engDepts do if s.data.empire.nightShift[dpt] ~= nil then return false end end return true end)())
+	s.data.empire.office = 2
+	check("nightShift by role: OFFICE below stage 3", call("EmpireAction", s, { action = "nightShift", role = "engineer", on = true }).err == "OFFICE")
+	s.data.empire.office = 3
 	local ap = call("EmpireAction", s, { action = "autoPrice", model = "nope", on = true })
 	check("autoPrice: unknown model refused (models package rule)", ap.ok == false, ap.err)
 	-- rate limit 4 burst through the real RemoteFunction
@@ -122,6 +130,12 @@ local function body()
 	check("pin again = unpin", call("DealAction", d, { action = "pin", clientId = "atlas" }).ok and d.data.empire.deals.pinned == nil)
 	check("skip", call("DealAction", d, { action = "skip", clientId = "ledger" }).ok and d.data.empire.deals.skip.ledger == true)
 	check("pin clears skip", call("DealAction", d, { action = "pin", clientId = "ledger" }).ok and d.data.empire.deals.skip.ledger == nil and d.data.empire.deals.pinned == "ledger")
+	-- integrate (apps request 6): an explicit boolean `on` sets the state, so a repeated request never undoes it
+	check("pin on = true twice keeps the pin", call("DealAction", d, { action = "pin", clientId = "ledger", on = true }).ok and d.data.empire.deals.pinned == "ledger")
+	check("pin on = false on another client keeps the current pin", call("DealAction", d, { action = "pin", clientId = "atlas", on = false }).ok and d.data.empire.deals.pinned == "ledger")
+	check("skip on = true twice stays skipped (and unpins)", call("DealAction", d, { action = "skip", clientId = "ledger", on = true }).ok and call("DealAction", d, { action = "skip", clientId = "ledger", on = true }).ok and d.data.empire.deals.skip.ledger == true and d.data.empire.deals.pinned == nil)
+	check("skip on = false clears it", call("DealAction", d, { action = "skip", clientId = "ledger", on = false }).ok and d.data.empire.deals.skip.ledger == nil)
+	check("pin on = true pins and clears skip", call("DealAction", d, { action = "skip", clientId = "ledger", on = true }).ok and call("DealAction", d, { action = "pin", clientId = "ledger", on = true }).ok and d.data.empire.deals.pinned == "ledger" and d.data.empire.deals.skip.ledger == nil)
 	check("joinMeeting away from the client office: TOO_FAR", call("DealAction", d, { action = "joinMeeting", clientId = "ledger" }).err == "TOO_FAR")
 	check("joinMeeting without a running pilot: NO_MEETING", EmpireService.joinMeeting(d, Ops.client("ledger")).err == "NO_MEETING")
 	table.insert(d.data.empire.deals.tripList, { client = "ledger", kind = "sign", back = d.data.empire.seconds + 100, founder = false, hosted = false, crew = 2 })

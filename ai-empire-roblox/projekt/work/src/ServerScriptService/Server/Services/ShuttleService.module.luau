@@ -26,6 +26,14 @@
 --     player: CityService state "flying" (PlotService away check), refund unless arrived.
 --   * Arrival: when the aircraft reaches "deboarding" the server streams the arrival hall and pivots the
 --     character there (CityPlan.ABROAD.arrival / AIRPORT.arrival), unanchored, state abroad / home.
+--   * Field staff on international trips (user request 20): at the start of every boarding the service picks
+--     up to MAX_PAX travellers of the server's companies - the field rep (and the travelling engineer) of each
+--     abroad pilot trip (CompanyOps tripList, not hosted, no company jet) flies out on the next out leg and home
+--     on the first return leg after the trip has ended (at the latest RETURN_CYCLES cycles later; the economy
+--     keeps its own trip clock, this is the visible part). Their rigs (EmployeeRigDesign, the same look as in
+--     the HQ: role + profile name/seed) are built once per leg as templates into ReplicatedStorage.Shuttle.
+--     Passengers (attributes Leg, PassengerName, Company); ShuttlePassengers (client) walks them from the gate
+--     to the aircraft during boarding and off it after the arrival when players are near.
 --   * VIP helicopter: TravelAction {action="heli", to="hotel"|"airport"} between the "Helipad" markers
 --     (Purpose VIPAirport = Port Meridian Airport, VIP = Meridian Grand Hotel roof; built by MetroBuilder; the
 --     service answers HELI_UNAVAILABLE if they are missing). Free with the "limo" game pass
@@ -39,11 +47,14 @@ local CampusMath=require(ReplicatedStorage.Shared.CampusMath)
 local Economy=require(script.Parent.EconomyService)
 local Session=require(script.Parent.SessionService)
 local Rig=require(script.Parent.EmployeeRigDesign)
+local Ops=require(ReplicatedStorage.Shared.CompanyOps)
 local Shuttle={}
 Shuttle.ENABLED=true
 Shuttle.HELI_FEE=2500 -- tuned by CORE_SPEC: VIP helicopter transfer without the limousine pass
 Shuttle.HELI_RADIUS=40 -- server distance check: character to the departure helipad / hotel lobby
 Shuttle.CREW={captain=9160,firstOfficer=9140} -- CampusMath.staffName indices (owner 0): the same two pilots on every server
+Shuttle.MAX_PAX=4 -- field staff shown per leg
+Shuttle.RETURN_CYCLES=2 -- a traveller flies home at the latest this many cycles after flying out
 -- (Tom Nakamura, Sana Okafor; indices far apart so the surnames differ)
 
 export type Api={trips: {[number]: any},setState: (Player,string)->(),rootOf: (Player)->(Model?,BasePart?,Humanoid?)}
@@ -58,6 +69,11 @@ local lastCrew=""
 local nextPadSearch=0
 local autoDone: {[string]: boolean}={}
 local heli: {busyUntil: number,from: Vector3?,to: Vector3?,fromPad: BasePart?,toPad: BasePart?}={busyUntil=0,from=nil,to=nil,fromPad=nil,toPad=nil}
+-- field staff: trip key -> what was shown (dir of the last leg flown, cycle, who)
+type Flown={dir: string,cycle: number,owner: number,profile: any,role: string,company: string}
+local flown: {[string]: Flown}={}
+Shuttle.flown=flown
+local paxKey=""
 
 local function now(): number return workspace:GetServerTimeNow() end
 local function flat(a: Vector3,b: Vector3): number return Vector3.new(a.X-b.X,0,a.Z-b.Z).Magnitude end
@@ -145,6 +161,109 @@ local function findPads()
 	end
 end
 local function padTop(p: BasePart): Vector3 return p.Position+Vector3.new(0,p.Size.Y/2,0) end
+
+------------------------------------------------------------------------------------------------ field staff
+local function profileOf(e: any,role: string,i: number): any
+	local list=if typeof(e.staffProfiles)=="table" then e.staffProfiles[role] else nil
+	local p=if typeof(list)=="table" then list[i] else nil
+	return if typeof(p)=="table" and typeof(p.n)=="string" then p else nil
+end
+-- Travellers of a company's abroad pilot trips: {key, trip, rep profile?, engineer profile?} (the k-th field rep
+-- for the k-th trip of the reps, the engineers CompanyOps.presence marks as travelling - PhoneService's rule).
+local function abroadTrips(e: any): {{key: string,profiles: {{p: any,role: string}}}}
+	local out={}
+	local deals=e.deals
+	if typeof(deals)~="table" or typeof(deals.tripList)~="table" or e.jet==true then return out end
+	local away: {any}={}
+	local okPresence,presence=pcall(Ops.presence,e,"engineer")
+	if okPresence and typeof(presence)=="table" then
+		for i,state in presence do if state=="trip" then local p=profileOf(e,"engineer",i);if p then table.insert(away,p) end end end
+	end
+	local k,m=0,0
+	local reps=Ops.fieldReps(e)
+	for _,trip in deals.tripList do
+		if typeof(trip)~="table" or trip.founder==true then continue end
+		k+=1
+		local c=Ops.client(trip.client)
+		if not c or c.trip=="city" or trip.hosted then continue end
+		if trip.kind=="sign" then m+=1 end
+		if c.trip~="abroad" or (tonumber(trip.crew) or 0)<=0 then continue end
+		local list: {{p: any,role: string}}={}
+		local rep=if k<=reps then profileOf(e,"marketer",k) else nil
+		if rep then table.insert(list,{p=rep,role="marketer"}) end
+		if trip.kind=="sign" and away[m] and (tonumber(trip.crew) or 0)>=2 then table.insert(list,{p=away[m],role="engineer"}) end
+		if #list>0 then table.insert(out,{key=tostring(trip.client)..":"..tostring(trip.left),profiles=list}) end
+	end
+	return out
+end
+-- Who flies on leg st (called once when its boarding starts): out = travellers of new abroad trips, back =
+-- travellers whose trip ended (or flew out RETURN_CYCLES cycles ago). Returns {owner, profile, role, company}.
+function Shuttle.passengersFor(st: FP.State): {Flown}
+	local list: {Flown}={}
+	local current: {[string]: boolean}={}
+	for _,s in Session.all() do
+		local player: Player?=s.player
+		local data=s.data
+		local e=if typeof(data)=="table" then data.empire else nil
+		if not player or typeof(e)~="table" then continue end
+		local company=if typeof(data.company)=="table" and typeof(data.company.name)=="string" then data.company.name else ""
+		for _,t in abroadTrips(e) do
+			local key=player.UserId..":"..t.key
+			current[key]=true
+			if st.dir=="out" and not flown[key] then
+				for _,who in t.profiles do
+					if #list>=Shuttle.MAX_PAX then break end
+					local f: Flown={dir="out",cycle=st.cycle,owner=player.UserId,profile=who.p,role=who.role,company=company}
+					flown[key..":"..who.role]=f
+					table.insert(list,f)
+				end
+				flown[key]={dir="out",cycle=st.cycle,owner=player.UserId,profile=nil,role="",company=company}
+			end
+		end
+	end
+	if st.dir=="back" then
+		for key,f in flown do
+			if f.dir~="out" or f.profile==nil or #list>=Shuttle.MAX_PAX then continue end
+			local tripKey=string.match(key,"^(.*):[^:]+$") or key
+			if not current[tripKey] or st.cycle-f.cycle>=Shuttle.RETURN_CYCLES then
+				f.dir="back";f.cycle=st.cycle
+				table.insert(list,f)
+			end
+		end
+	end
+	-- forget trips that ended and whose travellers are home (or never flew)
+	for key,f in flown do
+		local tripKey=if f.profile then (string.match(key,"^(.*):[^:]+$") or key) else key
+		if not current[tripKey] and (f.dir=="back" or f.profile==nil) and st.cycle-f.cycle>=1 then flown[key]=nil end
+	end
+	return list
+end
+local function publishPassengers(st: FP.State)
+	local f=folder
+	if not f then return end
+	local old=f:FindFirstChild("Passengers")
+	if old then old:Destroy() end
+	local pax=Instance.new("Folder");pax.Name="Passengers"
+	local legKey=st.dir..":"..st.cycle
+	pax:SetAttribute("Leg",legKey)
+	local temp=Instance.new("Folder")
+	for i,p in Shuttle.passengersFor(st) do
+		local ok,err=pcall(function()
+			local m=Rig.build(temp,p.owner,700+i,p.role,CFrame.new(),p.profile)
+			m:RemoveTag("CompanyEmployee")
+			for _,d in m:GetDescendants() do
+				if d:IsA("ProximityPrompt") then d:Destroy()
+				elseif d:IsA("BasePart") then d.Anchored=d.Name=="HumanoidRootPart";d.CanCollide=false;d.CanTouch=false;d.CanQuery=false end
+			end
+			m.Name="Passenger"..i
+			m:SetAttribute("PassengerName",tostring(p.profile.n or ""));m:SetAttribute("Company",p.company);m:SetAttribute("Leg",legKey)
+			m.Parent=pax
+		end)
+		if not ok then warn("[Shuttle] building a passenger rig failed: "..tostring(err)) end
+	end
+	temp:Destroy()
+	pax.Parent=f
+end
 
 ------------------------------------------------------------------------------------------------ publish
 local function publish(st: FP.State,t: number)
@@ -434,6 +553,11 @@ function Shuttle.tick(_dt: number)
 		lastKey=key;lastPhase=st.phase;lastCrew=crewState
 		publish(st,t)
 	end
+	-- field staff of this leg: once, when its boarding starts (or at start-up during a boarding)
+	if st.phase=="boarding" and key~=paxKey then
+		paxKey=key
+		publishPassengers(st)
+	end
 	-- the helipads may be built after the shuttle started (or stream in later on a test server): retry
 	local f=folder :: Folder
 	if f:GetAttribute("HeliAvailable")~=true and t>=nextPadSearch then
@@ -492,7 +616,8 @@ function Shuttle.init(cityApi: Api)
 	gatePrompt(g,"GateBoardHome",findHomeDesk(),"home","Gate "..FP.GATE_NAME.out.." · "..C.flights.out.." to Port Meridian")
 	gatePrompt(g,"GateBoardAbroad",FP.PM_GATES[1],"abroad",C.flights.back.." to City Airport")
 	g.Parent=workspace
-	lastKey="";lastPhase="";lastCrew="";nextPadSearch=0
+	lastKey="";lastPhase="";lastCrew="";nextPadSearch=0;paxKey=""
+	table.clear(flown)
 	table.clear(autoDone)
 	local st=FP.at(now())
 	autoDone[st.dir..":"..st.cycle]=st.phase~="boarding" -- a leg already past boarding at start-up boards nobody

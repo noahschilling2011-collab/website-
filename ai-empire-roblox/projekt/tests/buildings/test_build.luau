@@ -240,8 +240,9 @@ local function body()
 	end
 	check("t1: missing guest-house posts 13/14 do not warn (no guest house at tier 1)", assignOps(office1, cf1, 1) == 0)
 	local EmployeeConfig = M.require(RS.Shared.Config.EmployeeConfig)
-	-- staffops: OPERATIONS_JOBS[17] "Training Lead" has no post (placed only while there are apprentices)
-	check("t1: every operations job except the two guest-house jobs staffed", #office1.OperationsEmployees:GetChildren() == #EmployeeConfig.OPERATIONS_JOBS - 3, #office1.OperationsEmployees:GetChildren())
+	-- staffops: OPERATIONS_JOBS[17] "Training Lead" has no post (placed only while there are apprentices);
+	-- 18 / 19 = the stage-5 night rota (placed only in plan tier 4)
+	check("t1: every operations job except the two guest-house jobs staffed", #office1.OperationsEmployees:GetChildren() == #EmployeeConfig.OPERATIONS_JOBS - 5, #office1.OperationsEmployees:GetChildren())
 
 	--------------------------------------------------------------------------------------------- tier 2+
 	local tiers = if ALL then { 2, 3, 4 } else { 2 }

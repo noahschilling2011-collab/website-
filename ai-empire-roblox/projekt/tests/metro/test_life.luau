@@ -337,9 +337,11 @@ local function body()
 	for _, w in Life.walkers() do if w.alive or w.model.Parent ~= nil then alive += 1 end end
 	for _, c in Life.cars() do if c.alive or c.model.Parent ~= nil then alive += 1 end end
 	check("campus: every walker / car released", alive == 0, alive)
-	check("airport (check-in desks z 2461, car park z 2421, apron) / harbour / flight corridor are outside both regions",
+	check("airport apron / car park lot / above the terminal roof, harbour, flight corridor: outside every region; the terminal hall + forecourt + bridges are \"airport\"",
 		Plan.regionAt(Vector3.new(0, 30, 2800)) == nil and Plan.regionAt(Vector3.new(0, 300, 5000)) == nil and Plan.regionAt(Vector3.new(0, 30, 3500)) == nil
-		and Plan.regionAt(Vector3.new(-200, 30, 2461)) == nil and Plan.regionAt(Vector3.new(200, 30, 2461)) == nil and Plan.regionAt(Vector3.new(0, 30, 2421)) == nil)
+		and Plan.regionAt(Vector3.new(-400, 30, 2421)) == nil and Plan.regionAt(Vector3.new(0, City.GROUND + 60, 2470)) == nil
+		and Plan.regionAt(Vector3.new(0, 30, 2421)) == "airport" and Plan.regionAt(Vector3.new(0, 30, 2550)) == "airport"
+		and Plan.regionAt(Vector3.new(-200, 30, 2461)) == "airport" and Plan.regionAt(Vector3.new(200, 30, 2461)) == "airport")
 
 	------------------------------------------------------------------ activation keeps the frame step (no 0.5 s freeze)
 	Life.connectStep()
@@ -389,6 +391,53 @@ local function body()
 	check("downtown walkers on the walk graph", dOff == 0, dOff)
 	check("downtown cars stop for walkers on a crossing", occStops > 0, occStops)
 	print(string.format("PERF downtown (mock): %d steps, mean %.2f ms", dts, dtSum / math.max(1, dts) * 1000))
+
+	------------------------------------------------------------------ City Airport terminal (airport request #5)
+	local afocus = Vector3.new(0, City.GROUND + 6, 2470)
+	for _ = 1, 40 do now += dt; Life.update(afocus, dt, now) end -- the next scan switches downtown -> airport
+	R = Life.region()
+	local A = City.AIRPORT
+	local F = City.GROUND + 0.5
+	local aAlive, aCars = 0, 0
+	for _, w in Life.walkers() do if w.alive then aAlive += 1 end end
+	for _, c in Life.cars() do if c.alive then aCars += 1 end end
+	check("airport terminal active: 20-30 walkers (cap), no cars", R and R.id == "airport" and aAlive == Life.CAPS.airport.walkers and aCars == 0 and aAlive >= 20 and aAlive <= 30, aAlive .. " / " .. aCars)
+	local aOff, aOut, aY, aSit, aIdle, aMaxOff = 0, 0, 0, 0, 0, 0
+	local aSteps, aSum = 0, 0
+	local idleKinds = {}
+	for f = 1, 30 * 120 do
+		now += dt
+		local t0 = os.clock()
+		local stepped = Life.update(afocus, dt, now)
+		if stepped then aSteps += 1; aSum += os.clock() - t0 end
+		if stepped and aSteps % 3 == 0 then
+			for _, w in Life.walkers() do
+				if w.alive then
+					if w.mode == "sit" then
+						aSit += 1
+						local s = w.seat
+						if not s or math.abs(s.Y - F) > 0.01 then aY += 1 end
+					else
+						local dOff = nearestEdge(R.net, w.pos)
+						aMaxOff = math.max(aMaxOff, dOff)
+						if dOff > 2.2 then aOff += 1 end -- 2.2: standing up from a seat (1.6 behind the spot, 1.4 aside) eases back to the line
+						if math.abs(w.pos.Y - F) > 0.6 then aY += 1 end
+						if w.mode == "idle" then aIdle += 1; local n = R.net.nodes[w.from]; if n and n.idle then idleKinds[n.idle] = true end end
+					end
+					local t = A.terminal
+					if w.pos.X < t.x1 or w.pos.X > t.x2 or w.pos.Z < t.z1 or w.pos.Z > t.z2 then aOut += 1 end
+				end
+			end
+		end
+	end
+	local nk = 0
+	for _ in idleKinds do nk += 1 end
+	check("airport walkers stay on the terminal walk graph (within 2.2 of a line), inside the hall, at floor level", aOff == 0 and aOut == 0 and aY == 0, aOff .. " / " .. aOut .. " / " .. aY .. " max " .. aMaxOff)
+	check("airport walkers sit on seats and idle at queues / desks / shops / gates (>= 3 kinds)", aSit > 0 and aIdle > 0 and nk >= 3, aSit .. " / " .. aIdle .. " / " .. nk)
+	check("airport: recycling through the doors / the A1 jet bridge keeps the crowd at its cap", (function() local n = 0; for _, w in Life.walkers() do if w.alive then n += 1 end end; return n >= 0.75 * Life.CAPS.airport.walkers and n <= Life.CAPS.airport.walkers end)())
+	print(string.format("PERF airport terminal (mock): %d steps, mean %.2f ms", aSteps, aSum / math.max(1, aSteps) * 1000))
+	for _ = 1, 40 do now += dt; Life.update(campus, dt, now) end
+	check("leaving the terminal: asleep again", Life.region() == nil)
 
 	------------------------------------------------------------------ determinism
 	local function run()

@@ -6,7 +6,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
-local HardwareConfig = require(ReplicatedStorage.Shared.Config.HardwareConfig)
 local Toast = require(script.Parent.Parent.UI.Toast)
 
 export type Result = { [string]: any }
@@ -45,6 +44,7 @@ local MESSAGES: { [string]: string } = {
 	ARENA_BUSY="All three courier courses are in use. Try again shortly.",
 	MAX_COOLING="Your cooling system is fully upgraded.",
 	RATE_LIMIT = "Slow down a little.",
+	BUSY = "One moment: your last request is still on its way.",
 	LOADING = "Still loading your company...",
 	SERVER_ERROR = "Something went wrong on the server. Try again.",
 	NETWORK = "Connection problem. Try again.",

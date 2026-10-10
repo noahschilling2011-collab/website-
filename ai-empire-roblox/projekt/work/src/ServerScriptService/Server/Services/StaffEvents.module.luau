@@ -5,10 +5,13 @@
 --  * First day: a new hire (auto-HR, agency or interview) arrives from the street (or the visitor lounge),
 --    checks in at the reception (badge printer) and walks to the new desk.
 --  * Rack faults (CompanyOps.faults, user request 23): the faulty data-hall blade gets FxState "broken" plus
---    FaultSlot / FaultUntil (the economy's own repair estimate) for the client (PropFxController: red LEDs,
---    beacon, "Rack R3 · fault · capacity -1"). IT Support (or an engineer where IT may not enter / there is no
---    IT post) walks to the rack with a laptop and repairs it in a pose loop until the ECONOMY clears the fault;
---    someone who arrives after the fix still does a short closing step.
+--    FaultSlot / FaultUntil (the economy's own repair estimate) and FaultWorker / FaultFix (who repairs it and
+--    how: "walk", "rack", "remote"; nil = nobody yet) for the client (PropFxController: red LEDs, beacon,
+--    "Rack R3 · fault", "-1 compute unit · back in ~1 min", "IT Support repairing"). The IT post repairs:
+--    at the rack where IT may enter the room, else as a remote fix from the corridor in front of the rack
+--    room's door (BuildingPlan gives IT no compute clearance today, staffops request #1); an engineer walks
+--    to the rack only when no IT post is free (the garage has none). The worker loops repair poses until the
+--    ECONOMY clears the fault; someone who arrives after the fix still does a short closing step.
 --  * Apprentices (CORE_SPEC 11.1, user request 18): the Training Lead leads a tour group of first-day
 --    apprentices past 4-6 rooms (stop in front of the door, "present" pose, Task "Tour:<room id>" for the
 --    talk lines), runs one training session a day in a meeting room (apprentices seated, the trainer
@@ -59,6 +62,13 @@ Events.REPAIR_POSES = {
 	{ pose = "reach", item = "blade" },
 	{ pose = "typeStand", item = "laptop" },
 } :: { { pose: string, item: string } }
+-- remote fix from the corridor (IT may not enter the compute room): laptop, phone call, laptop
+Events.REMOTE_POSES = {
+	{ pose = "typeStand", item = "laptop" },
+	{ pose = "inspect", item = "laptop" },
+	{ pose = "phone", item = "" },
+	{ pose = "typeStand", item = "laptop" },
+} :: { { pose: string, item: string } }
 Events.CLOSE_SECONDS = 4 -- closing step after the economy cleared a fault (log the fix, close the rack)
 Events.REPAIR_RETRY = 20 -- a fault nobody could reach is offered again after this many seconds
 Events.GATHER_SECONDS = 45 -- a tour stop / training session starts at the latest this long after the call
@@ -91,6 +101,17 @@ local function face(e: any, point: Vector3?)
 		e.root.CFrame = CFrame.lookAt(e.root.Position, e.root.Position + d)
 	end
 	e.root.Anchored = true
+end
+-- The last few tenths of a stud of a direct step (a hop counts as done within 1.1 studs): stand exactly on
+-- the spot, keeping the facing. Only for small corrections on the same floor.
+local function settle(e: any, p: Vector3)
+	if not e.root.Parent or e.humanoid.SeatPart then
+		return
+	end
+	local here = e.root.Position
+	if flat(here, p) < 1.2 and math.abs(here.Y - p.Y) < 1.5 then
+		e.root.CFrame = e.root.CFrame.Rotation + Vector3.new(p.X, here.Y, p.Z)
+	end
 end
 local function setTask(e: any, id: string, state: string?)
 	e.task = { id = id, state = state or e.state }
@@ -300,10 +321,18 @@ function Events.rackPoint(e: any, blade: BasePart): (Vector3?, Vector3)
 	local p = floorPoint(e, blade.Position + dir.Unit * 1.7)
 	return p, blade.Position
 end
+-- Blade of a rack slot (slot i = the i-th child of Office.Blades, the order PlotService lights them in). The
+-- list is cached per office record (the blades are built once with the office) and re-read when stale.
 local function bladeAt(c: any, slot: number): BasePart?
-	local blades = c.office:FindFirstChild("Blades")
-	local b = if blades then blades:GetChildren()[slot] else nil
-	return if b and b:IsA("BasePart") then b else nil
+	local list = c.bladeList
+	local b = if list then list[slot] else nil
+	if not list or (b and b.Parent == nil) then
+		local blades = c.office:FindFirstChild("Blades")
+		list = if blades then blades:GetChildren() else {}
+		c.bladeList = list
+		b = list[slot]
+	end
+	return if b and b:IsA("BasePart") and b.Parent then b else nil
 end
 -- Mirrors the economy's fault list onto the blades: FxState "broken" + FaultSlot + FaultUntil (server time
 -- of the economy's own repair estimate: remaining work / repair rate, rate = 1/60 s with IT on duty, else
@@ -351,6 +380,8 @@ function Events.syncRacks(c: any, s: any, clock: number): { [number]: any }
 				blade:SetAttribute("FxState", "idle")
 				blade:SetAttribute("FaultSlot", nil)
 				blade:SetAttribute("FaultUntil", nil)
+				blade:SetAttribute("FaultWorker", nil)
+				blade:SetAttribute("FaultFix", nil)
 			end
 			if door and not doors[door] and door.Parent then
 				door:SetAttribute("FxState", "idle")
@@ -371,8 +402,43 @@ local function canReach(c: any, e: any, blade: BasePart): Vector3?
 	end
 	return p
 end
-local function pickWorker(c: any, blade: BasePart): (any, Vector3?)
+-- Remote-fix spot of IT for a rack in a room IT may not enter: the corridor in front of the rack room's door
+-- nearest to the blade (facing the door). Cached per blade.
+local function remoteStop(c: any, e: any, blade: BasePart): (Vector3?, Vector3?)
+	c.remoteStops = c.remoteStops or {}
+	local cached = c.remoteStops[blade]
+	if cached ~= nil then
+		if cached then
+			return cached.p, cached.look
+		end
+		return nil, nil
+	end
+	local lp = local_(e, blade.Position)
+	local room = Plan.roomAt(c.tier, lp)
+	local best, look, bd = nil, nil, math.huge
+	if room then
+		for _, d in Layout.doors(c.tier) do
+			if d.room == room.id and not d.exterior and not d.hidden then
+				local base = Vector3.new(d.x, Plan.levelY(d.level) + 3, d.z)
+				local out = base - d.inward * 3
+				if Plan.employeeAllowed(e.role, c.tier, out) then
+					local dist = (out - lp).Magnitude
+					if dist < bd then
+						best, look, bd = c.cf * out, c.cf * (base + d.inward * 3), dist
+					end
+				end
+			end
+		end
+	end
+	c.remoteStops[blade] = if best then { p = best, look = look } else false
+	return best, look
+end
+Events.remoteStop = remoteStop
+-- The IT post first (at the rack where IT may enter, else the remote fix from the corridor), an engineer
+-- only when no IT post is free. Returns worker, stand point, remote?, look-at point.
+local function pickWorker(c: any, blade: BasePart): (any, Vector3?, boolean, Vector3?)
 	local engineer, ep, edist = nil, nil, math.huge
+	local it, itp, itLook = nil, nil, nil
 	for _, e in c.all do
 		if not Events.free(e) or e.apprentice then
 			continue
@@ -380,7 +446,13 @@ local function pickWorker(c: any, blade: BasePart): (any, Vector3?)
 		if e.role == "support" and e.model:GetAttribute("Role") == "IT Support" then
 			local p = canReach(c, e, blade)
 			if p then
-				return e, p
+				return e, p, false, blade.Position
+			end
+			if not it then
+				local q, look = remoteStop(c, e, blade)
+				if q then
+					it, itp, itLook = e, q, look
+				end
 			end
 		elseif e.role == "engineer" then
 			local p = canReach(c, e, blade)
@@ -392,11 +464,15 @@ local function pickWorker(c: any, blade: BasePart): (any, Vector3?)
 			end
 		end
 	end
-	return engineer, ep
+	if it then
+		return it, itp, true, itLook
+	end
+	return engineer, ep, false, if engineer then blade.Position else nil
 end
-local function startRepair(e: any, c: any, slot: number, blade: BasePart, point: Vector3)
+Events.pickWorker = pickWorker
+local function startRepair(e: any, c: any, slot: number, blade: BasePart, point: Vector3, remote: boolean?, look: Vector3?)
 	stop(e, c)
-	local ev: any = { kind = "repair", slot = slot, blade = blade, phase = "go", since = api.now(), step = 0, cleared = false }
+	local ev: any = { kind = "repair", slot = slot, blade = blade, phase = "go", since = api.now(), step = 0, cleared = false, remote = remote == true, look = look or blade.Position }
 	e.event = ev
 	c.repairs[slot] = e
 	setTask(e, "RackRepair", "SERVER_CHECK")
@@ -413,7 +489,7 @@ local function startRepair(e: any, c: any, slot: number, blade: BasePart, point:
 			done(e)
 			return
 		end
-		face(e, blade.Position)
+		face(e, ev.look)
 		api.state(e, "SERVER_CHECK")
 		ev.phase = if ev.cleared then "close" else "repair"
 		ev.stepAt = api.now()
@@ -450,15 +526,35 @@ function Events.rackTick(c: any, s: any, clock: number)
 		end
 		local blade = bladeAt(c, slot)
 		if blade then
-			local worker, point = pickWorker(c, blade)
+			local worker, point, remote, look = pickWorker(c, blade)
 			if worker and point then
-				startRepair(worker, c, slot, blade, point)
+				startRepair(worker, c, slot, blade, point, remote, look)
 			end
 		end
 	end
 	for slot in c.repairRetry do
 		if not want[slot] then
 			c.repairRetry[slot] = nil
+		end
+	end
+	-- who repairs each open fault, for the rack label and the screens (written on change only)
+	for slot in want do
+		local blade = bladeAt(c, slot)
+		if blade then
+			local e = c.repairs[slot]
+			local ev = if e then e.event else nil
+			local title, fix = nil, nil
+			if ev and ev.kind == "repair" and ev.slot == slot then
+				local t = e.model:GetAttribute("Role")
+				title = if typeof(t) == "string" then t else nil
+				fix = if ev.phase == "go" then "walk" elseif ev.remote then "remote" else "rack"
+			end
+			if blade:GetAttribute("FaultWorker") ~= title then
+				blade:SetAttribute("FaultWorker", title)
+			end
+			if blade:GetAttribute("FaultFix") ~= fix then
+				blade:SetAttribute("FaultFix", fix)
+			end
 		end
 	end
 end
@@ -585,7 +681,9 @@ local function trainer(c: any): any
 	return nil
 end
 Events.trainer = trainer
--- Group members walk to a point next to the trainer's stop point (behind him, in a short row).
+-- Group members walk to a point next to the trainer's stop point: a short row behind him; where the corridor
+-- does not allow the row, a row one step further back, a tighter row, then a short queue behind the trainer
+-- (every member gets its own spot; employees do not collide, so shared spots would look like one person).
 local function memberPoint(c: any, group: { any }, stopPoint: Vector3, look: Vector3, k: number): Vector3
 	local dir = Vector3.new(look.X - stopPoint.X, 0, look.Z - stopPoint.Z)
 	if dir.Magnitude < 0.1 then
@@ -594,12 +692,15 @@ local function memberPoint(c: any, group: { any }, stopPoint: Vector3, look: Vec
 	dir = dir.Unit
 	local right = Vector3.new(-dir.Z, 0, dir.X)
 	local n = #group
-	local p = stopPoint - dir * 2.4 + right * ((k - (n + 1) / 2) * 1.9)
-	if allowedAll(c, group, p) then
-		return p
+	local lateral = (k - (n + 1) / 2) * 1.9
+	for _, p in { stopPoint - dir * 2.4 + right * lateral, stopPoint - dir * 4.2 + right * lateral, stopPoint - dir * 2.4 + right * (lateral * 0.5), stopPoint - dir * (1.6 + 1.3 * k) } do
+		if allowedAll(c, group, p) then
+			return p
+		end
 	end
 	return stopPoint - dir * 2.0
 end
+Events.memberPoint = memberPoint
 local function endTour(c: any, completed: boolean)
 	local t = c.tour
 	if not t then
@@ -653,9 +754,17 @@ local function tourStop(c: any)
 			if c.tour ~= t or e.event ~= ev then
 				return
 			end
-			t.arrived[e] = true
-			face(e, stopDef.point)
-			api.state(e, "WORKING")
+			-- the bounded navigation counts a route as done within 2.2 studs of its end: a short direct step
+			-- onto the own spot, so the group stands in its row instead of in a clump
+			Jobs.moveTo(e, c, p, nil, function(_ok2: boolean)
+				if c.tour ~= t or e.event ~= ev then
+					return
+				end
+				settle(e, p)
+				t.arrived[e] = true
+				face(e, stopDef.point)
+				api.state(e, "WORKING")
+			end, false)
 		end, true)
 	end
 end
@@ -914,6 +1023,10 @@ function Events.academyTick(c: any, hour: number, workday: number)
 		local group = availableApprentices(c, function(e: any): boolean
 			return e.apprentice.age <= 1 and not m.toured[e.personality.seed]
 		end)
+		-- a big batch (HireEmployee count up to 10) tours in groups of A.tourGroup, one run after another
+		while #group > A.tourGroup do
+			table.remove(group)
+		end
 		if #group > 0 then
 			startTour(c, lead, group)
 			return
@@ -1047,8 +1160,9 @@ function Events.tick(e: any, c: any, time: number)
 		end
 	elseif ev.kind == "repair" then
 		if ev.phase == "repair" and time >= (ev.stepAt or 0) then
-			ev.step = ev.step % #Events.REPAIR_POSES + 1
-			local p = Events.REPAIR_POSES[ev.step]
+			local poses = if ev.remote then Events.REMOTE_POSES else Events.REPAIR_POSES
+			ev.step = ev.step % #poses + 1
+			local p = poses[ev.step]
 			Workstations.setPose(e, p.pose)
 			Workstations.setItem(e, if p.item ~= "" then p.item else nil)
 			ev.stepAt = time + 4 + api.jitter(e, 2.5)

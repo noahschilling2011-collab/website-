@@ -7,8 +7,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config.EmpireConfig)
-local DepartmentConfig = require(Shared.Config.DepartmentConfig)
 local HardwareConfig = require(Shared.Config.HardwareConfig)
+local CityPlan = require(Shared.Config.CityPlan)
 local Math = require(Shared.EmpireMath)
 local Ops = require(Shared.CompanyOps)
 local ModelMath = require(Shared.ModelMath)
@@ -24,7 +24,6 @@ local Theme = require(UI.Theme)
 local Toast = require(UI.Toast)
 local C, F = Theme.colors, Theme.font
 local App = {}
-local page: Frame? = nil
 local scroll: ScrollingFrame? = nil
 local current = "overview"
 local updaters: { (any) -> () } = {}
@@ -34,8 +33,13 @@ local function watch(fn: (any) -> ())
 	table.insert(updaters, fn)
 	if State.snapshot then fn(State.snapshot) end
 end
+-- Touch-first screens: row buttons and switches are at least TAP design px tall. The Computer window is drawn at about
+-- 0.43 on a phone in landscape, so 96 px is about 41 pt (Apple asks for 44 pt; a Computer-wide touch scale is filed in
+-- design/requests/apps.md).
+local TAP = 96
+App.TAP = TAP
 local function button(parent: Instance, label: string, callback: () -> ())
-	local b = Kit.button(parent, label, "primary", UDim2.new(1,0,0,40))
+	local b = Kit.button(parent, label, "primary", UDim2.new(1,0,0,Kit.tap(40, TAP)))
 	b.LayoutOrder = 9
 	Kit.onClick(b, callback)
 	return b
@@ -46,6 +50,71 @@ local function call(name: string, payload: any, message: string?)
 		if ok and message then Toast.show("success", message) end
 	end)
 end
+-- One action at a time per remote: EmpireAction and DealAction each have a per-player token bucket on the server (4 calls
+-- at once, then 2 per second; EmpireService.init), and ActionController answers BUSY while a call of the same remote is
+-- in flight. Each remote gets a lane that mirrors that bucket a little stricter (BURST calls, then RATE per second, so
+-- other buttons keep a token) and retries RATE_LIMIT / BUSY answers, so a burst of taps (night shift for three roles,
+-- Pin twice, two switches) never ends half done. Jobs of one remote run in tap order.
+local BURST, RATE = 3, 1.8
+type Lane = { jobs: { () -> () }, running: boolean, tokens: number, last: number }
+local lanes: { [string]: Lane } = {}
+local function lane(name: string): Lane
+	local l = lanes[name]
+	if l == nil then
+		local made: Lane = { jobs = {}, running = false, tokens = BURST, last = os.clock() }
+		lanes[name] = made
+		return made
+	end
+	return l
+end
+local function enqueue(name: string, job: () -> ())
+	local l = lane(name)
+	table.insert(l.jobs, job)
+	if l.running then return end
+	l.running = true
+	task.spawn(function()
+		while #l.jobs > 0 do
+			local nextJob = table.remove(l.jobs, 1)
+			if nextJob then nextJob() end
+		end
+		l.running = false
+	end)
+end
+local function paced(name: string, payload: any): (boolean, any)
+	local l = lane(name)
+	local last: any = { ok = false, err = "RATE_LIMIT" }
+	for attempt = 1, 5 do
+		local now = os.clock()
+		l.tokens = math.min(BURST, l.tokens + (now - l.last) * RATE)
+		l.last = now
+		if l.tokens < 1 then
+			task.wait((1 - l.tokens) / RATE)
+			l.tokens = 1
+			l.last = os.clock()
+		end
+		l.tokens -= 1
+		local ok, res = Action.call(name, payload, true)
+		last = res
+		if ok then return true, res end
+		if res.err ~= "RATE_LIMIT" and res.err ~= "BUSY" then return false, res end
+		l.tokens = 0 -- the server's bucket is empty (another button used it): wait for a fresh token
+		task.wait(0.5 * attempt)
+	end
+	return false, last
+end
+-- a queued EmpireAction / DealAction with its success toast (errors: ActionController texts)
+local function queued(name: string, payload: any, message: string?)
+	enqueue(name, function()
+		local ok, res = paced(name, payload)
+		if ok and message then
+			Toast.show("success", message)
+		elseif not ok then
+			Toast.show("error", Action.message(res.err))
+		end
+	end)
+end
+App.RATE = RATE
+App.BURST = BURST
 local function para(parent: Instance, text: string, order: number?)
 	return Kit.para(parent, text, 14, C.muted, order or 2)
 end
@@ -75,14 +144,79 @@ local function stageName(i: number): string
 	local def = Config.OFFICES[math.clamp(math.floor(i), 1, #Config.OFFICES)]
 	return def.name
 end
+-- The safety rules of CORE_SPEC 8.3 in one line ("" when nothing applies): a whole game day below $0 pauses trips and
+-- night shifts (live.ops.paused); deep debt sends the newest hires on unpaid leave (empire.unpaidLeave)
+function App.safetyLine(s: any): string
+	local e = s.data.empire
+	local ops = if typeof(s.live.ops) == "table" then s.live.ops else {}
+	local leave = math.max(0, math.floor(tonumber(e.unpaidLeave) or 0))
+	local parts = {}
+	if ops.paused == true then
+		table.insert(parts, "Cash has been below $0 for a whole game day: trips and night shifts are paused")
+	elseif (tonumber(s.data.money) or 0) < 0 then
+		table.insert(parts, "Cash is below $0: trips and night shifts pause after a whole game day like this")
+	end
+	if leave > 0 then
+		table.insert(parts, string.format("%d newest hire%s on unpaid leave until cash is above %s", leave, if leave == 1 then " is" else "s are", dollars(Ops.dailyPayroll(e))))
+	end
+	return if #parts > 0 then table.concat(parts, ". ") .. "." else ""
+end
+-- Why automatic HR is or is not hiring right now: the checks of EmpireService.autoHire and CompanyOps.hrAllowed in
+-- the same order (the decision itself stays on the server). Returns the line and whether it is a warning.
+function App.hrStatus(s: any): (string, boolean)
+	local data = s.data
+	local e = data.empire
+	local ops = if typeof(s.live.ops) == "table" then s.live.ops else {}
+	local auto, budget = Ops.hrSettings(e)
+	if not auto then return "Off: hire by hand in Team.", false end
+	local anyLive = false
+	for _, id in data.modelOrder do local m = data.models[id]; if m and m.status == "live" then anyLive = true; break end end
+	if not anyLive then return "Waiting: HR starts hiring once your first model is live.", false end
+	local roleId = Ops.hrPick(e)
+	local role = if roleId then Config.find(Config.ROLES, roleId) else nil
+	if not role then return "Every department is at its HR target.", false end
+	local staff = Ops.heads(e)
+	local cap = Config.OFFICES[Ops.stageIndex(e)].staff
+	local cash = tonumber(data.money) or 0
+	if staff >= cap then return "Paused: every desk is filled. A bigger office adds desks.", true end
+	if cash < 0 then return "Paused: cash is below $0.", true end
+	if (tonumber(e.unpaidLeave) or 0) > 0 then return "Paused: people are on unpaid leave until cash covers a day of payroll.", true end
+	if ops.saveMode == true and staff >= cap * 0.5 then return "Save mode: HR stops at half the desks until the move.", true end
+	if staff >= Ops.HR_STARTERS then
+		local payroll = Ops.wage(e) + Ops.opsPosts(e) * Ops.OPS_WAGE / Ops.DAY -- $/s, like CompanyOps.hrAllowed
+		local income = math.max(0, (tonumber(ops.income) or 0) / 60)
+		if payroll + role.wage > budget * income then
+			return string.format("Paused: payroll %s/day is above the %d %% budget (%s/day). More income or a bigger budget lets HR hire again.",
+				dollars(payroll * Ops.DAY), math.floor(budget * 100 + 0.5), dollars(budget * income * Ops.DAY)), true
+		end
+	end
+	local fee = Math.hireCost(e, role)
+	local reserve = Ops.reserve(e) * 1.5
+	if cash - reserve < fee then
+		return string.format("Waiting: HR keeps a cash reserve of %s plus the %s fee.", dollars(reserve), dollars(fee)), true
+	end
+	return string.format("Hiring: next hire %s (fee %s), one every %d s.", role.name, dollars(fee), Ops.HIRE_GAP), false
+end
+local function safetyNote(parent: Instance, order: number): TextLabel
+	local t = Kit.para(parent, "", 14, C.warn, order)
+	t.Name = "Safety"
+	t.Font = F.bold
+	watch(function(s)
+		local text = App.safetyLine(s)
+		t.Text = text
+		t.Visible = text ~= ""
+	end)
+	return t
+end
 local function clearRows(rows: Instance)
 	for _, child in rows:GetChildren() do if child:IsA("GuiObject") then child:Destroy() end end
 end
 -- small segmented switch inside a card row (Off / On, 25 / 40 / 55 %, Auto / Off)
 local function switch(parent: Instance, options: { Kit.Option }, initial: string, order: number, width: number?, onSelect: (string) -> ()): Kit.Segmented
-	local seg = Kit.segmented(parent, options, initial, onSelect, 36)
+	local h = Kit.tap(36, TAP)
+	local seg = Kit.segmented(parent, options, initial, onSelect, h)
 	seg.frame.LayoutOrder = order
-	if width then seg.frame.Size = UDim2.fromOffset(width, 36) end
+	if width then seg.frame.Size = UDim2.fromOffset(width, h) end
 	return seg
 end
 local function profitChart(parent: Instance, order: number)
@@ -117,9 +251,11 @@ local function profitChart(parent: Instance, order: number)
 		local range=max-min
 		local zero=1-(0-min)/range
 		baseline.Position=UDim2.fromScale(0,zero)
-		positive.Text=Format.money(max).." / min"
-		negative.Text=Format.money(min).." / min"
-		caption.Text=if #history==0 then "The first sample appears after 10 seconds. Staff wages are included." else "Actual net profit · one sample every 10 seconds · staff wages included"
+		-- samples are $/min (EmpireService history): shown per game day like the rest of the UI (CORE_SPEC 6)
+		local perGameDay=Ops.DAY/60
+		positive.Text=if #history==0 then "" else Format.money(max*perGameDay).."/day"
+		negative.Text=if #history==0 or min>=0 then "" else Format.money(min*perGameDay).."/day"
+		caption.Text=if #history==0 then "The first sample appears after 10 seconds. Staff wages are included." else "Net profit per game day · one sample every 10 seconds · staff wages included"
 		for i,b in bars do
 			local sample=history[i]
 			b.Visible=sample~=nil
@@ -147,7 +283,7 @@ local function overview(parent: Instance)
 			Format.dayClock(Ops.day(e), Ops.hour(s.serverTime)), Math.staff(e), Config.OFFICES[stage].staff, e.points, e.xp, (b.speed-1)*100, (b.revenue-1)*100, dollars(b.wage*Ops.DAY),
 			if goal then goal.text else "every goal reached")
 	end)
-	local start = Kit.row(hero, 40, 8, 3)
+	local start = Kit.row(hero, Kit.tap(40, TAP), 8, 3)
 	for _, def in {{"Clients","empire","clients"},{"Money","empire","money"},{"Settings","empire","settings"}} do
 		local b = Kit.button(start, def[1], "secondary", UDim2.new(1/3,-6,1,0))
 		Kit.onClick(b, function() App.openSection(def[3]) end)
@@ -208,22 +344,55 @@ local function tripText(s: any, t: any): string
 	local c = Ops.client(t.client)
 	local name = if c then c.name else tostring(t.client)
 	local tier = t.tier or (if c then c.trip else "city")
-	local left = Format.duration(math.max(0, (tonumber(t.back) or 0) - (tonumber(s.data.empire.seconds) or 0)))
+	local left = Kit.countdown(math.max(0, (tonumber(t.back) or 0) - (tonumber(s.data.empire.seconds) or 0)))
 	local what = if t.kind == "renew" then "check-in" else "pilot visit"
 	if t.hosted then return string.format("%s team at your guest house · %s · back in %s", name, what, left) end
 	local who = if t.founder then "You (founder)" elseif (tonumber(t.crew) or 1) >= 2 then "Field rep + engineer" else "Field rep"
 	local how = if tier == "abroad" then (if s.data.empire.jet == true then "company jet" else "flight + 2 nights") elseif tier == "region" then "City Hotel night" else "car"
 	return string.format("%s → %s · %s · %s · back in %s", who, name, what, how, left)
 end
+-- where a client's office is (CityPlan destination + zone name: "Business City", "Port Meridian", ...)
+function App.clientPlace(c: any): (any, string)
+	local dest = CityPlan.clientOffice(c.name)
+	local zone = if dest then CityPlan.zone(dest.zone) else nil
+	return dest, if zone then zone.name elseif c.trip == "abroad" then "Port Meridian" else "Business City"
+end
+-- "Join in person" away from the client: a GPS route there (or to City Airport for Port Meridian) instead of an error
+function App.routeToClient(c: any, secondsLeft: number)
+	local dest, where = App.clientPlace(c)
+	if not dest then
+		Toast.show("error", Action.message("TOO_FAR"))
+		return
+	end
+	local Travel: any = require(Client.Controllers.TravelController) -- lazy: loaded after the apps
+	local within = Kit.countdown(secondsLeft)
+	local away = (game:GetService("Players").LocalPlayer :: any):GetAttribute("TravelState")
+	if dest.zone == "abroad" and away ~= "abroad" then
+		Travel.guide("airport")
+		Toast.show("info", string.format("%s is in Port Meridian: route to City Airport started. Fly over and tap Join at their lobby within %s.", c.name, within), 7)
+	else
+		Travel.guide(dest.id)
+		Toast.show("info", string.format("Route to %s (%s) started. Tap Join at their lobby within %s.", c.name, where, within), 7)
+	end
+end
 type ClientRow = { frame: Frame, update: (any) -> () }
+-- Pin / Skip are toggles on the server (DealAction): after a tap the row's buttons stay locked until a snapshot shows
+-- the new state AND at least MIN_LOCK s have passed (a double tap never undoes itself), at most LOCK_SECONDS
+local LOCK_SECONDS = 3
+local MIN_LOCK = 0.6
+App.MIN_LOCK = MIN_LOCK
 local function clientRow(parent: Instance, c: any): ClientRow
-	local frame = Kit.frame(parent, UDim2.new(1, 0, 0, 84))
+	local touch = Kit.isTouch()
+	local btnW, btnH = if touch then 124 else 84, if touch then TAP else 30
+	local rowH, shortH = if touch then btnH + 24 else 84, if touch then 66 else 62
+	local side = 2 * btnW + 8 + 14 -- right column with the buttons
+	local frame = Kit.frame(parent, UDim2.new(1, 0, 0, rowH))
 	frame.BackgroundTransparency = 0
 	frame.BackgroundColor3 = C.panel2
 	Kit.corner(frame, 10)
 	local stroke = Kit.stroke(frame, 0.93)
 	Kit.padding(frame, 12, 14, 12, 16)
-	local nameRow = Kit.frame(frame, UDim2.new(1, -190, 0, 22))
+	local nameRow = Kit.frame(frame, UDim2.new(1, -side, 0, 22))
 	Kit.list(nameRow, 8, true)
 	local name = Kit.text(nameRow, c.name, 17, F.bold, C.text)
 	name.LayoutOrder = 1
@@ -238,39 +407,62 @@ local function clientRow(parent: Instance, c: any): ClientRow
 	local status = Kit.text(frame, "", 14, F.medium, C.muted)
 	status.Name = "Status"
 	status.AutomaticSize = Enum.AutomaticSize.None
-	status.Size = UDim2.new(1, -190, 0, 18)
+	status.Size = UDim2.new(1, -side, 0, 18)
 	status.Position = UDim2.fromOffset(0, 27)
 	status.TextTruncate = Enum.TextTruncate.AtEnd
 	local bar = Kit.bar(frame, 6)
 	bar.frame.Name = "Trust"
-	bar.frame.Size = UDim2.new(1, -190, 0, 6)
+	bar.frame.Size = UDim2.new(1, -side, 0, 6)
 	bar.frame.Position = UDim2.fromOffset(0, 52)
-	local buttons = Kit.frame(frame, UDim2.fromOffset(176, 30), UDim2.fromScale(1, 1))
+	local buttons = Kit.frame(frame, UDim2.fromOffset(2 * btnW + 8, btnH), UDim2.fromScale(1, 1))
 	buttons.AnchorPoint = Vector2.new(1, 1)
 	local layout = Kit.list(buttons, 8, true)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-	local pin = Kit.button(buttons, "Pin", "secondary", UDim2.fromOffset(84, 30))
+	local pin = Kit.button(buttons, "Pin", "secondary", UDim2.fromOffset(btnW, btnH))
 	pin.Name = "Pin"
-	pin.TextSize = 14
+	pin.TextSize = if touch then 16 else 14
 	pin.LayoutOrder = 1
-	local skip = Kit.button(buttons, "Skip", "ghost", UDim2.fromOffset(84, 30))
+	local skip = Kit.button(buttons, "Skip", "ghost", UDim2.fromOffset(btnW, btnH))
 	skip.Name = "Skip"
-	skip.TextSize = 14
+	skip.TextSize = if touch then 16 else 14
 	skip.LayoutOrder = 2
-	local join = Kit.button(buttons, "Join in person", "secondary", UDim2.fromOffset(176, 30))
+	local join = Kit.button(buttons, "Join in person", "secondary", UDim2.fromOffset(2 * btnW + 8, btnH))
 	join.Name = "Join"
-	join.TextSize = 14
+	join.TextSize = if touch then 16 else 14
 	join.LayoutOrder = 3
-	Kit.onClick(pin, function() call("DealAction", { action = "pin", clientId = c.id }) end)
-	Kit.onClick(skip, function() call("DealAction", { action = "skip", clientId = c.id }) end)
+	-- Pin and Skip are toggles on the server (DealAction): one tap locks the row until a snapshot shows the result
+	local lock: { kind: string, want: boolean, at: number }? = nil
+	local function toggle(kind: string)
+		if lock then return end
+		local snapshot = State.snapshot
+		local d: any = if snapshot then snapshot.data.empire.deals else nil
+		local now = if typeof(d) ~= "table" then false elseif kind == "pin" then d.pinned == c.id else typeof(d.skip) == "table" and d.skip[c.id] == true
+		lock = { kind = kind, want = not now, at = os.clock() }
+		Kit.setDisabled(pin, true)
+		Kit.setDisabled(skip, true)
+		enqueue("DealAction", function()
+			local ok, res = paced("DealAction", { action = kind, clientId = c.id })
+			if not ok then
+				lock = nil
+				Kit.setDisabled(pin, false)
+				Kit.setDisabled(skip, false)
+				Toast.show("error", Action.message(res.err))
+			end
+		end)
+	end
+	Kit.onClick(pin, function() toggle("pin") end)
+	Kit.onClick(skip, function() toggle("skip") end)
+	local backLeft = 0
 	Kit.onClick(join, function()
-		task.spawn(function()
-			local ok, res = Action.call("DealAction", { action = "joinMeeting", clientId = c.id }, true)
+		enqueue("DealAction", function()
+			local ok, res = paced("DealAction", { action = "joinMeeting", clientId = c.id })
 			if ok then Toast.show("success", "You joined the " .. c.name .. " meeting: trust +15 %.", 5)
 			elseif res.err == "ALREADY_DONE" then Toast.show("info", "You are already in the " .. c.name .. " meeting.", 4)
-			elseif res.err ~= "BUSY" then Toast.show("error", Action.message(res.err)) end
+			elseif res.err == "TOO_FAR" then App.routeToClient(c, backLeft)
+			else Toast.show("error", Action.message(res.err)) end
 		end)
 	end)
+	local _, where = App.clientPlace(c)
 	local function update(s: any)
 		local data = s.data
 		local e = data.empire
@@ -285,6 +477,13 @@ local function clientRow(parent: Instance, c: any): ClientRow
 		local group, text, color = "lead", "", C.muted
 		local fraction: number? = nil
 		local canPin, canJoin = false, false
+		if lock then
+			local seen = if lock.kind == "pin" then pinned else skipped
+			local age = os.clock() - lock.at
+			if (seen == lock.want and age >= MIN_LOCK) or age > LOCK_SECONDS then
+				lock = nil
+			end
+		end
 		if acc then
 			group = "account"
 			local left = (tonumber(acc.expires) or 0) - (tonumber(e.seconds) or 0)
@@ -300,16 +499,20 @@ local function clientRow(parent: Instance, c: any): ClientRow
 			color = C.dim
 		elseif best < c.minimum then
 			group = "needs"
-			text = string.format("Needs %s %d · your best live model: %d", c.stat, c.minimum, math.floor(best))
+			text = if best <= 0 then string.format("Needs %s %d · release a model first", c.stat, c.minimum)
+				else string.format("Needs %s %d · your best live model: %d", c.stat, c.minimum, math.floor(best))
 			color = C.warn
 			canPin = true
 		else
 			canPin = true
 			fraction = math.min(1, trust or 0)
 			if trip and trip.kind == "sign" then
-				text = (if trip.hosted then "Client team at your guest house" else "Pilot visit under way") .. " · back in " .. Format.duration(math.max(0, (tonumber(trip.back) or 0) - (tonumber(e.seconds) or 0)))
+				backLeft = math.max(0, (tonumber(trip.back) or 0) - (tonumber(e.seconds) or 0))
+				text = (if trip.hosted then "Client team at your guest house" elseif trip.founder then "You are on the pilot visit" else "Pilot visit at " .. where)
+					.. " · back in " .. Kit.countdown(backLeft)
 				color = C.text
-				canJoin = not trip.hosted
+				-- the founder can join a rep's meeting in person (not the founder's own simulated visit, not a hosted one)
+				canJoin = not trip.hosted and not trip.founder
 				canPin = false -- the visit is already under way
 			elseif skipped then
 				text = "Skipped · your sales team leaves it out"
@@ -334,14 +537,15 @@ local function clientRow(parent: Instance, c: any): ClientRow
 		pin.Visible = canPin
 		skip.Visible = canPin and not canJoin
 		join.Visible = canJoin
-
+		Kit.setDisabled(pin, lock ~= nil)
+		Kit.setDisabled(skip, lock ~= nil)
 		pin.Text = if pinned then "Unpin" else "Pin"
 		skip.Text = if skipped then "Unskip" else "Skip"
 		value.TextColor3 = if group == "account" then C.good elseif group == "later" then C.dim else C.text
 		name.TextColor3 = if group == "later" then C.muted else C.text
 		frame.LayoutOrder = GROUPS[group] + table.find(Ops.CLIENTS, c) :: number
 		-- rows without a trust bar or buttons (accounts, later stages) are shorter
-		frame.Size = UDim2.new(1, 0, 0, if fraction ~= nil or canPin then 84 else 62)
+		frame.Size = UDim2.new(1, 0, 0, if fraction ~= nil or canPin or canJoin then rowH else shortH)
 		frame:SetAttribute("Group", group)
 	end
 	return { frame = frame, update = update }
@@ -356,15 +560,23 @@ local function clients(parent: Instance)
 	local mReps = Kit.metric(stats, "Field reps", 3, 20)
 	local mTrips = Kit.metric(stats, "On the road", 4, 20)
 	dim(head, "Sales run by themselves: the founder sells city clients (up to " .. Ops.FOUNDER_ACCOUNTS .. " accounts), Growth & Sales field reps take " .. Ops.ACCOUNTS_PER_REP .. " accounts each. Visits start 08:00–15:00. A signed client pays one day as pilot fee, then every day for " .. Ops.TERM_DAYS .. " days; a check-in visit renews it. Pin a client to visit it next, skip to leave it out.", 4)
+	safetyNote(head, 5)
 	local road = Kit.card(parent, 2)
 	title(road, "On the road")
 	local roadRows = Kit.stack(road, 6, 2)
 	local list = Kit.stack(parent, 8, 3)
+	-- group headings with some air above them (the list itself is packed at 8 px)
 	local captions: { [string]: TextLabel } = {}
+	local captionRows: { [string]: Frame } = {}
 	for group, order in GROUPS do
-		local cap = Kit.text(list, "", 15, F.bold, C.text)
-		cap.LayoutOrder = order
+		local holder = Kit.frame(list, UDim2.new(1, 0, 0, 30))
+		holder.Name = "Group_" .. group
+		holder.LayoutOrder = order
+		local cap = Kit.text(holder, "", 15, F.bold, C.text)
+		cap.AnchorPoint = Vector2.new(0, 1)
+		cap.Position = UDim2.new(0, 2, 1, -2)
 		captions[group] = cap
+		captionRows[group] = holder
 	end
 	local rows: { ClientRow } = {}
 	for _, c in Ops.CLIENTS do table.insert(rows, clientRow(list, c)) end
@@ -419,9 +631,11 @@ local function clients(parent: Instance)
 		end
 		captions.account.Text = string.format("Accounts (%d)", counts.account)
 		captions.lead.Text = string.format("Leads (%d)", counts.lead)
-		captions.needs.Text = string.format("Needs a better model (%d)", counts.needs)
+		local anyLive = false
+		for _, id in s.data.modelOrder do local m = s.data.models[id]; if m and m.status == "live" then anyLive = true; break end end
+		captions.needs.Text = string.format(if anyLive then "Needs a better model (%d)" else "Needs a live model (%d)", counts.needs)
 		captions.later.Text = string.format("Later stages (%d)", counts.later)
-		for group, cap in captions do cap.Visible = (counts[group] or 0) > 0 end
+		for group, holder in captionRows do holder.Visible = (counts[group] or 0) > 0 end
 		local news = if typeof(d.news) == "table" then d.news else {}
 		local lines = {}
 		for i = 1, math.min(Ops.NEWS_SHOWN, #news) do table.insert(lines, tostring(news[i])) end
@@ -468,146 +682,263 @@ function App.ledgerDays(ledger: any): { number }
 	table.sort(days, function(a, b) return a > b end)
 	return days
 end
-local function lineRow(parent: Instance, order: number, label: string, value: string, color: Color3, bold: boolean?): Frame
+-- One label / value row of the Money tab. Rows are built once and only their texts, colours and visibility change on
+-- snapshots (the ledger moves every tick and live rates every snapshot: no GuiObject churn).
+type LineRow = { frame: Frame, label: TextLabel, value: TextLabel, set: (label: string, value: string, color: Color3) -> () }
+local function lineRow(parent: Instance, order: number, label: string, value: string, color: Color3, bold: boolean?): LineRow
 	local row = Kit.frame(parent, UDim2.new(1, 0, 0, 22))
 	row.LayoutOrder = order
-	Kit.cell(row, label, UDim.new(0.62, 0), 14, if bold then F.bold else F.regular, if bold then C.text else C.muted).Position = UDim2.new()
+	local l = Kit.cell(row, label, UDim.new(0.62, 0), 14, if bold then F.bold else F.regular, if bold then C.text else C.muted)
+	l.Position = UDim2.new()
+	l.TextTruncate = Enum.TextTruncate.AtEnd
 	local v = Kit.cell(row, value, UDim.new(0.38, 0), 14, F.bold, color)
 	v.Position = UDim2.fromScale(0.62, 0)
 	v.TextXAlignment = Enum.TextXAlignment.Right
-	return row
+	local made: LineRow = { frame = row, label = l, value = v, set = function(_a: string, _b: string, _c: Color3) end }
+	made.set = function(newLabel: string, newValue: string, newColor: Color3)
+		if l.Text ~= newLabel then l.Text = newLabel end
+		if v.Text ~= newValue then v.Text = newValue end
+		v.TextColor3 = newColor
+	end
+	return made
 end
+-- signed whole dollars for the ledger: "+$1,200", "-$300", and a grey "$0" (never "+$0")
+local function signed(n: number, sign: string): (string, Color3)
+	if math.abs(n) < 0.5 then return "$0", C.dim end
+	return sign .. dollars(math.abs(n)), if sign == "-" then C.bad else C.good
+end
+-- the running rates of the Money tab, in a fixed order (live.ops $/min per category; serving & power = the rest)
+local RATE_COSTS = { "wages", "ops", "upkeep", "food", "fleet", "guest", "jet", "b2bserve" }
 local function money(parent: Instance)
 	local today = Kit.card(parent, 1)
 	local todayTitle = title(today, "Today")
-	local todayText = para(today, "", 2)
+	-- day picker: the category breakdown of any replicated company day (CompanyOps.LEDGER_SHOWN), today by default
+	local picker = Kit.frame(today, UDim2.new(1, 0, 0, Kit.tap(36, TAP)))
+	picker.Name = "DayPicker"
+	picker.LayoutOrder = 2
+	local todayText = para(today, "", 3)
 	local cols = Kit.frame(today, UDim2.fromScale(1, 0))
 	cols.AutomaticSize = Enum.AutomaticSize.Y
-	cols.LayoutOrder = 3
+	cols.LayoutOrder = 4
 	local left = Kit.frame(cols, UDim2.new(0.5, -12, 0, 0))
+	left.Name = "Income"
 	left.AutomaticSize = Enum.AutomaticSize.Y
 	Kit.list(left, 2)
 	local right = Kit.frame(cols, UDim2.new(0.5, -12, 0, 0), UDim2.new(0.5, 12, 0, 0))
+	right.Name = "Costs"
 	right.AutomaticSize = Enum.AutomaticSize.Y
 	Kit.list(right, 2)
+	Kit.caption(left, "Income", 0)
+	Kit.caption(right, "Costs", 0)
+	local noIncome = lineRow(left, 1, "No income yet", "$0", C.dim)
+	local noCosts = lineRow(right, 1, "No costs yet", "$0", C.dim)
+	local inTotalRow = lineRow(left, 999, "Total", "$0", C.dim, true)
+	local outTotalRow = lineRow(right, 999, "Total", "$0", C.dim, true)
+	local catRows: { [string]: LineRow } = {} -- "i:market", "o:wages", ... (created the first time a category appears)
 	local net = Kit.text(today, "", 20, F.display, C.text)
-	net.LayoutOrder = 4
+	net.Name = "Net"
+	net.LayoutOrder = 5
 	local days = Kit.card(parent, 2)
 	title(days, "Last company days")
 	local daysText = para(days, "", 2)
 	local tableFrame = Kit.stack(days, 2, 3)
+	tableFrame.Name = "DayTable"
 	local chart = Kit.frame(days, UDim2.new(1, 0, 0, 96))
+	chart.Name = "DayChart"
 	chart.LayoutOrder = 4
 	local running = Kit.card(parent, 3)
 	title(running, "Running now, per game day")
 	local runRows = Kit.stack(running, 2, 2)
-	dim(running, "Live rates at this moment (a game day is 20 minutes: 15 min day, 5 min night). Wages are paid day and night, also during vacation and sick days.", 3)
-	local sig: string? = nil
-	watch(function(s)
+	runRows.Name = "Rates"
+	local runEmpty = Kit.para(running, "Rates appear after the first update.", 14, C.dim, 3)
+	runEmpty.Name = "RatesEmpty"
+	dim(running, "Live rates at this moment (a game day is 20 minutes: 15 min day, 5 min night). Wages are paid day and night, also during vacation and sick days.", 4)
+	-- running rows: fixed lines, built once
+	type Rate = { key: string, income: boolean, row: LineRow }
+	local rates: { Rate } = {}
+	for i, key in { "market", "b2b", "guest" } do
+		table.insert(rates, { key = key, income = true, row = lineRow(runRows, i, App.categoryLabel(key, false), "", C.good) })
+	end
+	for i, key in RATE_COSTS do
+		table.insert(rates, { key = key, income = false, row = lineRow(runRows, 10 + i, App.categoryLabel(key, true), "", C.bad) })
+	end
+	table.insert(rates, { key = "serving", income = false, row = lineRow(runRows, 30, "Serving & power", "", C.bad) })
+	local netRate = lineRow(runRows, 40, "Net", "", C.dim, true)
+	-- day table + chart: rebuilt only when the set of days changes (a new company day), cells updated in place
+	type DayCols = { head: { TextLabel }, cells: { { TextLabel } }, bars: { Frame }, zero: Frame? }
+	local dayCols: DayCols = { head = {}, cells = {}, bars = {}, zero = nil }
+	local daysKey: string? = nil
+	local pickSig: string? = nil
+	local picked: number? = nil -- nil = today
+	local update: (any) -> () = function(_s: any) end
+	update = function(s: any)
 		local e = s.data.empire
 		local ledger = if typeof(e.ledger) == "table" then e.ledger else {}
 		local dayNow = Ops.day(e)
 		local list = App.ledgerDays(ledger)
-		local income, costs, inTotal, outTotal = App.ledgerDay(ledger[tostring(dayNow)])
-		todayTitle.Text = "Today · day " .. dayNow
-		todayText.Text = if #income + #costs == 0 then "Nothing booked yet today." else "Every dollar of today, by category (the company day started at 08:00)."
-		local s2 = tostring(dayNow) .. "|" .. tostring(inTotal) .. "|" .. tostring(outTotal) .. "|" .. tostring(#list)
-		for _, k in list do local _, _, a, b = App.ledgerDay(ledger[tostring(k)]); s2 ..= "|" .. a .. ":" .. b end
-		if s2 ~= sig then
-			sig = s2
-			clearRows(left); clearRows(right)
-			Kit.list(left, 2); Kit.list(right, 2)
-			Kit.caption(left, "Income", 0)
-			Kit.caption(right, "Costs", 0)
-			for i, l in income do lineRow(left, i, App.categoryLabel(l.cat, false), "+" .. dollars(l.value), C.good) end
-			for i, l in costs do lineRow(right, i, App.categoryLabel(l.cat, true), "-" .. dollars(l.value), C.bad) end
-			if #income == 0 then lineRow(left, 1, "No income yet", "$0", C.dim) end
-			if #costs == 0 then lineRow(right, 1, "No costs yet", "$0", C.dim) end
-			lineRow(left, 99, "Total", "+" .. dollars(inTotal), C.good, true)
-			lineRow(right, 99, "Total", if outTotal > 0 then "-" .. dollars(outTotal) else "$0", C.bad, true)
-			local n = inTotal - outTotal
-			net.Text = "Net today  " .. (if n >= 0 then "+" else "") .. dollars(n)
-			net.TextColor3 = if n >= 0 then C.good else C.bad
-			-- last days: oldest left, today right
+		-- the picker lists the replicated days, oldest left, today right
+		local pick = {}
+		for i = math.min(#list, Ops.LEDGER_SHOWN), 1, -1 do table.insert(pick, list[i]) end
+		if #pick == 0 or pick[#pick] ~= dayNow then table.insert(pick, dayNow) end
+		local shownDay = if picked and ledger[tostring(picked)] ~= nil and picked ~= dayNow then picked :: number else dayNow
+		local pk = tostring(dayNow) .. ":" .. table.concat(pick, ",")
+		if pk ~= pickSig then
+			pickSig = pk
+			clearRows(picker)
+			local options: { Kit.Option } = {}
+			for _, day in pick do table.insert(options, { id = tostring(day), label = if day == dayNow then "Today" else "Day " .. day }) end
+			local seg = Kit.segmented(picker, options, tostring(shownDay), function(id)
+				local n = tonumber(id)
+				picked = if n == dayNow then nil else n
+				if State.snapshot then update(State.snapshot) end
+			end, Kit.tap(36, TAP))
+			seg.frame.Size = UDim2.new(math.min(1, 0.2 * #options), 0, 0, Kit.tap(36, TAP))
+		end
+		picker.Visible = #pick >= 2
+		local isToday = shownDay == dayNow
+		local income, costs, inTotal, outTotal = App.ledgerDay(ledger[tostring(shownDay)])
+		todayTitle.Text = if isToday then "Today · day " .. dayNow else "Day " .. shownDay
+		todayText.Text = if #income + #costs == 0 then (if isToday then "Nothing booked yet today." else "Nothing was booked that day.")
+			elseif isToday then "Every dollar of today, by category (the company day started at 08:00)."
+			else "Every dollar of company day " .. shownDay .. ", by category."
+		-- category rows: shown / hidden / re-ordered, never rebuilt
+		local seen: { [string]: boolean } = {}
+		local function place(side: string, parentFrame: Frame, lines: { { cat: string, value: number } })
+			for i, l in lines do
+				local key = side .. ":" .. l.cat
+				local r = catRows[key]
+				if r == nil then
+					local made = lineRow(parentFrame, i + 1, "", "", C.text)
+					made.frame.Name = "Cat_" .. key
+					catRows[key] = made
+					r = made
+				end
+				assert(r)
+				seen[key] = true
+				r.frame.LayoutOrder = i + 1
+				r.frame.Visible = true
+				r.set(App.categoryLabel(l.cat, side == "o"), (if side == "i" then "+" else "-") .. dollars(l.value), if side == "i" then C.good else C.bad)
+			end
+		end
+		place("i", left, income)
+		place("o", right, costs)
+		for key, r in catRows do if not seen[key] then r.frame.Visible = false end end
+		noIncome.frame.Visible = #income == 0
+		noCosts.frame.Visible = #costs == 0
+		local inText, inColor = signed(inTotal, "+")
+		local outText, outColor = signed(outTotal, "-")
+		inTotalRow.set("Total", inText, inColor)
+		outTotalRow.set("Total", outText, outColor)
+		local n = inTotal - outTotal
+		local netText = if math.abs(n) < 0.5 then "$0" else (if n > 0 then "+" else "") .. dollars(n)
+		net.Text = (if isToday then "Net today  " else "Net day " .. shownDay .. "  ") .. netText
+		net.TextColor3 = if n >= 0.5 then C.good elseif n <= -0.5 then C.bad else C.muted
+		-- last days: oldest left, today right
+		local shown = {}
+		for i = math.min(#list, Ops.LEDGER_SHOWN), 1, -1 do table.insert(shown, list[i]) end
+		daysText.Text = if #shown <= 1 then "The table fills up day by day (the last " .. Ops.LEDGER_SHOWN .. " company days are kept here)." else string.format("The last %d company days (today so far on the right).", #shown)
+		local dk = tostring(dayNow) .. "|" .. table.concat(shown, ",")
+		local w = 1 / (#shown + 1)
+		if dk ~= daysKey then
+			daysKey = dk
 			clearRows(tableFrame)
 			clearRows(chart)
-			local shown = {}
-			for i = math.min(#list, Ops.LEDGER_SHOWN), 1, -1 do table.insert(shown, list[i]) end
-			daysText.Text = if #shown <= 1 then "The table fills up day by day (the last " .. Ops.LEDGER_SHOWN .. " company days are kept here)." else string.format("The last %d company days (today so far on the right).", #shown)
+			dayCols = { head = {}, cells = {}, bars = {}, zero = nil }
 			local head = Kit.frame(tableFrame, UDim2.new(1, 0, 0, 22))
 			head.LayoutOrder = 0
-			local w = 1 / (#shown + 1)
 			Kit.cell(head, "", UDim.new(w, 0), 13, F.medium, C.muted)
-			local rowNames = { "Income", "Costs", "Net" }
-			local totals: { { number } } = {}
 			for j, day in shown do
-				local _, _, a, b = App.ledgerDay(ledger[tostring(day)])
-				totals[j] = { a, b, a - b }
 				local cell = Kit.cell(head, if day == dayNow then "Day " .. day .. " (today)" else "Day " .. day, UDim.new(w, 0), 13, F.bold, C.muted)
 				cell.Position = UDim2.fromScale(w * j, 0)
 				cell.TextXAlignment = Enum.TextXAlignment.Right
+				dayCols.head[j] = cell
 			end
-			for r, rowName in rowNames do
+			for r, rowName in { "Income", "Costs", "Net" } do
 				local row = Kit.frame(tableFrame, UDim2.new(1, 0, 0, 22))
 				row.LayoutOrder = r
 				Kit.cell(row, rowName, UDim.new(w, 0), 14, if r == 3 then F.bold else F.regular, if r == 3 then C.text else C.muted)
+				dayCols.cells[r] = {}
 				for j in shown do
-					local v = totals[j][r]
-					local text = if r == 1 then "+" .. dollars(v) elseif r == 2 then "-" .. dollars(v) else (if v >= 0 then "+" else "") .. dollars(v)
-					local cell = Kit.cell(row, text, UDim.new(w, 0), 14, F.bold, if r == 1 then C.good elseif r == 2 then C.bad elseif v >= 0 then C.good else C.bad)
+					local cell = Kit.cell(row, "", UDim.new(w, 0), 14, F.bold, C.text)
 					cell.Position = UDim2.fromScale(w * j, 0)
 					cell.TextXAlignment = Enum.TextXAlignment.Right
+					dayCols.cells[r][j] = cell
 				end
 			end
-			-- net bars per day (zero line placed by the largest gain and loss, like the profit chart)
-			tableFrame.Visible = #shown >= 1
-			chart.Visible = #shown >= 1
-			local hi, lo = 0, 0
-			for _, t in totals do hi = math.max(hi, t[3]); lo = math.min(lo, t[3]) end
-			local range = math.max(1, hi - lo)
-			local zeroY = hi / range
-			local zero = Kit.frame(chart, UDim2.new(1, 0, 0, 1), UDim2.fromScale(0, zeroY))
+			local zero = Kit.frame(chart, UDim2.new(1, 0, 0, 1))
 			zero.BackgroundTransparency = 0.5
 			zero.BackgroundColor3 = C.dim
-			for j, t in totals do
-				local h = math.abs(t[3]) / range
-				local b = Kit.frame(chart, UDim2.new(w * 0.5, 0, h, 0), UDim2.fromScale(w * j + w * 0.45, zeroY))
-				b.AnchorPoint = Vector2.new(0, if t[3] >= 0 then 1 else 0)
+			dayCols.zero = zero
+			for j in shown do
+				local b = Kit.frame(chart, UDim2.new(w * 0.5, 0, 0, 0), UDim2.fromScale(w * j + w * 0.45, 0))
+				b.Name = "Bar" .. j
 				b.BackgroundTransparency = 0.15
-				b.BackgroundColor3 = if t[3] >= 0 then C.good else C.bad
 				Kit.corner(b, 3)
+				dayCols.bars[j] = b
 			end
 		end
-		-- running rates per game day from the live summary (live.ops: $/min per category)
-		clearRows(runRows)
-		local ops = if typeof(s.live.ops) == "table" then s.live.ops else {}
+		tableFrame.Visible = #shown >= 1
+		chart.Visible = #shown >= 1
+		local totals: { { number } } = {}
+		local hi, lo = 0, 0
+		for j, day in shown do
+			local _, _, a, b = App.ledgerDay(ledger[tostring(day)])
+			totals[j] = { a, b, a - b }
+			hi = math.max(hi, a - b)
+			lo = math.min(lo, a - b)
+		end
+		for r = 1, 3 do
+			for j, t in totals do
+				local cell = dayCols.cells[r] and dayCols.cells[r][j]
+				if cell then
+					local v = t[r]
+					local text, color = signed(v, if r == 1 then "+" elseif r == 2 then "-" elseif v >= 0 then "+" else "-")
+					if cell.Text ~= text then cell.Text = text end
+					cell.TextColor3 = color
+				end
+			end
+		end
+		-- net bars per day (zero line placed by the largest gain and loss, like the profit chart)
+		local range = math.max(1, hi - lo)
+		local zeroY = hi / range
+		if dayCols.zero then dayCols.zero.Position = UDim2.fromScale(0, zeroY) end
+		for j, t in totals do
+			local b = dayCols.bars[j]
+			if b then
+				b.Size = UDim2.new(w * 0.5, 0, math.abs(t[3]) / range, 0)
+				b.Position = UDim2.fromScale(w * j + w * 0.45, zeroY)
+				b.AnchorPoint = Vector2.new(0, if t[3] >= 0 then 1 else 0)
+				b.BackgroundColor3 = if t[3] >= 0 then C.good else C.bad
+			end
+		end
+		-- running rates per game day from the live summary (live.ops: $/min per category), updated in place
+		local ops = if typeof(s.live.ops) == "table" then s.live.ops else nil
 		local revenueMin = (tonumber(s.live.revenue) or 0) * 60
 		local costMin = (tonumber(s.live.cost) or 0) * 60
-		local b2b, guest = tonumber(ops.b2b) or 0, tonumber(ops.guest) or 0
-		type Line = { label: string, value: number, income: boolean }
-		local lines: { Line } = {
-			{ label = "AI products (users + API)", value = math.max(0, revenueMin - b2b - guest), income = true },
-			{ label = "Client retainers", value = b2b, income = true },
-			{ label = "Guest house", value = guest, income = true },
-		}
+		local any = ops ~= nil and (revenueMin > 0.5 or costMin > 0.5)
+		runEmpty.Visible = ops == nil
+		local o: any = ops or {}
 		local known = 0
-		for _, key in { "wages", "ops", "upkeep", "food", "fleet", "guest", "jet", "b2bserve" } do
-			local v = tonumber(ops[key .. "Cost"]) or 0
-			known += v
-			table.insert(lines, { label = App.categoryLabel(key, true), value = v, income = false })
-		end
-		table.insert(lines, { label = "Serving & power", value = math.max(0, costMin - known), income = false })
-		local order = 0
-		for _, l in lines do
-			if l.value > 0.5 then
-				order += 1
-				lineRow(runRows, order, l.label, (if l.income then "+" else "-") .. perDay(l.value), if l.income then C.good else C.bad)
+		for _, key in RATE_COSTS do known += tonumber(o[key .. "Cost"]) or 0 end
+		for _, r in rates do
+			local v = if r.key == "market" then math.max(0, revenueMin - (tonumber(o.b2b) or 0) - (tonumber(o.guest) or 0))
+				elseif r.key == "serving" then math.max(0, costMin - known)
+				elseif r.income then tonumber(o[r.key]) or 0
+				else tonumber(o[r.key .. "Cost"]) or 0
+			r.row.frame.Visible = any and v > 0.5
+			if r.row.frame.Visible then
+				r.row.set(r.row.label.Text, (if r.income then "+" else "-") .. perDay(v), if r.income then C.good else C.bad)
 			end
 		end
-		order += 1
 		local netMin = revenueMin - costMin
-		lineRow(runRows, order, "Net", (if netMin >= 0 then "+" else "-") .. perDay(math.abs(netMin)), if netMin >= 0 then C.good else C.bad, true)
-	end)
+		netRate.frame.Visible = ops ~= nil
+		if not any or math.abs(netMin * Ops.DAY / 60) < 0.5 then
+			netRate.set("Net", "$0/day", C.dim)
+		else
+			netRate.set("Net", (if netMin >= 0 then "+" else "-") .. perDay(math.abs(netMin)), if netMin >= 0 then C.good else C.bad)
+		end
+	end
+	watch(update)
 end
 
 -- Team section: open applications (invite → the candidate walks to the visitor lounge for an in-person
@@ -639,11 +970,11 @@ local function applications(parent: Instance, order: number)
 			table.clear(expiry)
 			for i, a in list do
 				local roleDef = Config.find(Config.ROLES, a.role)
-				local row = Kit.frame(rows, UDim2.new(1, 0, 0, 52))
+				local row = Kit.frame(rows, UDim2.new(1, 0, 0, Kit.tap(52, TAP)))
 				row.LayoutOrder = i
 				local initials = ""
 				for word in string.gmatch(a.n, "%S+") do initials ..= string.sub(word, 1, 1) end
-				Conversation.avatar(row, string.upper(string.sub(initials, 1, 2)), a.s, 40).Position = UDim2.fromOffset(0, 6)
+				Conversation.avatar(row, string.upper(string.sub(initials, 1, 2)), a.s, 40).Position = UDim2.new(0, 0, 0.5, -20)
 				local name = Kit.text(row, a.n, 16, F.bold, C.text)
 				name.Position = UDim2.fromOffset(52, 4)
 				-- same price the server charges (RecruitingService.hireCost: escalates with the team size)
@@ -651,17 +982,17 @@ local function applications(parent: Instance, order: number)
 				local sub = Kit.text(row, string.format("%s  ·  %d yrs  ·  ex-%s  ·  asks %s", if roleDef then roleDef.name else a.role, a.xp, a.prev, cost), 13, F.regular, C.muted)
 				sub.Position = UDim2.fromOffset(52, 27)
 				sub.AutomaticSize = Enum.AutomaticSize.None
-				sub.Size = UDim2.new(1, -250, 0, 18)
+				sub.Size = UDim2.new(1, -Kit.tap(250, 300), 0, 18)
 				sub.TextTruncate = Enum.TextTruncate.AtEnd
 				local status = Kit.text(row, "", 12, F.medium, C.muted)
 				status.AnchorPoint = Vector2.new(1, 0)
-				status.Position = UDim2.new(1, -180, 0, 6)
+				status.Position = UDim2.new(1, -Kit.tap(180, 240), 0, 6)
 				status.TextXAlignment = Enum.TextXAlignment.Right
 				if a.st == "new" then
 					expiry[a.id] = status
-					local invite = Kit.button(row, "Invite", "primary", UDim2.fromOffset(86, 34))
+					local invite = Kit.button(row, "Invite", "primary", UDim2.fromOffset(Kit.tap(86, 110), Kit.tap(34, 80)))
 					invite.AnchorPoint = Vector2.new(1, 0.5)
-					invite.Position = UDim2.new(1, -90, 0.5, 0)
+					invite.Position = UDim2.new(1, -Kit.tap(90, 122), 0.5, 0)
 					invite.TextSize = 15
 					Kit.onClick(invite, function()
 						task.spawn(function()
@@ -673,7 +1004,7 @@ local function applications(parent: Instance, order: number)
 					status.Text = if a.st == "interviewing" then "In the interview" else "Waiting in the visitor lounge (G)"
 					Theme.bindAccent(status, "TextColor3")
 				end
-				local reject = Kit.button(row, "Reject", "danger", UDim2.fromOffset(80, 34))
+				local reject = Kit.button(row, "Reject", "danger", UDim2.fromOffset(Kit.tap(80, 110), Kit.tap(34, 80)))
 				reject.AnchorPoint = Vector2.new(1, 0.5)
 				reject.Position = UDim2.new(1, 0, 0.5, 0)
 				reject.TextSize = 15
@@ -687,7 +1018,7 @@ local function applications(parent: Instance, order: number)
 		end
 		for _, a in list do
 			local label = expiry[a.id]
-			if label then label.Text = "Closes in " .. Format.duration(math.max(0, Math.APPLICATION_SECONDS - ((e.seconds or 0) - a.at))) end
+			if label then label.Text = "Closes in " .. Kit.countdown(math.max(0, Math.APPLICATION_SECONDS - ((e.seconds or 0) - a.at))) end
 		end
 	end)
 end
@@ -729,7 +1060,7 @@ local function roster(parent: Instance, order: number)
 		clearRows(rows)
 		for n, entry in entries do
 			if n > ROSTER_LIMIT then break end
-			local row = Kit.frame(rows, UDim2.new(1, 0, 0, 34))
+			local row = Kit.frame(rows, UDim2.new(1, 0, 0, Kit.tap(34, 72)))
 			row.LayoutOrder = n
 			Kit.cell(row, entry.name, UDim.new(0.3, 0), 15, F.bold, C.text).Position = UDim2.new()
 			local roleCell = Kit.cell(row, if entry.apprentice then entry.role.name .. " · apprentice" else entry.role.name, UDim.new(0.22, 0), 13, F.regular, C.muted)
@@ -767,6 +1098,7 @@ local function team(parent: Instance)
 		local e = s.data.empire
 		capacity.Text = string.format("%d / %d desks filled. Staff earn wages every second, day and night (also on vacation and sick days). Bonuses stop when you dismiss an employee. Hiring fees are non-refundable. Agency hires start at once with average skill (★2–★3); interviewing applicants is how you find stronger people. Automatic HR and apprentices: Company → Settings.",Math.staff(e),Config.OFFICES[e.office].staff)
 	end)
+	safetyNote(intro, 3)
 	applications(parent, 2)
 	roster(parent, 3)
 	for i, role in Config.ROLES do
@@ -774,7 +1106,7 @@ local function team(parent: Instance)
 		title(card, role.name)
 		para(card, role.desc)
 		local info = para(card, "", 3)
-		local row = Kit.row(card,40,10,4)
+		local row = Kit.row(card,Kit.tap(40, TAP),10,4)
 		local hire = Kit.button(row,"Hire","primary",UDim2.new(0.4,-6,1,0))
 		local group = Kit.button(row,"Hire 5","secondary",UDim2.new(0.35,-6,1,0))
 		local fire = Kit.button(row,"Dismiss one","secondary",UDim2.new(0.25,-6,1,0))
@@ -814,13 +1146,13 @@ local function research(parent: Instance)
 		local card=Kit.card(parent,i+1)
 		title(card,def.name)
 		para(card,def.desc)
-		local info=para(card,"",3)
+		local cardInfo=para(card,"",3)
 		local b=button(card,"Research",function() call("StartResearch",{researchId=def.id},"Research started: " .. def.name) end)
 		watch(function(s)
 			local e=s.data.empire
 			local locked=def.prereq and not e.research[def.prereq]
 			local done=e.research[def.id]==true
-			info.Text=string.format("%s · %d RP · %ds",Format.money(def.cost),def.points,def.seconds) ..
+			cardInfo.Text=string.format("%s · %d RP · %ds",Format.money(def.cost),def.points,def.seconds) ..
 				(if locked then "\nRequires: " .. Config.find(Config.RESEARCH,def.prereq).name else "")
 			b.Text=if done then "Completed" elseif e.researchJob and e.researchJob.id==def.id then "Researching..." elseif locked then "Locked" else "Start research"
 			Kit.setDisabled(b,done or locked==true or e.researchJob~=nil or e.points<def.points or s.data.money<def.cost)
@@ -905,28 +1237,31 @@ local function settings(parent: Instance)
 	local hr = Kit.card(parent, 1)
 	title(hr, "Automatic HR")
 	local hrText = para(hr, "", 2)
-	local autoRow = Kit.row(hr, 36, 12, 3)
+	local hrStatus = Kit.para(hr, "", 14, C.text, 3)
+	hrStatus.Name = "HrStatus"
+	hrStatus.Font = F.bold
+	local autoRow = Kit.row(hr, Kit.tap(36, TAP), 12, 4)
 	Kit.text(autoRow, "Hire automatically", 15, F.medium, C.text).LayoutOrder = 1
-	local autoSwitch = switch(autoRow, { { id = "on", label = "On" }, { id = "off", label = "Off" } }, "on", 2, 170, function(id)
-		call("EmpireAction", { action = "hrAuto", on = id == "on" }, if id == "on" then "Automatic HR is on." else "Automatic HR is off. Hire by hand in Team.")
+	local autoSwitch = switch(autoRow, { { id = "on", label = "On" }, { id = "off", label = "Off" } }, "on", 2, Kit.tap(170, 220), function(id)
+		queued("EmpireAction", { action = "hrAuto", on = id == "on" }, if id == "on" then "Automatic HR is on." else "Automatic HR is off. Hire by hand in Team.")
 	end)
-	local budgetRow = Kit.row(hr, 36, 12, 4)
+	local budgetRow = Kit.row(hr, Kit.tap(36, TAP), 12, 5)
 	Kit.text(budgetRow, "Wage budget", 15, F.medium, C.text).LayoutOrder = 1
 	local budgetOptions: { Kit.Option } = {}
 	for _, b in Ops.HR_BUDGETS do table.insert(budgetOptions, { id = string.format("%.2f", b), label = string.format("%d %%", math.floor(b * 100 + 0.5)) }) end
-	local budgetSwitch = switch(budgetRow, budgetOptions, "0.40", 2, 260, function(id)
-		call("EmpireAction", { action = "hrBudget", budget = tonumber(id) }, "Wage budget set to " .. math.floor((tonumber(id) or 0) * 100 + 0.5) .. " % of income.")
+	local budgetSwitch = switch(budgetRow, budgetOptions, "0.40", 2, Kit.tap(260, 330), function(id)
+		queued("EmpireAction", { action = "hrBudget", budget = tonumber(id) }, "Wage budget set to " .. math.floor((tonumber(id) or 0) * 100 + 0.5) .. " % of income.")
 	end)
-	local needText = para(hr, "", 5)
-	dim(hr, "HR hires one person every " .. Ops.HIRE_GAP .. " s into the department furthest below its need, only while the payroll (team + operations staff) stays inside the budget share of the 5-minute income. The first " .. Ops.HR_STARTERS .. " hires are always allowed. In Save mode HR stops at half the desks.", 6)
+	local needText = para(hr, "", 6)
+	dim(hr, "HR hires one person every " .. Ops.HIRE_GAP .. " s into the department furthest below its need, only while the payroll (team + operations staff) stays inside the budget share of the 5-minute income. The first " .. Ops.HR_STARTERS .. " hires are always allowed. In Save mode HR stops at half the desks.", 7)
 	-- Save mode
 	local save = Kit.card(parent, 2)
 	title(save, "Save mode")
 	local saveText = para(save, "", 2)
-	local saveRow = Kit.row(save, 36, 12, 3)
+	local saveRow = Kit.row(save, Kit.tap(36, TAP), 12, 3)
 	Kit.text(saveRow, "Save for the next office", 15, F.medium, C.text).LayoutOrder = 1
-	local saveSwitch = switch(saveRow, { { id = "auto", label = "Auto" }, { id = "off", label = "Off" } }, "auto", 2, 170, function(id)
-		call("EmpireAction", { action = "saveMode", mode = id }, if id == "auto" then "Save mode: automatic." else "Save mode switched off.")
+	local saveSwitch = switch(saveRow, { { id = "auto", label = "Auto" }, { id = "off", label = "Off" } }, "auto", 2, Kit.tap(170, 220), function(id)
+		queued("EmpireAction", { action = "saveMode", mode = id }, if id == "auto" then "Save mode: automatic." else "Save mode switched off.")
 	end)
 	dim(save, "Auto switches on when the next office is less than " .. Ops.SAVE_MINUTES .. " minutes of profit away. It pauses research, Lab levels, big trainings, HR beyond half the desks and ordinary GPU buys. GPUs that pay back fast while servers are full still get bought.", 4)
 	-- night shift
@@ -936,29 +1271,35 @@ local function settings(parent: Instance)
 	local nightRows = Kit.stack(night, 6, 3)
 	local nightSwitches: { [string]: Kit.Segmented } = {}
 	local nightLabels: { [string]: TextLabel } = {}
-	-- the night crew works per role (CompanyOps.nightOn: any department of the role); the switch sets all of them
+	local nightWant: { [string]: boolean } = {} -- a switch tap still on its way to the server (shown meanwhile)
+	-- the night crew works per role (CompanyOps.nightOn: any department of the role); the switch sets every department
+	-- of the role, one paced call each (EmpireAction nightShift is idempotent: it sets, never toggles), so a burst of
+	-- taps on several roles never ends with a role half on
+	local switchW, rowH = Kit.tap(170, 220), Kit.tap(36, TAP)
 	for i, roleDef in Config.ROLES do
-		local row = Kit.row(nightRows, 36, 12, i)
+		local row = Kit.row(nightRows, rowH, 12, i)
 		row.Name = "Night_" .. roleDef.id
 		local label = Kit.cell(row, roleDef.name, UDim.new(0, 170), 15, F.medium, C.text)
 		label.LayoutOrder = 1
-		local sub = Kit.cell(row, "", UDim.new(1, -370), 13, F.regular, C.muted)
+		local sub = Kit.cell(row, "", UDim.new(1, -(200 + switchW)), 13, F.regular, C.muted)
 		sub.LayoutOrder = 2
+		sub.TextTruncate = Enum.TextTruncate.AtEnd
 		nightLabels[roleDef.id] = sub
-		nightSwitches[roleDef.id] = switch(row, { { id = "off", label = "Off" }, { id = "on", label = "On" } }, "off", 3, 170, function(id)
-			local snapshot = State.snapshot
-			if not snapshot then return end
-			local map = snapshot.data.empire.nightShift
-			task.spawn(function()
-				local okAll = true
+		nightSwitches[roleDef.id] = switch(row, { { id = "off", label = "Off" }, { id = "on", label = "On" } }, "off", 3, switchW, function(id)
+			local want = id == "on"
+			nightWant[roleDef.id] = want
+			enqueue("EmpireAction", function()
+				local failed: string? = nil
 				for _, dept in Ops.ROLE_DEPTS[roleDef.id] or {} do
-					local on = typeof(map) == "table" and map[dept] == true
-					if on ~= (id == "on") then
-						local ok = Action.call("EmpireAction", { action = "nightShift", dept = dept, on = id == "on" })
-						okAll = okAll and ok
-					end
+					local ok, res = paced("EmpireAction", { action = "nightShift", dept = dept, on = want })
+					if not ok then failed = tostring(res.err); break end
 				end
-				if okAll then Toast.show("success", roleDef.name .. (if id == "on" then ": night shift on." else ": night shift off.")) end
+				if nightWant[roleDef.id] == want then nightWant[roleDef.id] = nil end
+				if failed then
+					Toast.show("error", Action.message(failed))
+				else
+					Toast.show("success", roleDef.name .. (if want then ": night shift on." else ": night shift off."))
+				end
 			end)
 		end)
 	end
@@ -967,7 +1308,7 @@ local function settings(parent: Instance)
 	local appr = Kit.card(parent, 4)
 	title(appr, "Apprentices")
 	local apprText = para(appr, "", 2)
-	local hireRow = Kit.grid(appr, 4, 40, 8, 3)
+	local hireRow = Kit.grid(appr, 4, Kit.tap(40, TAP), 8, 3)
 	local hireButtons: { [string]: TextButton } = {}
 	for i, roleDef in Config.ROLES do
 		local b = Kit.button(hireRow, roleDef.name, "secondary", UDim2.new())
@@ -985,14 +1326,14 @@ local function settings(parent: Instance)
 	title(jet, "Company jet")
 	local jetText = para(jet, "", 2)
 	local jetButton = button(jet, "Buy company jet", function()
-		call("EmpireAction", { action = "buyJet" }, "The company jet is yours. It waits in the airport hangar with your 2 pilots.")
+		queued("EmpireAction", { action = "buyJet" }, "The company jet is yours. It waits in the airport hangar with your 2 pilots.")
 	end)
 	jetButton.Name = "BuyJet"
 	-- Lab level lives in the Models app
 	local lab = Kit.card(parent, 6)
 	title(lab, "Lab level")
 	local labText = para(lab, "", 2)
-	local labButton = Kit.button(lab, "Open Models", "secondary", UDim2.new(1, 0, 0, 40))
+	local labButton = Kit.button(lab, "Open Models", "secondary", UDim2.new(1, 0, 0, Kit.tap(40, TAP)))
 	labButton.LayoutOrder = 3
 	Kit.onClick(labButton, function() if nav then nav.show("lab") end end)
 	local apprSig: string? = nil
@@ -1005,10 +1346,11 @@ local function settings(parent: Instance)
 		budgetSwitch.set(string.format("%.2f", budget))
 		local payrollMin = (tonumber(ops.wagesCost) or 0) + (tonumber(ops.opsCost) or 0)
 		local income = tonumber(ops.income) or 0
-		local anyLive = false
-		for _, id in s.data.modelOrder do local m = s.data.models[id]; if m and m.status == "live" then anyLive = true; break end end
-		hrText.Text = string.format("Payroll now %s · budget %s (%d %% of the income of the last 5 minutes)%s",
-			perDay(payrollMin), perDay(budget * income), math.floor(budget * 100 + 0.5), if not auto then " · automatic hiring is off" elseif not anyLive then " · HR starts hiring once your first model is live" else "")
+		hrText.Text = string.format("Payroll now %s · budget %s (%d %% of the income of the last 5 minutes)",
+			perDay(payrollMin), perDay(budget * income), math.floor(budget * 100 + 0.5))
+		local statusLine, warn = App.hrStatus(s)
+		hrStatus.Text = statusLine
+		hrStatus.TextColor3 = if warn then C.warn else C.text
 		local needs = {}
 		for _, id in Ops.HR_ORDER do
 			local roleDef = Config.find(Config.ROLES, id)
@@ -1026,19 +1368,29 @@ local function settings(parent: Instance)
 		-- night shift
 		local nightOpen = stage >= Ops.NIGHT.from
 		nightRows.Visible = nightOpen
-		nightText.Text = if nightOpen then "Optional per team. Needs a security guard on duty (operations staff)." else "Night shifts start at the " .. stageName(Ops.NIGHT.from) .. "."
+		nightText.Text = if nightOpen and ops.paused == true then "Paused: cash has been below $0 for a whole game day. Night crews come back once cash is positive."
+			elseif nightOpen then "Optional per team. Needs a security guard on duty (operations staff)." else "Night shifts start at the " .. stageName(Ops.NIGHT.from) .. "."
 		if nightOpen then
 			for _, roleDef in Config.ROLES do
 				local heads = e.employees[roleDef.id] or 0
 				local seats = Ops.seats(e, roleDef.id)
 				local over = math.max(0, heads - seats)
-				local on = false
-				for _, dept in Ops.ROLE_DEPTS[roleDef.id] or {} do
-					if typeof(e.nightShift) == "table" and e.nightShift[dept] == true then on = true end
+				local depts = Ops.ROLE_DEPTS[roleDef.id] or {}
+				local onCount = 0
+				for _, dept in depts do
+					if typeof(e.nightShift) == "table" and e.nightShift[dept] == true then onCount += 1 end
 				end
-				nightSwitches[roleDef.id].set(if on then "on" else "off")
-				nightLabels[roleDef.id].Text = string.format("%d people / %d desks%s", heads, seats,
-					if over > 0 then string.format(" · %d work at night", math.min(over, seats)) elseif on then " · nobody over the desks yet" else "")
+				local want = nightWant[roleDef.id]
+				local partial = want == nil and onCount > 0 and onCount < #depts
+				local on = if want ~= nil then want else onCount > 0
+				-- a half-on role (an older save, a failed call) highlights neither side, so either tap fixes it
+				nightSwitches[roleDef.id].set(if partial then "partial" elseif on then "on" else "off")
+				local sub = nightLabels[roleDef.id]
+				sub.Text = string.format("%d people / %d desks%s", heads, seats,
+					if want ~= nil then " · switching…"
+					elseif partial then string.format(" · on in %d of %d departments: tap On or Off", onCount, #depts)
+					elseif over > 0 then string.format(" · %d work at night", math.min(over, seats)) elseif on then " · nobody over the desks yet" else "")
+				sub.TextColor3 = if partial then C.warn else C.muted
 			end
 		end
 		-- apprentices
@@ -1080,8 +1432,9 @@ local function settings(parent: Instance)
 			jetButton.Text = "Owned"
 			Kit.setDisabled(jetButton, true)
 		else
-			jetText.Text = string.format("%s once, then %s/day (%d pilots + upkeep) and %s fuel per abroad trip. Abroad trips take %.1f days instead of %d and win +%d %% trust. Needs the %s.",
-				dollars(J.price), dollars(running), J.pilots, dollars(J.fuel), J.days, Ops.TRIPS.abroad.days, math.floor(J.trust * 100), stageName(J.stage))
+			jetText.Text = string.format("%s once, then %s/day (%d pilots + upkeep) and %s fuel per abroad trip. Abroad trips take %.1f days instead of %d and win +%d %% trust. %s",
+				dollars(J.price), dollars(running), J.pilots, dollars(J.fuel), J.days, Ops.TRIPS.abroad.days, math.floor(J.trust * 100),
+				if stage < J.stage then "Needs the " .. stageName(J.stage) .. "." else "It waits in the airport hangar with 2 company pilots once you buy it.")
 			jetButton.Text = if stage < J.stage then "Needs the " .. stageName(J.stage) else "Buy company jet · " .. dollars(J.price)
 			Kit.setDisabled(jetButton, stage < J.stage or s.data.money < J.price)
 		end
@@ -1136,7 +1489,6 @@ local function render()
 end
 function App.mount(parent: Frame, navigation: any)
 	nav=navigation
-	page=parent
 	local head=Kit.frame(parent,UDim2.new(1,0,0,38))
 	local label=Kit.text(head,"Company",24,F.display,C.text)
 	label.Position=UDim2.fromOffset(0,2)
@@ -1144,7 +1496,8 @@ function App.mount(parent: Frame, navigation: any)
 	tabs.Name="Tabs"
 	tabs.BackgroundTransparency=1
 	tabs.BorderSizePixel=0
-	tabs.Size=UDim2.new(1,0,0,46)
+	local tabH=Kit.tap(36,80)
+	tabs.Size=UDim2.new(1,0,0,tabH+10)
 	tabs.Position=UDim2.fromOffset(0,42)
 	tabs.CanvasSize=UDim2.new()
 	tabs.AutomaticCanvasSize=Enum.AutomaticSize.X
@@ -1154,7 +1507,7 @@ function App.mount(parent: Frame, navigation: any)
 	Kit.list(tabs,6,true)
 	tabButtons={}
 	for i,def in TABS do
-		local b=Kit.button(tabs,def[2],"secondary",UDim2.fromOffset(96,36))
+		local b=Kit.button(tabs,def[2],"secondary",UDim2.fromOffset(Kit.tap(96,140),tabH))
 		b.Name="Tab_"..def[1]
 		b.LayoutOrder=i
 		tabButtons[def[1]]=b
@@ -1164,7 +1517,8 @@ function App.mount(parent: Frame, navigation: any)
 		end)
 	end
 	paintTabs()
-	local body=Kit.scroll(parent,UDim2.new(1,0,1,-100),UDim2.fromOffset(0,100))
+	local top=42+tabH+22
+	local body=Kit.scroll(parent,UDim2.new(1,0,1,-top),UDim2.fromOffset(0,top))
 	body.Name="EmpireScroll"
 	scroll=body
 	State.onChange(function(s)

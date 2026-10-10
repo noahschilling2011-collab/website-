@@ -283,8 +283,13 @@ local function body()
 	Phone.scan(fs)
 	check("no second first-client call", callCount("PHONE_CALL") == 1)
 	CLOCK += 26
+	local upd0 = callCount("PHONE_UPDATE")
 	Phone.scan(fs)
 	check("unanswered call is missed after 25 s", Phone.calls(fs)[1].state == "missed")
+	local mu = lastNote("PHONE_UPDATE")
+	check("the server tells the phone the call was missed (PHONE_UPDATE calls with the call)", callCount("PHONE_UPDATE") == upd0 + 1 and mu.payload.what == "calls" and mu.payload.call.id == n1.payload.id and mu.payload.call.state == "missed", mu and mu.payload.what)
+	Phone.scan(fs)
+	check("the missed notice is sent once", callCount("PHONE_UPDATE") == upd0 + 1)
 	local ans = Phone._act(fs, { action = "call", id = n1.payload.id, answer = "accept" })
 	check("a missed call can still be answered (call back)", ans.ok == true and ans.call.state == "accepted")
 	check("answered twice -> NO_CALL", Phone._act(fs, { action = "call", id = n1.payload.id, answer = "accept" }).err == "NO_CALL")
@@ -341,6 +346,7 @@ local function body()
 	Phone.scan(os_)
 	local oc = lastNote("PHONE_CALL")
 	check("enough cash for the next office -> 'We can move!' that opens the Company app", oc and oc.player == os_.player and oc.payload.kind == "office" and oc.payload.open == "empire" and string.find(oc.payload.text, "Founder Headquarters", 1, true) ~= nil, oc and oc.payload.text)
+	check("the office call opens Company on the Office tab it names", oc and oc.payload.section == "office" and string.find(oc.payload.text, "Company → Office ", 1, true) ~= nil and oc.payload.accept == "Open Office", oc and (tostring(oc.payload.section) .. " / " .. oc.payload.text))
 	local nb = callCount("PHONE_CALL")
 	Phone.scan(os_)
 	check("office call only once", callCount("PHONE_CALL") == nb)
@@ -378,11 +384,16 @@ local function body()
 	check("unknown contact -> BAD_INPUT", Phone._act(ss, { action = "call", contact = "pizza" }).err == "BAD_INPUT")
 
 	-- settings
+	-- integrate (phone request 1): EmpireMath.new / Template now give every save empire.prefs = {autoTrips = false},
+	-- so the default company saves the setting; the session-only fallback is tested with prefs removed
+	check("new saves carry empire.prefs = {autoTrips = false} (phone request 1)", typeof(sd.empire.prefs) == "table" and sd.empire.prefs.autoTrips == false)
+	local savedPrefs = sd.empire.prefs
+	sd.empire.prefs = nil
 	local st0 = Phone._act(ss, { action = "inbox" })
 	check("setting default: join trips automatically = off", st0.settings.autoTrips == false and st0.saved == false)
 	local st1 = Phone._act(ss, { action = "setting", key = "autoTrips", value = true })
-	check("setting stored for the session (no empire.prefs yet)", st1.ok and st1.settings.autoTrips == true and st1.saved == false and Phone.setting(ss, "autoTrips") == true)
-	sd.empire.prefs = {}
+	check("setting stored for the session (save without empire.prefs)", st1.ok and st1.settings.autoTrips == true and st1.saved == false and Phone.setting(ss, "autoTrips") == true)
+	sd.empire.prefs = savedPrefs
 	local st2 = Phone._act(ss, { action = "setting", key = "autoTrips", value = false })
 	check("with empire.prefs the setting is saved there", st2.saved == true and sd.empire.prefs.autoTrips == false and Phone.setting(ss, "autoTrips") == false)
 	check("bad setting key / value -> BAD_INPUT", Phone._act(ss, { action = "setting", key = "money", value = true }).err == "BAD_INPUT" and Phone._act(ss, { action = "setting", key = "autoTrips", value = "yes" }).err == "BAD_INPUT")
@@ -390,6 +401,8 @@ local function body()
 	-- calendar items and messages of other packages
 	local un = callCount("PHONE_UPDATE")
 	check("addCalendarItem", Phone.addCalendarItem(ss, { key = "itin1", title = "Flight PM 101", at = CLOCK + 300, kind = "flight" }) == true and callCount("PHONE_UPDATE") == un + 1)
+	local cu = lastNote("PHONE_UPDATE")
+	check("PHONE_UPDATE carries the new calendar item (no refetch needed)", cu.payload.what == "calendar" and cu.payload.item and cu.payload.item.key == "itin1" and cu.payload.item.title == "Flight PM 101" and cu.payload.item.at == CLOCK + 300)
 	Phone.addCalendarItem(ss, { key = "itin1", title = "Flight PM 102", at = CLOCK + 300 })
 	local calr = Phone._act(ss, { action = "calendar" })
 	check("same key replaces the item", #calr.items == 1 and calr.items[1].title == "Flight PM 102")
@@ -398,7 +411,10 @@ local function body()
 	check("calendar items capped at 24", #Phone._act(ss, { action = "calendar" }).items == 24)
 	Phone.removeCalendarItem(ss, "k30")
 	check("removeCalendarItem", #Phone._act(ss, { action = "calendar" }).items == 23)
+	check("PHONE_UPDATE names the removed item", lastNote("PHONE_UPDATE").payload.removed == "k30")
 	Phone.message(ss, { from = "Travel desk", title = "Your driver is waiting", text = "At the main entrance." })
+	local mm = lastNote("PHONE_UPDATE")
+	check("PHONE_UPDATE carries the new message", mm.payload.what == "messages" and mm.payload.message and mm.payload.message.title == "Your driver is waiting" and mm.payload.message.body == "At the main entrance.")
 	local inbox = Phone._act(ss, { action = "inbox" })
 	check("message of another package in the inbox", inbox.messages[1] and inbox.messages[1].title == "Your driver is waiting" and inbox.messages[1].from == "Travel desk")
 	check("inbox lists the call log and whether hooks exist", typeof(inbox.calls) == "table" and inbox.hooks.driver == true)
@@ -460,7 +476,8 @@ local function body()
 	T += 5
 	FILTER = function(text) return string.rep("#", #text) end
 	local f2 = Phone._act(ms, { action = "chat", modelId = "nova", text = "badword" })
-	check("chat: the model gets and the player sees the filtered text", f2.ok and f2.user == "#######" and g1.calls[#g1.calls].UserPrompt == "#######")
+	local up = g1.calls[#g1.calls].UserPrompt
+	check("chat: the model gets and the player sees the filtered text", f2.ok and f2.user == "#######" and string.sub(up, -7) == "#######" and not string.find(up, "badword", 1, true), up)
 	FILTER = function(text) return text end
 	-- input validation
 	T += 5
@@ -498,6 +515,222 @@ local function body()
 		return g
 	end)
 	check("TextGenerator exists with SystemPrompt / Temperature / TopP / Seed (API dump)", ok and gen.ClassName == "TextGenerator", gen)
+
+	------------------------------------------------------------------ review round 1: breakers per player, context, recap
+	do
+	Phone._reset()
+	local BAD = {}
+	local ERRTEXT = "TextGenerator: request blocked (test double)"
+	local tg = {}
+	Phone._seams({
+		generator = function(prompt, temperature, topP, seed)
+			local g = { prompt = prompt, calls = {} }
+			function g:GenerateTextAsync(req)
+				table.insert(self.calls, req)
+				if BAD[req.UserPrompt] or BAD[string.match(req.UserPrompt, "The player now says: (.*)$") or ""] then error(ERRTEXT) end
+				return { GeneratedText = "ok " .. #self.calls, ContextToken = "tok" .. #self.calls }
+			end
+			table.insert(tg, g)
+			return g
+		end,
+	})
+	local spec = { { id = "nova", name = "Nova", version = 2, sizeId = "s1b", stats = { reasoning = 63, coding = 55, math = 54, creativity = 71, knowledge = 66, reliability = 60, speed = 76, efficiency = 74 } } }
+	local att = C.session(C.company({ stage = 2, models = spec }), 3101)
+	local vic = C.session(C.company({ stage = 2, models = spec }), 3102)
+	local third = C.session(C.company({ stage = 2, models = spec }), 3103)
+	BAD["blocked text"] = true
+	T += 100
+	local a1 = Phone._act(att, { action = "chat", modelId = "nova", text = "blocked text" })
+	check("breaker: a refused prompt -> labelled demo for that player", a1.ok and a1.source == "demo" and a1.reason == "error" and a1.label == PM.DEMO_LABEL)
+	T += 5
+	local v1 = Phone._act(vic, { action = "chat", modelId = "nova", text = "hello" })
+	check("breaker: another player 5 s later still gets the AI (one player's error never switches it off for everybody)", v1.ok and v1.source == "ai", tostring(v1.source) .. "/" .. tostring(v1.reason))
+	local a2 = Phone._act(att, { action = "chat", modelId = "nova", text = "a normal question" })
+	check("breaker: the failing player himself gets demo replies for a while (no TextGenerator call)", a2.ok and a2.source == "demo" and a2.reason == "offline")
+	T += Phone.PLAYER_BREAKER_BASE + 1
+	local a3 = Phone._act(att, { action = "chat", modelId = "nova", text = "a normal question" })
+	check("breaker: after his pause the player gets the AI again", a3.ok and a3.source == "ai", tostring(a3.source) .. "/" .. tostring(a3.reason))
+	-- sustained: the attacker re-sends a refused prompt whenever he may; the victim asks every 6.5 s for 30 min
+	Phone._reset()
+	local aiN, demoN, t0 = 0, 0, T
+	while T - t0 < 1800 do
+		Phone._act(att, { action = "chat", modelId = "nova", text = "blocked text" })
+		local rv = Phone._act(vic, { action = "chat", modelId = "nova", text = "hi " .. math.floor(T) })
+		if rv.ok then if rv.source == "ai" then aiN += 1 else demoN += 1 end end
+		T += 6.5
+	end
+	check("breaker: 30 min of refused prompts by one player -> the other player only ever gets AI replies", aiN > 200 and demoN == 0, aiN .. " ai / " .. demoN .. " demo")
+	-- the global breaker: request errors of 2 different players within 60 s (no success between)
+	Phone._reset()
+	T += 100
+	BAD["bad b"] = true
+	Phone._act(att, { action = "chat", modelId = "nova", text = "blocked text" })
+	T += 10
+	Phone._act(vic, { action = "chat", modelId = "nova", text = "bad b" })
+	T += 5
+	local g3 = Phone._act(third, { action = "chat", modelId = "nova", text = "hello" })
+	check("global breaker: errors of 2 different players within 60 s -> everybody gets the offline demo", g3.ok and g3.source == "demo" and g3.reason == "offline", tostring(g3.reason))
+	T += Phone.BREAKER_BASE + 1
+	check("global breaker: closes again after BREAKER_BASE s", Phone._act(third, { action = "chat", modelId = "nova", text = "hello again" }).source == "ai")
+	Phone._reset()
+	T += 100
+	Phone._act(att, { action = "chat", modelId = "nova", text = "blocked text" })
+	T += 5
+	Phone._act(third, { action = "chat", modelId = "nova", text = "fine" }) -- a success in between
+	T += 5
+	Phone._act(vic, { action = "chat", modelId = "nova", text = "bad b" })
+	T += 5
+	local fourth = C.session(C.company({ stage = 2, models = spec }), 3104)
+	check("global breaker: a success clears the error log (A fails, C succeeds, B fails -> D still gets the AI)", Phone._act(fourth, { action = "chat", modelId = "nova", text = "hello" }).source == "ai")
+	Phone._reset()
+	T += 100
+	ERRTEXT = "TextGenerator is not available for this experience (test double)"
+	BAD["any"] = true
+	Phone._act(att, { action = "chat", modelId = "nova", text = "any" })
+	T += 5
+	check("global breaker: 'not available' errors open it at once (TextGenerator does not work here)", Phone._act(fourth, { action = "chat", modelId = "nova", text = "hi there" }).reason == "offline")
+	ERRTEXT = "TextGenerator: request blocked (test double)"
+	BAD = {}
+	Phone._reset()
+	T += 100
+	local fresh = C.session(C.company({ stage = 2, models = spec }), 3105)
+	Phone._seams({ generator = function() error("Unable to create an Instance of type \"TextGenerator\"") end })
+	Phone._act(fresh, { action = "chat", modelId = "nova", text = "hi" })
+	T += 5
+	local others = Phone._act(fourth, { action = "chat", modelId = "nova", text = "hi you" })
+	check("global breaker: a generator that cannot be created opens it at once", others.reason == "offline", tostring(others.reason))
+	Phone._reset()
+	-- recap and context token
+	Phone._seams({
+		generator = function(prompt)
+			local g = { prompt = prompt, calls = {} }
+			function g:GenerateTextAsync(req)
+				table.insert(self.calls, req)
+				if BAD[string.match(req.UserPrompt, "The player now says: (.*)$") or req.UserPrompt] then error(ERRTEXT) end
+				return { GeneratedText = "answer " .. #self.calls, ContextToken = "tok" .. #self.calls }
+			end
+			table.insert(tg, g)
+			return g
+		end,
+	})
+	local rd = C.company({ stage = 2, models = spec })
+	local rs2 = C.session(rd, 3106)
+	T += 100
+	Phone._act(rs2, { action = "chat", modelId = "nova", text = "my name is Mia" })
+	local gA = tg[#tg]
+	T += 5
+	Phone._act(rs2, { action = "chat", modelId = "nova", text = "what is my name" })
+	check("context: the second request sends the ContextToken and only the new text", gA.calls[2].ContextToken == "tok1" and gA.calls[2].UserPrompt == "what is my name")
+	BAD["boom"] = true
+	T += 5
+	Phone._act(rs2, { action = "chat", modelId = "nova", text = "boom" })
+	Phone._reset()
+	T += 5
+	Phone._act(rs2, { action = "chat", modelId = "nova", text = "still there?" })
+	local last = gA.calls[#gA.calls]
+	check("recap: after an error (token lost) the last turns travel inside UserPrompt", last.ContextToken == nil and string.find(last.UserPrompt, "Earlier in this chat:", 1, true) ~= nil
+		and string.find(last.UserPrompt, "Player: my name is Mia", 1, true) ~= nil and string.find(last.UserPrompt, "You: answer 1", 1, true) ~= nil
+		and string.sub(last.UserPrompt, -#"The player now says: still there?") == "The player now says: still there?", last.UserPrompt)
+	check("recap: the offline demo reply is not presented as something the model said", not string.find(last.UserPrompt, "You: " .. PM.demoReply(rd.models.nova, "Nimbus Labs", "boom", 3), 1, true)
+		and select(2, string.gsub(last.UserPrompt, "\nYou: ", "")) == 2, last.UserPrompt)
+	check("recap: the server remembers the turns it re-sends (memory only)", #Phone._state(rs2).chat.nova.turns >= 6)
+	-- the model changes (new overall): new generator, new system prompt, no old token, fresh conversation
+	local nGen = #tg
+	rd.models.nova.overall += 7
+	T += 5
+	Phone._act(rs2, { action = "chat", modelId = "nova", text = "new me?" })
+	local gB = tg[#tg]
+	check("context: a changed model gets a new generator without the old ContextToken or old turns", #tg == nGen + 1 and gB.calls[1].ContextToken == nil and gB.calls[1].UserPrompt == "new me?"
+		and string.find(gB.prompt, "Overall score " .. math.floor(rd.models.nova.overall), 1, true) ~= nil, gB.calls[1].UserPrompt)
+	check("context: the old conversation is gone on the server too", #Phone._state(rs2).chat.nova.turns == 2)
+	BAD = {}
+	Phone._reset()
+	-- recap maths
+	local turns = {}
+	for i = 1, 10 do table.insert(turns, { who = if i % 2 == 1 then "you" else "ai", text = "t" .. i }) end
+	table.insert(turns, { who = "demo", text = "demo words" })
+	local rp = PM.recapPrompt(turns, "now")
+	check("recapPrompt: the last 6 real turns, no demo replies, then the new text", string.find(rp, "Player: t5\nYou: t6", 1, true) ~= nil and not string.find(rp, "t4", 1, true) and not string.find(rp, "demo words", 1, true)
+		and string.sub(rp, -#"The player now says: now") == "The player now says: now", rp)
+	check("recapPrompt: no history -> the text alone", PM.recapPrompt({}, "hi") == "hi")
+	local longTurns = {}
+	for i = 1, 6 do table.insert(longTurns, { who = "you", text = string.rep("x", 500) }) end
+	check("recapPrompt: capped at CHAT_RECAP_CHARS (input limits)", #PM.recapPrompt(longTurns, "q") <= PM.CHAT_RECAP_CHARS + 120, #PM.recapPrompt(longTurns, "q"))
+	end
+
+	------------------------------------------------------------------ review round 1: news cap, play-clock anchor, calendar items
+	do
+	local many = {}
+	for i = 1, 40 do table.insert(many, string.format("day 9 %02d:%02d: renewed CloudDesk for %d days", 8 + math.floor(i / 60), i % 60, i)) end
+	local nm = PM.newsMessages({ news = many })
+	check("news: the phone shows the newest 20 log lines (CORE_SPEC: deals.news <= 40, phone 20)", #nm == PM.NEWS_SHOWN and PM.NEWS_SHOWN == 20 and nm[1].key == "news:" .. many[1] and nm[20].key == "news:" .. many[20])
+	check("anchor: a snapshot within the 1 Hz step keeps the old anchor", PM.anchor(5000, 6000.6, 1000, 2) == 5000 and PM.anchor(5000, 6001.4, 1001.9, 2) == 5000)
+	check("anchor: a real jump (offline time) moves it", PM.anchor(5000, 9000, 1000, 2) == 8000 and PM.anchor(nil, 6000, 1000) == 5000)
+	local eA = { calendar = { day = 9 }, seconds = 1000 }
+	local base = C.clockAt(22.5, 3)
+	local seen = {}
+	for k = 0, 19 do
+		-- the server's play clock steps once per second, the client clock runs smoothly in between
+		local clock = base + k * 0.25
+		eA.seconds = 1000 + math.floor(k * 0.25)
+		local off = PM.anchor(base - 1000, clock, eA.seconds)
+		local d, h = PM.atPlay(eA, clock, 1000 + 60, off)
+		seen[d .. " " .. PM.clock(h)] = true
+	end
+	check("anchor: a deadline converted with the anchor does not jitter while the play clock steps", C.count(seen) == 1, C.count(seen))
+	local seenLive = {}
+	for k = 0, 19 do
+		local clock = base + k * 0.25
+		eA.seconds = 1000 + math.floor(k * 0.25)
+		local d, h = PM.atPlay(eA, clock, 1000 + 60)
+		seenLive[d .. " " .. PM.clock(h)] = true
+	end
+	check("anchor: (the live-clock conversion it replaces does jitter at night)", C.count(seenLive) > 1, C.count(seenLive))
+	-- day + hour of other packages = what the status bar shows at that moment
+	local e13 = { calendar = { day = 13 }, seconds = 0, deals = {} }
+	local c7 = C.clockAt(7, 19) + 0.01 -- 07:00 at the end of the night: company day 13 still (it turns at 08:00)
+	check("calendar items: the status bar reads 'Day 13 · 07:00' at that moment", PM.statusText(e13, c7) == "Day 13 · 07:00", PM.statusText(e13, c7))
+	local ci = PM.calendar({ empire = e13 }, {}, C.clockAt(10, 19), { { key = "a", title = "By clock", at = c7 }, { key = "b", title = "By day", day = 13, hour = 7 }, { key = "c", title = "Meeting", day = 13, hour = 9 } }, nil, nil)
+	local byClock, byDay = C.find(ci, function(x) return x.key == "item:a" end), C.find(ci, function(x) return x.key == "item:b" end)
+	check("calendar items: {day = 13, hour = 7} is the same moment as `at` = that clock (documented rule)", byClock and byDay and byClock.day == byDay.day and byClock.order == byDay.order and byDay.day == 13, byClock and (byClock.day .. " vs " .. byDay.day))
+	check("calendar items: so it sorts after {day = 13, hour = 9}", ci[#ci].title ~= "Meeting" and ci[1].title == "Meeting", ci[1].title)
+	end
+
+	------------------------------------------------------------------ review round 1: public shuttle, field staff reports
+	do
+	local shuttleSpec = { at = C.clockAt(11), flight = "PM 101", airline = "Meridian Air" }
+	local gar = C.company({ stage = 1 })
+	check("shuttle: not in a garage company's calendar (Port Meridian does not matter yet)", #PM.calendar(gar, { ops = {} }, C.clockAt(10), {}, shuttleSpec, nil) == 0 and not PM.abroadRelevant(gar.empire))
+	local st4 = C.company({ stage = 4 })
+	local cal4 = PM.calendar(st4, { ops = {} }, C.clockAt(10), {}, shuttleSpec, nil)
+	check("shuttle: listed once abroad clients are possible, as a public timetable entry", #cal4 == 1 and cal4[1].public == true and string.find(cal4[1].detail, "Public shuttle timetable", 1, true) ~= nil, cal4[1] and cal4[1].detail)
+	gar.empire.deals.accounts = { helix = { expires = 99999, since = 0 } }
+	check("shuttle: an abroad client also makes it relevant", PM.abroadRelevant(gar.empire))
+	-- arrivals
+	local ad = C.company({ stage = 4, money = 1e6, gpus = { datacenter = 1 }, staff = { marketer = 6, engineer = 6 }, models = { { stats = { math = 75 } } } })
+	local as = C.session(ad, 3107)
+	C.step(as, Economy, C.clockAt(10))
+	local ae = ad.empire
+	local helixTrip, hostedTrip, cityTrip
+	for _, t in ae.deals.tripList do
+		local c = Ops.client(t.client)
+		if c.trip == "abroad" then helixTrip = t elseif t.hosted then hostedTrip = t elseif c.trip == "city" then cityTrip = t end
+	end
+	check("fixture: an abroad trip, a hosted visit and a city trip", helixTrip and hostedTrip and cityTrip)
+	local L = 50000
+	check("arrival: abroad without the jet = when the shuttle lands (timetable function)", PM.arrivalAt(ae, helixTrip, L, function(x) return x + 333 end) == L + 333)
+	check("arrival: abroad fallback without a timetable", PM.arrivalAt(ae, helixTrip, L, nil) == L + PM.ARRIVE.abroad * Ops.DAY)
+	ae.jet = true
+	check("arrival: with the company jet a short hop", PM.arrivalAt(ae, helixTrip, L, function(x) return x + 333 end) == L + PM.ARRIVE.jet * Ops.DAY)
+	ae.jet = false
+	check("arrival: no report for client teams at the guest house or city trips", PM.arrivalAt(ae, hostedTrip, L) == nil and PM.arrivalAt(ae, cityTrip, L) == nil)
+	local rep2, eng2 = PM.travellers(ae, helixTrip)
+	local am = PM.arrivalMessage(ae, helixTrip, C.clockAt(11), C.clockAt(12), { city = "City Hotel", abroad = "Meridian Grand Hotel" })
+	check("arrival: 'Arrived in Port Meridian' from the travel desk with the real names and the hotel",
+		am and am.title == "Arrived in Port Meridian" and am.from == "Travel desk" and rep2 and eng2 and string.find(am.body, rep2 .. " and " .. eng2 .. " landed in Port Meridian", 1, true) ~= nil
+			and string.find(am.body, "checked in at the Meridian Grand Hotel", 1, true) ~= nil and string.find(am.body, "pilot meeting at Helix Research", 1, true) ~= nil and string.find(am.body, "Back Day", 1, true) ~= nil, am and am.body)
+	check("arrival: one key per trip, stamped at the arrival time", am and am.key == "arrived:helix:" .. tostring(helixTrip.left) and am.day == ae.calendar.day and math.abs(am.hour - 11) < 1e-6)
+	end
 
 	------------------------------------------------------------------ remote validation through Remote.bind
 	local folder = game.ReplicatedStorage:FindFirstChild("Remotes")

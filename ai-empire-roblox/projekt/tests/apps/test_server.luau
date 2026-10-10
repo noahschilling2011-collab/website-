@@ -108,6 +108,7 @@ local function body()
 		check("rich: waitlist with the cooling hint", string.find(row(b, "Models", "Servers") or "", "waiting", 1, true) ~= nil, row(b, "Models", "Servers"))
 		check("rich: hosted client team in the trips", string.find(row(b, "Today", "Trips") or "", "Mosaic Worlds team at the guest house", 1, true) ~= nil, row(b, "Today", "Trips"))
 		check("rich: growth effect row", row(b, "Models", "Growth") ~= nil)
+		check("rich: goal recommendation says how far the lines are", string.find(b.recommendations[1].text, "All 4 lines at 90+: 1 of 4 lines are there.", 1, true) == 1, b.recommendations[1].text)
 	end
 	if results.garage then
 		local g = Assistant.briefing(results.garage.session)
@@ -161,9 +162,27 @@ local function body()
 		local s = results.mid.session
 		local h, b = present(s, "compute", "B1_DATAHALL:compute")
 		check("data hall: rack fault header", h == "DATA HALL · RACK FAULT", h)
-		check("data hall: fault line with IT", string.find(b, "Rack R2 fault · Workstation GPU · IT on the way", 1, true) ~= nil, b)
+		check("data hall: fault line, IT on duty but nobody assigned yet", string.find(b, "Rack R2 fault · Workstation GPU · waiting for IT", 1, true) ~= nil, b)
+		-- who repairs it (staffops request #8): the blade attributes FaultWorker / FaultFix of StaffEvents
+		do
+			local office = G.Instance.new("Model"); office.Name = "Office"
+			local blades = G.Instance.new("Folder"); blades.Name = "Blades"; blades.Parent = office
+			local list = {}
+			for i = 1, 3 do local p = G.Instance.new("Part"); p.Name = "Blade" .. i; p.Parent = blades; list[i] = p end
+			local screen = G.Instance.new("Part"); screen.Name = "Screen"; screen.Parent = office
+			local function hall() local ok, h2, b2 = pcall(Screens.presentation, s, "compute", nil, screen); return if ok then b2 else tostring(h2) end
+			list[2]:SetAttribute("FaultWorker", "IT Support"); list[2]:SetAttribute("FaultFix", "remote")
+			check("data hall: IT doing a remote fix", string.find(hall(), "Rack R2 fault · Workstation GPU · IT Support · remote fix", 1, true) ~= nil, hall())
+			list[2]:SetAttribute("FaultWorker", "ML Engineer"); list[2]:SetAttribute("FaultFix", "walk")
+			check("data hall: engineer on the way", string.find(hall(), "ML Engineer on the way", 1, true) ~= nil, hall())
+			list[2]:SetAttribute("FaultFix", "rack")
+			check("data hall: engineer repairing at the rack", string.find(hall(), "ML Engineer repairing", 1, true) ~= nil, hall())
+			office:Destroy()
+		end
 		check("data hall: reserved compute for 5 accounts", string.find(b, string.format("Reserved for clients %.1f units · 5 accounts", s.live.compute.reserved), 1, true) ~= nil, b)
 		check("data hall: load %", string.find(b, string.format("Servers %d%% full", math.floor(s.live.load / s.live.capacity * 100 + 0.5)), 1, true) ~= nil, b)
+		-- which model uses the serving compute: users x SERVE_UNITS (both 1B: Nova 43.4K users, Coder 16.5K users)
+		check("data hall: serving share per live model", string.find(b, "Serving  Nova v3 72% · Coder v2 28%", 1, true) ~= nil, b)
 		h, b = present(s, "customers", "L1_EI4:customers")
 		check("clients screen: accounts + retainer/day", h == "BUSINESS CLIENTS" and string.find(b, "Accounts 5 / 7 · $72,000/day", 1, true) ~= nil, b)
 		check("clients screen: account end day", string.find(b, "CloudDesk · $9,000/day · until day 14", 1, true) ~= nil, b)

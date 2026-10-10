@@ -25,6 +25,8 @@
 -- (facts.apprentices: training day, skill, 40 % wage), rack faults from CompanyOps.faults; the Training Lead
 -- (kind "trainer"), first-day hires, rack repairs, the apprentice tour ("Tour:<room id>"), training session,
 -- shadowing and practice have their own lines. Night crew shifts come from the rig's ShiftStart / ShiftEnd.
+-- "Who's away today?" uses the company day the staff animation uses (StaffRota.workday: from 06:00 to 08:00
+-- already the coming day), read from live.workforce.hour (StaffService); without it the saved day.
 local Config=require(script.Parent.Config.EmployeeConfig)
 local EmpireConfig=require(script.Parent.Config.EmpireConfig)
 local Plan=require(script.Parent.Config.BuildingPlan)
@@ -205,18 +207,23 @@ function Dialogue.facts(data: any,live: any): any
  f.vram=if okFleet then num(fleet.vram) else 0;f.slots=if okFleet then num(fleet.slotsUsed) else 0
  -- staffops: who is away today, apprentices, rack faults (same functions the economy uses)
  f.day=Ops.day(e)
+ -- the shift day (StaffRota.workday): between 06:00 and 08:00 the people arriving are the coming day's
+ local wf: any=lv.workforce
+ local hour=if typeof(wf)=="table" and typeof(wf.hour)=="number" then wf.hour else nil
+ f.workday=f.day+(if hour then Config.workdayOffset(hour) else 0)
+ local view: any=if f.workday~=f.day then setmetatable({calendar={day=f.workday}},{__index=e}) else e
  f.away={};f.awayCount={vacation=0,sick=0,trip=0,leave=0};f.apprentices={};f.apprenticeCount=0
  local profiles: any=if typeof(e.staffProfiles)=="table" then e.staffProfiles else {}
  for _,role in EmpireConfig.ROLES do
   if num(employees[role.id])<=0 then continue end
   local list: any=profiles[role.id]
-  local okP,presence=pcall(Ops.presence,e,role.id)
+  local okP,presence=pcall(Ops.presence,view,role.id)
   for i,state in (if okP and typeof(presence)=="table" then presence else {}) :: {string} do
    local p=if typeof(list)=="table" then list[i] else nil
    local name=if typeof(p)=="table" and typeof(p.n)=="string" then p.n else nil
    local seed=if typeof(p)=="table" and typeof(p.s)=="number" and p.s==p.s then math.floor(math.abs(p.s))%2147483647 else nil
    if state~="present" and name then
-    table.insert(f.away,{name=name,role=role.id,state=state,back=f.day+1})
+    table.insert(f.away,{name=name,role=role.id,state=state,back=f.workday+1})
     f.awayCount[state]=(f.awayCount[state] or 0)+1
    end
    if seed and typeof(e.apprentices)=="table" then
@@ -525,7 +532,7 @@ local function awayText(f: any): string
  if num(c.trip)>0 then table.insert(bits,Format.int(num(c.trip)).." on client trips") end
  if num(c.leave)>0 then table.insert(bits,Format.int(num(c.leave)).." on unpaid leave") end
  if n>3 and #bits>0 then text..=" In total "..table.concat(bits,", ").."." end
- return text.." HR plans it so that no team misses more than one in ten."
+ return text.." HR spreads vacations so only a few people per team are off on the same day."
 end
 -- Teammates of the same role who are away today ("From my team, Mia Weber is sick today.").
 local function teamAway(f: any,roleId: any,selfName: any): string
@@ -601,7 +608,10 @@ local TASK_TEXT: {[string]:(any,any,Vary)->string}={
  FirstDay=function(_s,_f,V) return V("task",{"It's my first day! I'm picking up my badge at reception, then I'm off to my new desk.","First day here! Badge from reception first, then my new desk."}) end,
  RackRepair=function(s,f,_V)
   local n=count(f,"rackFaults")
-  local text="I'm fixing a server rack"..roomPhrase(s).."."
+  -- IT outside the compute rooms (no compute clearance): the remote fix from the corridor (StaffEvents)
+  local remote=s.job=="IT Support" and s.roomAccess~="compute"
+  local text=if remote then "I'm fixing a rack fault remotely from out here: IT has no access to the compute rooms."
+   else "I'm fixing a server rack"..roomPhrase(s).."."
   if n>0 then
    text..=" "..plural(n,"rack fault").." open right now: each one takes a compute unit offline until it's fixed"
    text..=if num(f.stage,1)<2 then " (about five minutes: there's no IT post in the garage yet)." else " (about a minute while IT is on duty, five minutes otherwise)."
@@ -648,7 +658,7 @@ local POSE_TEXT: {[string]:string}={pour="Pulling a coffee right now.",stir="Sti
  wash="Doing the dishes right now.",wipe="Wiping down right now.",greet="Greeting people at the door right now.",scan="Out on my patrol right now.",
  inspect="Checking the equipment right now.",typeStand="Updating the system right now.",type="At the computer right now.",sort="Sorting parcels right now.",
  plug="Plugging in a car to charge right now.",phone="On the phone right now.",push="Pushing the cart around right now."}
-local function taskText(subject: any,f: any,c: any,kind: string,V: Vary): string
+local function taskBody(subject: any,f: any,c: any,kind: string,V: Vary): string
  local task=subject.task
  local tourRoom=if typeof(task)=="string" then string.match(task,"^Tour:(.+)$") else nil
  if tourRoom then return tourRoomText(c,tourRoom) end
@@ -665,6 +675,13 @@ local function taskText(subject: any,f: any,c: any,kind: string,V: Vary): string
   text..=" "..extra
  end
  return text
+end
+local function taskText(subject: any,f: any,c: any,kind: string,V: Vary): string
+ -- the night crew says so first (the shift is otherwise only in "How's your day going?")
+ if HIRED[kind] and subject.shiftStart==Config.NIGHT_CREW.start and typeof(subject.shiftEnd)=="number" then
+  return "I'm on the night crew ("..Dialogue.clock(subject.shiftStart).." to "..Dialogue.clock(subject.shiftEnd).."). "..taskBody(subject,f,c,kind,V)
+ end
+ return taskBody(subject,f,c,kind,V)
 end
 -- Destination phrase while walking ("On my way to the café").
 local WALK_TO: {[string]:string}={Lunch="lunch at the café",Coffee="grab a coffee",Snack="grab a snack",FridgeDrink="get a drink",RoofBreak="the roof for some air",
@@ -762,11 +779,15 @@ local function scheduleText(subject: any,c: any,kind: string,tone: string,V: Var
   return now.." "..text
  end
  if typeof(subject.shiftStart)=="number" and typeof(subject.shiftEnd)=="number" then
+  if subject.shiftStart>subject.shiftEnd then
+   -- the stage-5 night rota (EmployeeConfig.NIGHT_ROTA): an evening start, a morning end
+   return now.." I'm on the night rota: "..Dialogue.clock(subject.shiftStart).." to "..Dialogue.clock(subject.shiftEnd)..". I take over the post when the day shift goes home."
+  end
   return now.." My shift today runs from "..Dialogue.clock(subject.shiftStart).." to "..Dialogue.clock(subject.shiftEnd).."."
  end
- -- operations staff have no personal hours (StaffService keeps role "support" on duty around the clock)
+ -- no ShiftStart/ShiftEnd on the rig: the guard who stays on while a department runs a night crew (StaffRota)
  local post=string.lower(tostring(subject.job or "campus"))
- return now.." "..fill(V("day",{"I'm at the {post} post today.","The campus team covers the building around the clock, so you'll find me at the {post} post."}),{post=post})
+ return now.." "..fill(V("day",{"We have a night crew, so I stay on at the {post} post tonight.","Our night crew needs a guard on duty, so I'm staying at the {post} post through the night."}),{post=post})
 end
 local function aboutText(subject: any,c: any,V: Vary): string
  local roleName=ROLE_NAME[subject.roleId] or "specialist"

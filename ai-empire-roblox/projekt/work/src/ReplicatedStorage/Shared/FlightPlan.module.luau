@@ -9,8 +9,10 @@
 --     FP.leg("out").duration later. Port Meridian boarding is CONFIG.pmBoarding; home boarding gets the rest
 --     of the interval (at least CONFIG.minBoarding; if the moving phases do not fit, the interval grows).
 --   * Phases of a leg (same names both ways): boarding, doors, pushback, taxi, takeoff, climb, cruise,
---     approach, landing, taxiin, deboarding. At Port Meridian the aircraft parks lined up on the runway, so
---     its "pushback" is the engine start and "taxi" the line-up (short holds).
+--     approach, landing, taxiin, deboarding. Port Meridian (with MetroPlan.APRON): nose-in on apron stand 1
+--     facing the hall, pushback east along the stand line with the nose swung north (towards the runway),
+--     taxi north along the painted taxi line, left onto the runway. Without the apron the aircraft parks lined
+--     up on the runway and its "pushback" / "taxi" are short holds (engine start, line-up).
 --   * Paths along the real CityPlan geometry: home stand A<shuttleStand> -> pushback onto the taxilane ->
 --     taxilane, west exit, taxiway, west connector -> runway, take-off roll east, climb-out, right turn over
 --     the sea, cruise south-west, left turn onto a 4-degree final east into Port Meridian's runway, flare,
@@ -26,6 +28,9 @@
 --     track, heading from the smoothed tangent (reversed for the pushback), pitch from the climb angle plus an
 --     angle-of-attack schedule (rotation, climb, flare, de-rotation), bank from the turn rate.
 local CityPlan=require(script.Parent.Config.CityPlan)
+-- Port Meridian's apron (MetroPlan.APRON, metro package): stand 1 = the shuttle's stand, taxi line at taxiX.
+-- Read-only data; without it the shuttle parks on the runway as before.
+local okMetro,MetroPlan=pcall(require,script.Parent.Config.MetroPlan)
 local FP={}
 
 FP.CONFIG={
@@ -33,7 +38,7 @@ FP.CONFIG={
 	-- minutes for the round trip; long waits are bridged by the instant charter flight at the counter)
 	epoch=0, -- timetable origin (server time, seconds)
 	minBoarding=75, -- home boarding at least this long (gate A<shuttleStand>; the rest of the interval goes here too)
-	pmBoarding=37, -- Port Meridian boarding (the crew stays aboard for the quick turnaround)
+	pmBoarding=30, -- Port Meridian boarding (the crew stays aboard for the quick turnaround)
 	doors=5,deboarding=10, -- seconds
 	startup=6,lineup=4, -- Port Meridian: engine start and line-up holds
 	kind="320",scale=1.8, -- the shuttle: AircraftModel kind and scale (the same as the parked stand aircraft)
@@ -210,14 +215,23 @@ local PRZ=(B.runway.z1+B.runway.z2)/2
 FP.PM_LINE=PRZ-11
 local PZ=FP.PM_LINE
 FP.HOME_STAND=CFrame.new(SX,HY,SZ) -- the parked shuttle (= the airport package's stand aircraft frame)
-FP.PM_STAND=CFrame.lookAt(v(140,PY,PZ),v(100,PY,PZ)) -- facing west, left doors towards the terminal
+local apron: any=if okMetro and typeof(MetroPlan)=="table" and typeof(MetroPlan.APRON)=="table" and typeof(MetroPlan.APRON.stand)=="CFrame"
+	and typeof(MetroPlan.APRON.taxiX)=="number" then MetroPlan.APRON else nil
+FP.PM_APRON=apron~=nil
+-- Port Meridian stand: apron stand 1 (nose-in towards the hall's east wall, facing west, left doors towards the
+-- city-side walkway), else on the runway facing west (left doors towards the terminal)
+FP.PM_STAND=if apron then apron.stand :: CFrame else CFrame.lookAt(v(140,PY,PZ),v(100,PY,PZ))
 FP.HOME_GATES={(A.gates[A.shuttleStand] or A.gates[1]).Position}
-FP.PM_GATES={v(0,G+4,7636),B.checkin[1]+Vector3.new(0,4,0),B.checkin[2]+Vector3.new(0,4,0)}
+-- Port Meridian boarding: inside the hall at its apron door (MetroPlan.APRON.door), the hall centre, the counters
+local pmDoor: Vector3?=if apron and typeof(apron.door)=="table" then v(apron.door.x-12,G+4,(apron.door.z1+apron.door.z2)/2) else nil
+FP.PM_DOOR=if apron and typeof(apron.door)=="table" then v(apron.door.x,G+3.5,(apron.door.z1+apron.door.z2)/2) else nil
+FP.PM_GATES=if pmDoor then {pmDoor,v(0,G+4,7636),B.checkin[1]+Vector3.new(0,4,0),B.checkin[2]+Vector3.new(0,4,0)}
+	else {v(0,G+4,7636),B.checkin[1]+Vector3.new(0,4,0),B.checkin[2]+Vector3.new(0,4,0)}
 FP.GATE_RADIUS=36
 FP.GATE_NAME={out="A"..A.shuttleStand,back="Port Meridian"}
 -- Where a boarded passenger's character is held (anchored, hidden below the apron) while the client shows
 -- the ride: under the departure stand, then under the arrival stand from the middle of the cruise.
-FP.HOLD={home=CFrame.new(SX,G-40,SZ),abroad=CFrame.new(140,G-40,PZ)}
+FP.HOLD={home=CFrame.new(SX,G-40,SZ),abroad=CFrame.new(FP.PM_STAND.X,G-40,FP.PM_STAND.Z)}
 
 -- tracks per leg (built once, deterministic)
 type LegTracks={push: Track?,taxi: Track?,roll: Track,air: Track,flareFrom: number,climbTo: number,descentFrom: number,rollout: Track,taxiin: Track}
@@ -232,14 +246,33 @@ local function outTracks(): LegTracks
 		v(-2600,G+380,7050),v(-2850,G+250,7400),v(-2450,G+170,PZ),v(-1900,G+112,PZ),v(-1300,G+55,PZ),
 		v(-850,G+14,PZ) --[[ 15 = flare start ]],v(-700,G+4,PZ),v(-600,PY,PZ)}
 	local air=FP.airTrack(ctrl,Vector3.new(1,0,0),Vector3.new(1,0,0))
-	local rollout=makeTrack({v(-600,PY,PZ),v(90,PY,PZ)})
-	-- teardrop U-turn east of the stand (x <= 250; the decorative aircraft stands at x 420)
-	local taxiin=FP.groundTrack({v(90,PY,PZ),v(160,PY,PZ),v(210,PY,PZ-22),v(250,PY,PZ-2),v(225,PY,PZ+20),v(180,PY,PZ+7),v(140,PY,PZ)},14)
+	local rollout: Track,taxiin: Track
+	if apron then
+		-- roll out to the taxi line, right onto it (north side of the runway), along it to the stand line, left
+		-- nose-in to stand 1
+		local st=FP.PM_STAND;local tx=apron.taxiX;local AY=st.Y
+		rollout=makeTrack({v(-600,PY,PZ),v(tx-70,PY,PZ)})
+		taxiin=FP.groundTrack({v(tx-70,PY,PZ),v(tx,PY,PZ),v(tx,AY,st.Z),v(st.X,AY,st.Z)},30)
+	else
+		rollout=makeTrack({v(-600,PY,PZ),v(90,PY,PZ)})
+		-- teardrop U-turn east of the stand (x <= 250; the decorative aircraft stands at x 420)
+		taxiin=FP.groundTrack({v(90,PY,PZ),v(160,PY,PZ),v(210,PY,PZ-22),v(250,PY,PZ-2),v(225,PY,PZ+20),v(180,PY,PZ+7),v(140,PY,PZ)},14)
+	end
 	return {push=push,taxi=taxi,roll=roll,air=air,climbTo=air.marks[5],descentFrom=air.marks[9],flareFrom=air.marks[15],rollout=rollout,taxiin=taxiin}
 end
+-- Port Meridian pushback: straight back (east) along the stand line to the taxi line, the tail swung south
+-- (towards the city) so the nose ends pointing north at the runway; FP.PM_PUSH_END = studs past the stand line.
+FP.PM_PUSH_R=7
+FP.PM_PUSH_END=11
 local function backTracks(): LegTracks
 	local liftX=140-720
-	local roll=makeTrack({v(140,PY,PZ),v(liftX,PY,PZ)})
+	local push: Track?,taxi: Track?,roll: Track=nil,nil,makeTrack({v(140,PY,PZ),v(liftX,PY,PZ)})
+	if apron then
+		local st=FP.PM_STAND;local tx=apron.taxiX;local AY=st.Y
+		push=FP.groundTrack({v(st.X,AY,st.Z),v(tx,AY,st.Z),v(tx,AY,st.Z+FP.PM_PUSH_END)},FP.PM_PUSH_R)
+		taxi=FP.groundTrack({v(tx,AY,st.Z+FP.PM_PUSH_END),v(tx,PY,PZ),v(tx-70,PY,PZ)},30)
+		roll=makeTrack({v(tx-70,PY,PZ),v(liftX,PY,PZ)})
+	end
 	-- straight climb-out along PM_LINE until past the towers (x < -1040), then the right turn north
 	local ctrl={v(liftX,PY,PZ),v(-800,G+20,PZ),v(-1040,G+60,PZ),v(-1300,G+105,PZ-6),v(-1700,G+190,7380),v(-1950,G+330,6950), -- 6 = top of climb
 		v(-1700,G+520,6200),v(-500,G+680,5200),v(1000,G+700,4300),v(2300,G+560,3700), -- 10 = top of descent
@@ -251,14 +284,14 @@ local function backTracks(): LegTracks
 	end)
 	local rollout=makeTrack({v(820,HY,RZ),v(-700,HY,RZ)})
 	local taxiin=FP.groundTrack({v(-700,HY,RZ),v(WEST,HY,RZ),v(WEST,HY,TZ),v(EXIT,HY,TZ),v(EXIT,HY,TL),v(SX,HY,TL),v(SX,HY,SZ)},40)
-	return {push=nil,taxi=nil,roll=roll,air=air,climbTo=air.marks[6],descentFrom=air.marks[10],flareFrom=air.marks[15],rollout=rollout,taxiin=taxiin}
+	return {push=push,taxi=taxi,roll=roll,air=air,climbTo=air.marks[6],descentFrom=air.marks[10],flareFrom=air.marks[15],rollout=rollout,taxiin=taxiin}
 end
 
 ------------------------------------------------------------------------------------------------ legs
 local C=FP.CONFIG
--- Ground handling at the home stand (client visuals, shared maths so the tests can sweep them): the pushback
--- tug pushes the aircraft, disconnects during `detach` seconds at the end of the pushback (moves 24 studs
--- aside) and drives back to its place in `home` seconds; the jet bridge retracts (telescopes `retract` studs
+-- Ground handling at the departure stand (client visuals, shared maths so the tests can sweep them): the
+-- pushback tug pushes the aircraft, disconnects during `detach` seconds at the end of the pushback (moves 24
+-- studs aside, towards its parking spot) and drives back to its place in `home` seconds; the jet bridge retracts (telescopes `retract` studs
 -- and swings `angle` away from the fuselage about its terminal end) while the doors close and docks again in
 -- `time` seconds after arrival.
 FP.TUG={detach=3,home=18,aside=24}
@@ -302,8 +335,17 @@ local function movingSegments(dir: string): {Segment}
 	else
 		local t=backTracks()
 		table.insert(segs,holdSeg("doors",FP.PM_STAND,C.doors))
-		table.insert(segs,holdSeg("pushback",FP.PM_STAND,C.startup))
-		table.insert(segs,holdSeg("taxi",FP.PM_STAND,C.lineup))
+		if t.push and t.taxi then
+			local push=t.push :: Track
+			local pushSeg=moveSeg("pushback","ground",push,0,push.length,profile(push.length,0,C.pushSpeed*0.75,0,C.pushAcc),true)
+			table.insert(segs,pushSeg)
+			table.insert(segs,holdSeg("pushback",segmentPose(pushSeg,pushSeg.t1).cf,FP.TUG.detach))
+			local taxi=t.taxi :: Track
+			table.insert(segs,moveSeg("taxi","ground",taxi,0,taxi.length,profile(taxi.length,0,C.taxiSpeed*0.7,0,C.taxiAcc)))
+		else
+			table.insert(segs,holdSeg("pushback",FP.PM_STAND,C.startup))
+			table.insert(segs,holdSeg("taxi",FP.PM_STAND,C.lineup))
+		end
 		local L=t.roll.length
 		table.insert(segs,moveSeg("takeoff","roll",t.roll,0,L,profile(L,0,C.liftoffPM,C.liftoffPM,C.liftoffPM^2/(2*L))))
 		local air=t.air
@@ -432,7 +474,7 @@ function segmentPose(seg: Segment,tau: number): Pose
 	local local_t=tau-seg.t0
 	if seg.mode=="hold" then
 		local cf=seg.hold or CFrame.new()
-		return {cf=cf,phase=seg.phase,speed=0,onGround=true,gearDown=true,engines=seg.phase~="boarding" and seg.phase~="deboarding",altitude=0}
+		return {cf=cf,phase=seg.phase,speed=0,onGround=true,gearDown=true,engines=seg.phase~="boarding" and seg.phase~="deboarding" and seg.phase~="parked",altitude=0}
 	end
 	local d,speed=along(seg.prof,local_t)
 	local s=seg.s0+d
@@ -475,18 +517,21 @@ function FP.pose(now: number): (Pose,State)
 	local st=FP.at(now)
 	return FP.legPose(st.leg,st.tau),st
 end
--- Pushback tug of the home stand: its frame now, given its parked frame (attached to the nose gear).
+-- Pushback tug of the departure stand (home: the airport package's tug; Port Meridian: ShuttleGround's local
+-- tug): its frame now, given its parked frame (attached to the nose gear).
 function FP.tugFrame(st: State,parked: CFrame): CFrame
-	if st.dir~="out" then return parked end
+	if st.dir=="back" and not FP.PM_APRON then return parked end -- runway stand: no pushback
 	local leg=st.leg
 	local push=leg.phases.pushback
 	local hold=FP.TUG.detach
 	if st.tau<push.t0 then return parked end
-	local rel=FP.HOME_STAND:ToObjectSpace(parked)
+	local rel=leg.stand:ToObjectSpace(parked)
 	if st.tau<push.t1-hold then return FP.legPose(leg,st.tau).cf*rel end
 	local endCf=FP.legPose(leg,push.t1-hold).cf
 	local attached=endCf*rel
-	local aside=CFrame.new(endCf.RightVector*FP.TUG.aside)*attached
+	-- it pulls aside towards the side of its parking spot, clear of the nose gear's taxi path
+	local sideSign=if (parked.Position-attached.Position):Dot(endCf.RightVector)>=0 then 1 else -1
+	local aside=CFrame.new(endCf.RightVector*FP.TUG.aside*sideSign)*attached
 	if st.tau<push.t1 then return attached:Lerp(aside,smooth((st.tau-(push.t1-hold))/hold)) end
 	local tx=st.tau-leg.phases.taxi.t0
 	if tx>=FP.TUG.home then return parked end
@@ -543,8 +588,8 @@ end
 FP.CREW_WALK=22
 FP.CREW_LEAVE=20
 FP.CREW_SEATED=3
-FP.WALKAROUND_START=4
-FP.WALKAROUND=30
+FP.WALKAROUND_START=3
+FP.WALKAROUND=22
 FP.CREW_TURN=FP.WALKAROUND_START+FP.WALKAROUND+3 -- the shortest Port Meridian boarding
 -- (state, seconds since the leave / walk started; nil otherwise)
 function FP.crewTimes(st: State): (string,number?)
@@ -652,12 +697,14 @@ function FP.heliAt(destination: string,start: number,now: number,a: Vector3,b: V
 end
 
 ------------------------------------------------------------------------------------------------ ambient traffic
--- Other airliners at City Airport (client-only visuals), flying the same runway directions as the shuttle:
--- arrivals land west (from the east, like the shuttle's return), roll out to the far west end of the runway
--- (x <= -1000, beyond the taxiway and out of the terminal's view) and fade there; departures appear at that
--- end, lined up east, and take off east like the shuttle. Sky crossings fly straight across the map at
--- 2,400-3,400 studs. Runway events are placed in each cycle where the shuttle does not use the runway or
--- its approach (FP.ambientSlots).
+-- Other airliners at City Airport (client-only visuals). Each visit is one aircraft: it lands east (from the
+-- west), rolls out, turns off at the east connector, taxis along the taxiway and nose-in onto remote stand R2
+-- (FP.AMBIENT_STAND, east apron), stands there, then pushes back onto the taxiway, taxis to the east
+-- connector and takes off west. Nothing appears or vanishes near the airport: a visit starts and ends in the
+-- air several thousand studs out. Sky crossings fly straight across the map at 2,400-3,400 studs. The
+-- runway movements are placed in each cycle where the shuttle does not use the runway or its approach
+-- (FP.ambientSlots); with two slots a visit lands and departs in the same cycle, with one it lands in even
+-- and departs in odd cycles.
 export type Ambient={kind: string,t0: number,duration: number,track: Track,segs: {Segment},livery: number,big: boolean}
 local function hash(n: number): number
 	n=math.floor(n)%2147483647
@@ -666,28 +713,33 @@ local function hash(n: number): number
 	return n
 end
 FP.hash=hash
-FP.AMBIENT_END_X=-1060 -- where ambient arrivals vanish and departures appear (runway west end, x >= -1100)
+FP.AMBIENT_STAND=CFrame.lookAt(v(575,HY,2700),v(575,HY,2600)) -- remote stand R2: nose north, clear of R1 (x 470, z 2640)
+local EAST=A.connectors[2]
 local function arrivalSegs(): {Segment}
-	local ctrl={v(6500,G+420,RZ),v(4200,G+260,RZ),v(2400,G+130,RZ),v(1400,G+40,RZ),v(1000,G+8,RZ),v(880,HY,RZ)}
-	local air=FP.airTrack(ctrl,Vector3.new(-1,0,0),Vector3.new(-1,0,0))
-	local roll=makeTrack({v(880,HY,RZ),v(-880,HY,RZ)})
-	local off=makeTrack({v(-880,HY,RZ),v(FP.AMBIENT_END_X,HY,RZ)})
-	local segs={
+	local st=FP.AMBIENT_STAND
+	local ctrl={v(-6500,G+420,RZ),v(-4200,G+260,RZ),v(-2400,G+130,RZ),v(-1400,G+40,RZ),v(-1000,G+8,RZ),v(-880,HY,RZ)}
+	local air=FP.airTrack(ctrl,Vector3.new(1,0,0),Vector3.new(1,0,0))
+	local roll=makeTrack({v(-880,HY,RZ),v(EAST-150,HY,RZ)})
+	local taxi=FP.groundTrack({v(EAST-150,HY,RZ),v(EAST,HY,RZ),v(EAST,HY,TZ),v(st.X,HY,TZ),v(st.X,HY,st.Z)},40)
+	return {
 		moveSeg("approach","air",air,0,air.length,profile(air.length,230,230,C.touchdown,(230^2-C.touchdown^2)/(2*air.length)),false,rad(3),rad(5.5)),
 		moveSeg("landing","rollout",roll,0,roll.length,profile(roll.length,C.touchdown,C.touchdown,24,(C.touchdown^2-24^2)/(2*roll.length))),
-		moveSeg("taxiin","ground",off,0,off.length,profile(off.length,24,24,8,1.5)),
+		moveSeg("taxiin","ground",taxi,0,taxi.length,profile(taxi.length,24,32,0,3)),
 	}
-	return segs
 end
 local function departureSegs(): {Segment}
-	local x0=FP.AMBIENT_END_X
-	local start=CFrame.lookAt(v(x0,HY,RZ),v(x0+10,HY,RZ))
-	local roll=makeTrack({v(x0,HY,RZ),v(x0+1000,HY,RZ)})
-	local lx=x0+1000
-	local ctrl={v(lx,HY,RZ),v(lx+460,G+55,RZ),v(lx+1060,G+190,RZ),v(2200,G+460,3150),v(4200,G+900,3600),v(7000,G+1400,4200)}
-	local air=FP.airTrack(ctrl,Vector3.new(1,0,0),Vector3.new(1,0,0.2))
+	local st=FP.AMBIENT_STAND
+	local push=FP.groundTrack({v(st.X,HY,st.Z),v(st.X,HY,TZ),v(st.X-30,HY,TZ)},30)
+	local pushSeg=moveSeg("pushback","ground",push,0,push.length,profile(push.length,0,C.pushSpeed,0,C.pushAcc),true)
+	local taxi=FP.groundTrack({v(st.X-30,HY,TZ),v(EAST,HY,TZ),v(EAST,HY,RZ),v(EAST-60,HY,RZ)},40)
+	local roll=makeTrack({v(EAST-60,HY,RZ),v(-150,HY,RZ)})
+	local ctrl={v(-150,HY,RZ),v(-600,G+60,RZ),v(-1300,G+220,RZ),v(-2600,G+480,2900),v(-4500,G+900,2500),v(-7000,G+1400,2000)}
+	local air=FP.airTrack(ctrl,Vector3.new(-1,0,0),Vector3.new(-1,0,-0.2))
 	return {
-		holdSeg("taxi",start,4),
+		holdSeg("doors",st,4),
+		pushSeg,
+		holdSeg("pushback",segmentPose(pushSeg,pushSeg.t1).cf,FP.TUG.detach),
+		moveSeg("taxi","ground",taxi,0,taxi.length,profile(taxi.length,0,34,0,3.5)),
 		moveSeg("takeoff","roll",roll,0,roll.length,profile(roll.length,0,C.liftoff,C.liftoff,C.liftoff^2/(2*roll.length))),
 		moveSeg("climb","air",air,0,air.length,profile(air.length,C.liftoff,280,280,(280^2-C.liftoff^2)/(2*air.length))),
 	}
@@ -697,18 +749,18 @@ local function timed(segs: {Segment}): ({Segment},number)
 	for _,s in segs do local T=s.t1-s.t0;s.t0=t;s.t1=t+T;t+=T end
 	return segs,t
 end
-local ambientCache: {arrival: {Segment},departure: {Segment},arrivalT: number,departureT: number}?=nil
+local ambientCache: {arrival: {Segment},departure: {Segment},arrivalT: number,departureT: number,parked: {Segment}}?=nil
 local function ambientBase()
 	if ambientCache then return ambientCache end
 	local a,at=timed(arrivalSegs())
 	local d,dt=timed(departureSegs())
-	local c={arrival=a,departure=d,arrivalT=at,departureT=dt}
+	local c={arrival=a,departure=d,arrivalT=at,departureT=dt,parked={holdSeg("parked",FP.AMBIENT_STAND,1e9)}}
 	ambientCache=c
 	return c
 end
 local slotCache: {number}?=nil
 function FP.resetAmbient() slotCache=nil;ambientCache=nil end
--- Offsets (seconds into a cycle) where an ambient runway event fits (the longer of arrival / departure).
+-- Offsets (seconds into a cycle) where an ambient runway movement fits (the longer of arrival / departure).
 function FP.ambientSlots(): {number}
 	if slotCache then return slotCache end
 	local b=build()
@@ -730,18 +782,37 @@ function FP.ambientSlots(): {number}
 	slotCache=slots
 	return slots
 end
--- Ambient events of cycle k: up to two runway movements and two sky crossings (deterministic per cycle).
-export type AmbientEvent={id: string,kind: string,t0: number,duration: number,segs: {Segment}?,from: Vector3?,to: Vector3?,livery: number,lod: string}
+-- Ambient events of cycle k: the runway visit (arrival, parked at R2, departure - one aircraft, key `visit`)
+-- and two sky crossings (deterministic per cycle). fadeIn / fadeOut: whether the client fades the model at the
+-- start / end of the event (only far out in the air).
+export type AmbientEvent={id: string,kind: string,t0: number,duration: number,segs: {Segment}?,from: Vector3?,to: Vector3?,livery: number,lod: string,
+	visit: string?,fadeIn: boolean,fadeOut: boolean}
 function FP.ambient(cycle: number): {AmbientEvent}
 	local base=ambientBase()
 	local I=build().interval
 	local start=C.epoch+cycle*I
 	local out: {AmbientEvent}={}
-	for i,off in FP.ambientSlots() do
-		local h=hash(cycle*7+i)
-		local arrival=(h//65536)%2==0 -- a high bit: the low bits of the LCG alternate with a short period
-		table.insert(out,{id="rw"..cycle.."_"..i,kind=if arrival then "arrival" else "departure",t0=start+off,
-			duration=if arrival then base.arrivalT else base.departureT,segs=if arrival then base.arrival else base.departure,livery=(h//4096)%5+1,lod="medium"})
+	local slots=FP.ambientSlots()
+	local function visitOf(k: number): (string,number)
+		local h=hash(k*7+3)
+		return "visit"..k,(h//4096)%5+1
+	end
+	local function arrival(k: number,t0: number,departAt: number)
+		local id,livery=visitOf(k)
+		table.insert(out,{id=id.."_arr",kind="arrival",t0=t0,duration=base.arrivalT,segs=base.arrival,livery=livery,lod="medium",visit=id,fadeIn=true,fadeOut=false})
+		local parkedAt=t0+base.arrivalT
+		table.insert(out,{id=id.."_park",kind="parked",t0=parkedAt,duration=math.max(0,departAt-parkedAt),segs=base.parked,livery=livery,lod="medium",visit=id,fadeIn=false,fadeOut=false})
+	end
+	local function departure(k: number,t0: number)
+		local id,livery=visitOf(k)
+		table.insert(out,{id=id.."_dep",kind="departure",t0=t0,duration=base.departureT,segs=base.departure,livery=livery,lod="medium",visit=id,fadeIn=false,fadeOut=true})
+	end
+	if #slots>=2 then
+		arrival(cycle,start+slots[1],start+slots[2])
+		departure(cycle,start+slots[2])
+	elseif #slots==1 then
+		if cycle%2==0 then arrival(cycle,start+slots[1],start+I+slots[1])
+		else departure(cycle-1,start+slots[1]) end
 	end
 	for i=1,2 do
 		local h=hash(cycle*13+i*101)
@@ -750,7 +821,7 @@ function FP.ambient(cycle: number): {AmbientEvent}
 		local centre=v(((h//7)%1600)-800,alt,1400+((h//11)%1600))
 		local d=Vector3.new(math.cos(ang),0,math.sin(ang))
 		table.insert(out,{id="sky"..cycle.."_"..i,kind="sky",t0=start+(i-1)*I/2+((h//13)%60),duration=16000/260,
-			from=centre-d*8000,to=centre+d*8000,livery=(h//17)%5+1,lod="low"})
+			from=centre-d*8000,to=centre+d*8000,livery=(h//17)%5+1,lod="low",visit=nil,fadeIn=true,fadeOut=true})
 	end
 	return out
 end

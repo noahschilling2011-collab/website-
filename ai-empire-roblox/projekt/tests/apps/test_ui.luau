@@ -123,14 +123,31 @@ local function body()
 	elseif STATE == "client" then
 		check("client: Sign your first client", goal.id == "client" and titleLabel.Text == "Sign your first client (CloudDesk)")
 		check("client: trust progress", have and have.Text == "Trust 0 %", have and have.Text)
-		check("client: founder trip countdown (back - seconds = 80 s)", eta and eta.Text == "back in 1:20", eta and eta.Text)
+		check("client: founder trip countdown (back - seconds = 80 s, never a clock-like 1:20)", eta and eta.Text == "back in 1 min 20 s", eta and eta.Text)
 		click(card)
 		check("client: tap opens Company → Clients", ui.Computer.isOpen() and find("Tab_clients") ~= nil and has("Business clients") ~= nil)
 		check("client: founder trip listed on the road", has("You (founder) → CloudDesk · pilot visit · car") ~= nil)
 		ui.Computer.close(); M.settle(0.5)
 	elseif STATE == "save" then
 		check("save: Founder Headquarters goal", goal.id == "office2" and titleLabel.Text == "Founder Headquarters $27,000", titleLabel.Text)
-		check("save: First client ✓ · $18,400 / $27,000", have and have.Text == "First client ✓ · $18,400 / $27,000", have and have.Text)
+		-- the first form that fits beside the ETA: exact, compact money, compact without the prefix (never cut off)
+		local function firstFit(list)
+			local room = HUD.WIDTH - 28 - (if eta.Text == "" then 0 else math.ceil(HUD.textWidth(eta.Text, eta.TextSize)) + 10)
+			for _, t in list do if HUD.textWidth(t, have.TextSize) <= room then return t end end
+			return list[#list]
+		end
+		check("save: desktop shows the exact form 'Client ✓ · $18,400 / $27,000'", have and have.Text == "Client ✓ · $18,400 / $27,000"
+			and firstFit({ "Client ✓ · $18,400 / $27,000" }) == have.Text, have and have.Text)
+		check("save: describe() keeps the exact, compact and short forms", view.progress == "Client ✓ · $18,400 / $27,000" and view.compactProgress == "Client ✓ · $18.4K / $27K" and view.shortProgress == "$18.4K / $27K")
+		-- deep debt in the garage (reviewer: '-$48,250 / $27,…' was cut off): a shorter form, never an ellipsis
+		local cash0 = s.data.money
+		s.data.money = -1248250
+		ui.push()
+		local v2 = HUD.describe(State.snapshot)
+		local want2 = firstFit({ v2.progress, v2.compactProgress, v2.shortProgress })
+		check("deep debt: progress picks the first form that fits", have.Text == want2 and want2 ~= v2.progress, have.Text .. " / " .. want2)
+		s.data.money = cash0
+		ui.push()
 		local want = "~" .. math.ceil(goal.etaMinutes) .. " min"
 		check("save: ETA from nextGoal (" .. want .. ")", eta and eta.Text == want and HUD.etaText(goal.etaMinutes) == want, eta and eta.Text)
 		check("save: no Save-mode tag in the garage", find("SaveMode", card) == nil)
@@ -140,8 +157,19 @@ local function body()
 		check("mid: Save-mode tag on the card", find("SaveMode", card) ~= nil)
 		if STATE == "phone" then
 			check("phone: compact card (no hint line)", hint ~= nil and hint.Visible == false)
-			check("phone: larger title on a small screen", titleLabel.TextSize == 19)
-			check("phone: HUD column keeps width 300 at -16 (Phone.HUD_WIDTH)", find("Column", hud).Size.X.Offset == 300 and find("Column", hud).Position.X.Offset == -16)
+			check("phone: larger title on a small screen", titleLabel.TextSize == 20, titleLabel.TextSize)
+			local column = find("Column", hud)
+			check("phone: HUD column keeps width 300 at -16, scaled by its own UIScale 1.5", column.Size.X.Offset == 300 and column.Position.X.Offset == -16
+				and column:FindFirstChild("CompactBoost").Scale == HUD.COMPACT_BOOST and HUD.COMPACT_BOOST == 1.5)
+			local hudFrame = find("HUD", hud)
+			check("phone: HUD frame attributes LaneWidth = 466, Compact = true", hudFrame and hudFrame:GetAttribute("LaneWidth") == 466 and hudFrame:GetAttribute("Compact") == true, hudFrame and hudFrame:GetAttribute("LaneWidth"))
+			-- text and touch targets in screen points: UIRoot scale x the column's boost
+			local rootScale = hud:FindFirstChild("Root"):FindFirstChildOfClass("UIScale").Scale
+			local k = rootScale * column:FindFirstChild("CompactBoost").Scale
+			check("phone: goal title >= 12.5 pt, progress >= 10.5 pt on screen", titleLabel.TextSize * k >= 12.5 and have.TextSize * k >= 10.5, string.format("%.1f / %.1f pt (scale %.3f)", titleLabel.TextSize * k, have.TextSize * k, k))
+			local open = find("OpenCompany", hud)
+			check("phone: Open company is a 44 pt touch target", open and open.Size.Y.Offset * k >= 44, open and string.format("%.1f pt", open.Size.Y.Offset * k))
+			check("phone: compact progress text ($74.3K / $380K)", have.Text == "$74.3K / $380K", have.Text)
 		else
 			check("desktop: hint line shown with the Save mode reason", hint and hint.Visible and string.find(hint.Text, "Save mode", 1, true) ~= nil, hint and hint.Text)
 		end
@@ -183,7 +211,8 @@ local function body()
 	if STATE == "mid" then
 		check("account until day N (CloudDesk: day 10 + 4.0 days)", has("Account until day 14 · 4.0 days left") ~= nil)
 		check("renewing account", has("Account · check-in visit under way") ~= nil)
-		check("trip under way: rep + engineer to PixelForge (City Hotel night)", has("Field rep + engineer → PixelForge · pilot visit · City Hotel night · back in 15:00") ~= nil)
+		check("trip under way: rep + engineer to PixelForge (City Hotel night)", has("Field rep + engineer → PixelForge · pilot visit · City Hotel night · back in 15 min") ~= nil)
+		check("row status names where the visit is", has("Pilot visit at Business City · back in 15 min") ~= nil)
 		check("lead with trust bar text", has("Lead · trust 62 %") ~= nil)
 		check("pinned client marked", has("Pinned · visited next") ~= nil)
 		check("skipped client marked", has("Skipped · your sales team leaves it out") ~= nil)
@@ -206,19 +235,29 @@ local function body()
 		check("skipped client shows Unskip", skipBtn and skipBtn.Text == "Unskip")
 		click(skipBtn)
 		p = lastCall("DealAction")
-		check("Unskip → DealAction {skip, north}", p and p.action == "skip" and p.clientId == "north" and e.deals.skip.north == nil)
+		check("Unskip → DealAction {skip, north}", p and p.action == "skip" and p.clientId == "north" and e.deals.skip.north == nil, p and (tostring(p.action) .. "/" .. tostring(p.clientId) .. "/" .. tostring(e.deals.skip.north)))
 		local forge = rowOf("PixelForge")
 		check("trip under way: Join in person instead of Pin/Skip", forge and forge:FindFirstChild("Join", true).Visible and not forge:FindFirstChild("Pin", true).Visible)
+		-- Join away from the client's office: the server says TOO_FAR, the app starts a GPS route there (TravelController)
+		local Travel = M.require(Client.Controllers.TravelController)
+		local guided
+		local origGuide = Travel.guide
+		Travel.guide = function(id) guided = id end
 		click(forge and forge:FindFirstChild("Join", true))
+		M.settle(0.5)
+		Travel.guide = origGuide
 		p = lastCall("DealAction")
 		check("Join → DealAction {joinMeeting, creative}", p and p.action == "joinMeeting" and p.clientId == "creative")
-		M.settle(0.3)
-		check("Join far away → TOO_FAR text (ActionController)", has(Action.message("TOO_FAR")) ~= nil)
+		local CityPlan = M.require(RS.Shared.Config.CityPlan)
+		local dest = CityPlan.clientOffice("PixelForge")
+		check("Join far away (TOO_FAR) → GPS route to the client's office", dest ~= nil and guided == dest.id, tostring(guided))
+		check("Join far away → toast names the client and where it is", has("Route to PixelForge (Business City) started") ~= nil and has(Action.message("TOO_FAR")) == nil)
 	elseif STATE == "rich" then
 		check("abroad trip by flight", has("Field rep + engineer → Orbit Systems · pilot visit · flight + 2 nights") ~= nil)
 		check("hosted pilot at the guest house", has("Mosaic Worlds team at your guest house") ~= nil)
 	elseif STATE == "garage" then
 		check("garage: every client is a later stage or needs a model", nAcc == 0 and has("Accounts (") == nil)
+		check("garage: needs text asks for a first release (no 'best live model: 0')", has("Needs reliability 24 · release a model first") ~= nil and has("your best live model: 0") == nil)
 	end
 
 	------------------------------------------------------------------ Money (ledger)
@@ -239,7 +278,7 @@ local function body()
 	end)())
 	check("Today card title", has("Today · day " .. dayKey) ~= nil)
 	local net = inTotal - outTotal
-	check("net today shown", has("Net today  " .. (if net >= 0 then "+" else "") .. Ops.money(net)) ~= nil, Ops.money(net))
+	check("net today shown", has("Net today  " .. (if net > 0 then "+" else "") .. Ops.money(net)) ~= nil, Ops.money(net))
 	if STATE == "mid" then
 		check("today: wages line", has("-$31,600") ~= nil and has("Wages") ~= nil)
 		check("today: retainers line", has("Client retainers") ~= nil and has("+$26,600") ~= nil)
@@ -248,10 +287,38 @@ local function body()
 		local _, _, a8, b8 = EmpireApp.ledgerDay(e.ledger["8"])
 		check("day 8 net (office move) shown negative", has("-" .. Ops.money(b8 - a8)) ~= nil, Ops.money(a8 - b8))
 		check("running rates per game day", has("Running now, per game day") ~= nil and has("/day") ~= nil)
+		-- day picker: the category breakdown of an earlier replicated day
+		local picker = find("DayPicker")
+		check("day picker lists the 4 replicated days (Day 7 .. Today)", picker and button("Day 7", picker) and button("Day 9", picker) and button("Today", picker) and button("Day 6", picker) == nil)
+		click(picker and button("Day 8", picker))
+		ui.push()
+		local inc8, out8, a8b, b8b = EmpireApp.ledgerDay(e.ledger["8"])
+		check("Day 8 picked: title, office move line and net of that day", has("Every dollar of company day 8, by category.") ~= nil and has("Office move") ~= nil and has("-$100,000") ~= nil
+			and has("Net day 8  " .. Ops.money(a8b - b8b)) ~= nil, Ops.money(a8b - b8b))
+		click(picker and button("Today", picker))
+		ui.push()
+		check("Today picked again", has("Today · day " .. dayKey) ~= nil and has("Office move") == nil)
+		-- rows are updated in place: the ledger and the live rates move on every snapshot, no GuiObject is created
+		local created = 0
+		local conn = pg.DescendantAdded:Connect(function(x) if x:IsA("GuiObject") then created += 1 end end)
+		for i = 1, 6 do
+			e.ledger[dayKey].i.market += 111
+			e.ledger[dayKey].o.wages += 37
+			s.live.revenue += 0.5
+			ui.push()
+		end
+		conn:Disconnect()
+		check("Money tab: no GuiObject churn while the ledger and rates move", created == 0, created)
+		check("Money tab: today's income total follows the ledger", has("+" .. Ops.money(inTotal + 666)) ~= nil, Ops.money(inTotal + 666))
 	elseif STATE == "garage" then
 		check("garage: empty day says so", has("Nothing booked yet today.") ~= nil)
 		check("garage: no day table yet", has("Income") ~= nil and has("Day 1 (today)") == nil)
+		check("garage: no day picker with one day", find("DayPicker") == nil)
 	end
+	check("ledgerDay drops zero and negative lines", (function()
+		local inc, out, a, b = EmpireApp.ledgerDay({ i = { market = 0, b2b = 500, pilot = -3 }, o = { wages = 0 } })
+		return #inc == 1 and inc[1].cat == "b2b" and #out == 0 and a == 500 and b == 0
+	end)())
 	check("category labels", EmpireApp.categoryLabel("b2b", false) == "Client retainers" and EmpireApp.categoryLabel("market", true) == "Serving & power" and EmpireApp.categoryLabel("newthing", true) == "Newthing")
 
 	------------------------------------------------------------------ Settings
@@ -266,11 +333,12 @@ local function body()
 		click(seg("55 %"))
 		local p = lastCall("EmpireAction")
 		check("wage budget 55 % → EmpireAction {hrBudget, 0.55}", p and p.action == "hrBudget" and math.abs((p.budget or 0) - 0.55) < 1e-9 and e.hr.budget == 0.55)
+		check("HR status line explains why HR waits (Save mode at half the desks)", has("Save mode: HR stops at half the desks until the move.") ~= nil)
 		click(seg("Off"))
 		p = lastCall("EmpireAction")
 		check("HR auto Off → EmpireAction {hrAuto, false}", p and p.action == "hrAuto" and p.on == false and e.hr.auto == false)
 		ui.push()
-		check("HR text says automatic hiring is off", has("automatic hiring is off") ~= nil)
+		check("HR status says automatic hiring is off", has("Off: hire by hand in Team.") ~= nil)
 		-- Save mode switch: the second "Off" on the page (row "Save for the next office")
 		local saveRow
 		for _, x in pg:GetDescendants() do if x:IsA("TextLabel") and x.Text == "Save for the next office" then saveRow = x.Parent end end
@@ -282,9 +350,22 @@ local function body()
 		local before = #ui.calls
 		click(engRow and button("On", engRow))
 		M.settle(1)
-		local depts = {}
-		for i = before + 1, #ui.calls do local c = ui.calls[i]; if c.name == "EmpireAction" and c.payload.action == "nightShift" then depts[c.payload.dept] = c.payload.on end end
-		check("night shift On → nightShift for engineering + training", depts.engineering == true and depts.training == true and e.nightShift.engineering == true and e.nightShift.training == true)
+		-- integrate (apps request 5): ONE atomic call {nightShift, role, on} instead of one call per department
+		local roleCalls, deptCalls, roleOn = 0, 0, nil
+		for i = before + 1, #ui.calls do
+			local c = ui.calls[i]
+			if c.name == "EmpireAction" and c.payload.action == "nightShift" then
+				if c.payload.role ~= nil then roleCalls += 1; roleOn = c.payload.role == "engineer" and c.payload.on else deptCalls += 1 end
+			end
+		end
+		check("night shift On → one nightShift {role = engineer, on} call; engineering + training on", roleCalls == 1 and deptCalls == 0 and roleOn == true and e.nightShift.engineering == true and e.nightShift.training == true, roleCalls .. "/" .. deptCalls)
+		-- a role half on (older save / failed call): label says so in warn colour, neither side highlighted
+		e.nightShift = { engineering = true }
+		ui.push()
+		local engSub = has("on in 1 of 2 departments", engRow)
+		check("night shift half on: 'on in 1 of 2 departments'", engSub ~= nil)
+		local onBtn, offBtn = button("On", engRow), button("Off", engRow)
+		check("night shift half on: neither On nor Off highlighted", onBtn and offBtn and onBtn.BackgroundTransparency == 1 and offBtn.BackgroundTransparency == 1)
 		-- apprentices
 		check("apprentice list: day and skill from empire.apprentices", has("Jonas Weber") ~= nil and has("day 3 of 9") ~= nil and has("skill 3 (max)") ~= nil)
 		check("Training Lead on duty while apprentices train", has("Training Lead on duty ($900/day)") ~= nil)
@@ -296,13 +377,19 @@ local function body()
 		check("server: apprentice added at half the fee", Ops.apprenticeCount(e) == nAppr + 1 and s.data.money == money0 - 500, s.data.money - money0)
 		-- company jet: disabled before the Innovation Campus; the server says OFFICE
 		local jet = find("BuyJet")
-		check("jet button needs the Innovation Campus", jet and jet.Text == "Needs the Innovation Campus" and jet:GetAttribute("Disabled") == true)
+		local cash0 = s.data.money
+		s.data.money = 2000000 -- enough cash: the stage alone must keep the button disabled
+		ui.push()
+		check("jet button needs the Innovation Campus (even with $2M cash)", jet and jet.Text == "Needs the Innovation Campus" and jet:GetAttribute("Disabled") == true)
+		s.data.money = cash0
+		ui.push()
 		local ok, res = Action.call("EmpireAction", { action = "buyJet" })
 		M.settle(0.3)
 		check("direct buyJet → OFFICE with its English text", not ok and res.err == "OFFICE" and has(Action.message("OFFICE")) ~= nil)
 	elseif STATE == "rich" then
 		local jet = find("BuyJet")
 		check("rich: Buy company jet · $900,000", jet and jet.Text == "Buy company jet · $900,000" and jet:GetAttribute("Disabled") ~= true)
+		check("rich: jet text no longer names a stage requirement", has("Needs the Innovation Campus") == nil and has("once you buy it") ~= nil)
 		local money0 = s.data.money
 		click(jet)
 		M.settle(0.3)

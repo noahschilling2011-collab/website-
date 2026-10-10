@@ -115,12 +115,39 @@ local function body()
 	M.settle(1)
 	local plot1 = Plot.get(p1)
 	local function call(s, payload) return act(s, payload) end
+	-- a company with an abroad pilot trip in progress (field staff on the shuttle, user request 20): a stage-4
+	-- office, two Growth & Sales heads (the first is the field rep of the first trip); no character, no plot
+	local pf = F.player(5009, "Fiona", CFrame.new(0, 27.5, 0))
+	local sf = F.session(pf, 100000)
+	sf.data.company.name = "Helix Partners"
+	local ef = sf.data.empire
+	ef.office = 4
+	ef.employees = ef.employees or {}
+	ef.employees.marketer = 2; ef.employees.engineer = 0
+	ef.staffProfiles = { marketer = { { n = "Mia Chen", s = 1111 }, { n = "Leo Park", s = 2222 } } }
+	ef.deals = ef.deals or {}
+	ef.deals.tripList = { { client = "helix", kind = "sign", back = 1e12, founder = false, hosted = false, crew = 2, left = 4242 } }
+	table.insert(Session.sessions, sf)
 
 	------------------------------------------------------------------ publish / crew state
 	local walkStart = out.phases.boarding.t1 - FP.CREW_SEATED - FP.CREW_WALK
 	setTime(legStart("out", K) + 1); City.tick(0.1)
 	check("boarding published", folder:GetAttribute("Phase") == "boarding" and folder:GetAttribute("Flight") == FP.CONFIG.flights.out and folder:GetAttribute("From") == "home")
 	check("crew still leaving after the last arrival", folder:GetAttribute("CrewState") == "leaving")
+	-- field staff on this leg
+	local pax = folder:FindFirstChild("Passengers")
+	local mia = pax and pax:FindFirstChild("Passenger1")
+	check("field staff published at the start of boarding (Passengers, leg key)", pax ~= nil and pax:GetAttribute("Leg") == "out:" .. K and #pax:GetChildren() == 1, pax and #pax:GetChildren())
+	check("the field rep of the abroad trip flies out (name, company)", mia ~= nil and mia:GetAttribute("PassengerName") == "Mia Chen" and mia:GetAttribute("Company") == "Helix Partners")
+	check("passenger rig is a template (no tag, no prompt, no collision, only the root anchored)", mia ~= nil and (function()
+		if mia:HasTag("CompanyEmployee") then return false end
+		for _, d in mia:GetDescendants() do
+			if d:IsA("ProximityPrompt") then return false end
+			if d:IsA("BasePart") and (d.CanCollide or d.CanTouch or (d.Anchored ~= (d.Name == "HumanoidRootPart"))) then return false end
+		end
+		return true end)())
+	setTime(legStart("out", K) + 3); City.tick(0.1)
+	check("passengers built once per leg (not re-published every tick)", folder:FindFirstChild("Passengers") == pax)
 	setTime(legStart("out", K) + walkStart - 1); City.tick(0.1)
 	check("crew in the crew room", folder:GetAttribute("CrewState") == "crewroom")
 	setTime(legStart("out", K) + walkStart + 1); City.tick(0.1)
@@ -230,7 +257,7 @@ local function body()
 	check("second passenger arrived too", City.state(p2) == "abroad" and near(p2.root.Position, CityPlan.ABROAD.arrival.Position, 0.01))
 	check("player attribute writes during the whole ride are few", p1.attrWrites - writes1 <= 4, p1.attrWrites - writes1)
 	setTime(legStart("out", K) + out.phases.deboarding.t0 + 1); City.tick(0.1)
-	check("crew leaving after arrival", folder:GetAttribute("CrewState") == "leaving")
+	check("Port Meridian turnaround: the crew stays aboard", folder:GetAttribute("CrewState") == "cockpit")
 	check("rebuild while abroad still keeps the founder abroad", (function() plot1.office:SetAttribute("OfficeTier", -1); Plot.refresh(s1); M.settle(1); return builds == beforeBuilds + 2 and near(p1.root.Position, CityPlan.ABROAD.arrival.Position, 0.01) end)())
 
 	------------------------------------------------------------------ return flight
@@ -249,6 +276,9 @@ local function body()
 	check("return mid-cruise: held under the home stand", near(Vector3.new(p1.root.Position.X, 0, p1.root.Position.Z), Vector3.new(FP.HOLD.home.X, 0, FP.HOLD.home.Z), 0.5))
 	setTime(legStart("back", K) + back.phases.deboarding.t0 + 0.2); City.tick(0.1); M.settle(1)
 	check("home again: arrivals hall, state cleared", near(p1.root.Position, CityPlan.AIRPORT.arrival.Position, 0.01) and City.state(p1) == "home" and p1:GetAttribute("TravelState") == nil and p1.root.Anchored == false)
+	check("home arrival: the crew leaves the aircraft", folder:GetAttribute("CrewState") == "leaving")
+	local paxBack = folder:FindFirstChild("Passengers")
+	check("the rep stays abroad while the trip runs (nobody on the return leg)", paxBack ~= nil and paxBack:GetAttribute("Leg") == "back:" .. K and #paxBack:GetChildren() == 0, paxBack and #paxBack:GetChildren())
 
 	------------------------------------------------------------------ refunds: respawn / leave mid-flight, unused tickets
 	local K2 = K + 1
@@ -331,6 +361,29 @@ local function body()
 	Shop.setMode("ok")
 	F.respawn(p8, CFrame.new(0, 27.5, 0))
 	check("respawn during the helicopter ride: refunded", s8.data.money == m8 and City.state(p8) == "home")
+
+	------------------------------------------------------------------ field staff fly home when the trip ends
+	ef.deals.tripList = {}
+	local KB = K3 + 1
+	setTime(legStart("out", KB) + 1); City.tick(0.1)
+	check("an ended trip sends nobody out again", #folder.Passengers:GetChildren() == 0)
+	setTime(legStart("back", KB) + 1); City.tick(0.1)
+	local home = folder.Passengers
+	check("trip over: the rep flies home on the next return leg", home:GetAttribute("Leg") == "back:" .. KB and home:FindFirstChild("Passenger1") ~= nil
+		and home.Passenger1:GetAttribute("PassengerName") == "Mia Chen", #home:GetChildren())
+	setTime(legStart("back", KB + 1) + 1); City.tick(0.1)
+	check("... and only once", #folder.Passengers:GetChildren() == 0 and next(Shuttle.flown) == nil)
+	-- at most MAX_PAX per leg
+	ef.deals.tripList = {}
+	for i = 1, 6 do table.insert(ef.deals.tripList, { client = "helix", kind = "sign", back = 1e12, founder = false, hosted = false, crew = 1, left = 9000 + i }) end
+	ef.employees.marketer = 6
+	ef.staffProfiles.marketer = {}
+	for i = 1, 6 do ef.staffProfiles.marketer[i] = { n = "Rep " .. i, s = 300 + i } end
+	setTime(legStart("out", KB + 2) + 1); City.tick(0.1)
+	check("at most MAX_PAX field staff per leg", #folder.Passengers:GetChildren() <= Shuttle.MAX_PAX and #folder.Passengers:GetChildren() >= 2, #folder.Passengers:GetChildren())
+	ef.jet = true
+	setTime(legStart("out", KB + 3) + 1); City.tick(0.1)
+	check("a company with its own jet does not use the shuttle", #folder.Passengers:GetChildren() == 0)
 
 	------------------------------------------------------------------ shuttle switched off
 	Shuttle.setEnabled(false)

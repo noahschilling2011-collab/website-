@@ -56,8 +56,21 @@ function Theme.bindAccent(inst: Instance, prop: string, mix: ((Color3) -> Color3
 	end)
 end
 
-function Theme.onAccent(callback: (Color3) -> ())
+-- Returns a disconnect function: UI that is rebuilt (app cards, segmented controls) calls it on Destroying, so
+-- destroyed controls are neither kept alive nor repainted on the next accent change.
+function Theme.onAccent(callback: (Color3) -> ()): () -> ()
 	table.insert(listeners, callback)
+	return function()
+		local index = table.find(listeners, callback)
+		if index then
+			table.remove(listeners, index)
+		end
+	end
+end
+
+-- number of registered accent callbacks (tests: rebuilt controls must not leak listeners)
+function Theme.listenerCount(): number
+	return #listeners
 end
 
 function Theme.setAccent(color: Color3)

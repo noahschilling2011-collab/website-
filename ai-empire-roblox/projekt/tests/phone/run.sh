@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Phone package suites: test_phone (PhoneMath + PhoneService, server) and test_ui (client: garage + rich).
+# Phone package suites: test_phone (PhoneMath + PhoneService, server) and test_ui (client: garage, rich, the review
+# round's scenarios "fixes" and a small touch phone "touch").
 # Usage: tests/phone/run.sh [gen-name]   (default: builds harness/.gen_phone from work/src)
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT"
 GEN="${1:-.gen_phone}"
@@ -16,5 +17,7 @@ suite() { # label file [state]
 suite phone test_phone.luau
 suite phone_ui_garage test_ui.luau garage
 suite phone_ui_rich test_ui.luau rich
+suite phone_ui_fixes test_ui.luau fixes
+suite phone_ui_touch test_ui.luau touch
 echo "phone suites: $(if [ $rc -eq 0 ]; then echo all passed; else echo FAILURES; fi)"
 exit $rc

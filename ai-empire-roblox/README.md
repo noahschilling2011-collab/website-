@@ -6,8 +6,12 @@ Du startest in einer Garage und baust eine KI-Firma bis zum großen Hauptquartie
 
 | Datei | Stand | Geprüft? |
 |---|---|---|
-| `AIEmpire_Stand_2026-10-04_geprueft.rbxlx` | 4.10. abends | 39/39 Test-Suites grün im Headless-Mock, Roundtrip OK. In Studio nicht getestet. |
-| `AIEmpire_Stand_2026-10-10.rbxlx` | 10.10. morgens, **Zwischenstand** | Nur Roundtrip OK (139 Skripte). Die Test-Suites sind auf diesem Stand nicht gelaufen. Mitarbeiter-Alltag, Handy, Apps und die Welt-Fixes sind hier halb fertig. |
+| `AIEmpire_Stand_2026-10-10_abend.rbxlx` | 10.10. abends, **neuester geprüfter Stand** | 47/47 Test-Suites grün im Headless-Mock (`projekt/run_all_2026-10-10_abend.txt`), Roundtrip OK (141 Skripte). Enthält Mitarbeiter-Alltag (Urlaub, Nachtschicht, Azubis, IT repariert Server), Diensthandy mit KI-Chat, neue Apps, Flughafen innen, Port Meridian mit Menschen und Verkehr, Shuttle mit Piloten, Gästehaus. In Studio nicht getestet. |
+| `AIEmpire_Stand_2026-10-04_geprueft.rbxlx` | 4.10. abends | Älterer Stand, 39/39 Test-Suites grün. |
+
+Hinweis: Der Gesamttest (`run_all`) enthält die eigenen Test-Suites von Handy, Mitarbeiter-Alltag, Apps, Flughafen, Stadt, Flug und Gästehaus noch nicht; die liefen einzeln in ihren Paketen grün. Sie werden im nächsten Schritt in den Gesamttest aufgenommen.
+
+Noch nicht drin (in Arbeit): das neue KI-Studio im Stil von „Build a Phone Empire“ (Entwürfe in `entwurf_ki_studio/`), Fahrer, Hotelgäste, Firmenjet, Geschäftsreise.
 
 Öffnen: Roblox Studio → File → Open from File → `.rbxlx` auswählen.
 

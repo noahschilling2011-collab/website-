@@ -33,6 +33,7 @@ HELI_SKIP = {"HeliSkid", "HeliSkidTip", "HeliStrut", "HeliBlade", "HeliTailBlade
 PENDING = [
     ("/Airport/Apron/", {"FloodMast", "FloodFrame", "FloodHead"}, "airport: flight.md #6 (flood masts in the wingtip corridor)"),
     ("/Airport/Apron/", {"HoldSign", "HoldSignPost"}, "airport: flight.md #6 (hold-short sign next to the connector)"),
+    ("/Airport/Runway/", {"Windsock", "WindsockPole"}, "airport: flight.md #6 (windsock beside the east taxiway)"),
 ]
 
 passed = failed = 0

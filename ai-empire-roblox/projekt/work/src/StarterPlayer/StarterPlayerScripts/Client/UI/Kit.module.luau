@@ -319,6 +319,32 @@ function Kit.onClick(button: GuiButton, callback: () -> ())
 	end)
 end
 
+-- Touch-first screens (phones, tablets without a mouse): rows use bigger tap targets there.
+function Kit.isTouch(): boolean
+	return UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+end
+
+-- design px of a tap target: `normal` with mouse / keyboard / gamepad, `touch` on touch-first screens
+function Kit.tap(normal: number, touch: number): number
+	return if Kit.isTouch() then touch else normal
+end
+
+-- A countdown in play time that never looks like a clock time: "45 s", "1 min 20 s", "15 min", "~32 min", "~1.5 h"
+function Kit.countdown(seconds: number): string
+	local s = math.max(0, math.floor((if seconds == seconds then seconds else 0) + 0.5))
+	if s < 60 then
+		return tostring(s) .. " s"
+	end
+	if s < 600 then
+		local m, r = s // 60, s % 60
+		return if r == 0 then tostring(m) .. " min" else string.format("%d min %d s", m, r)
+	end
+	if s < 5400 then
+		return (if s % 60 == 0 then "" else "~") .. tostring(math.floor(s / 60 + 0.5)) .. " min"
+	end
+	return string.format("~%.1f h", s / 3600)
+end
+
 -- Unsichtbarer Vollflächen-Button: schluckt Klicks/Touches (Kamera dreht sich nicht mit)
 function Kit.blocker(parent: Instance, color: Color3, transparency: number): TextButton
 	local button = Instance.new("TextButton")
@@ -416,9 +442,11 @@ function Kit.segmented(
 		end)
 	end
 	paint()
-	Theme.onAccent(function()
+	-- rebuilt tabs create new segmented controls: drop the accent callback with the control
+	local disconnect = Theme.onAccent(function()
 		paint()
 	end)
+	frame.Destroying:Once(disconnect)
 
 	return {
 		frame = frame,

@@ -1,10 +1,12 @@
 --!strict
 -- AirTrafficController (package "flight", client only; required and initialised by TravelController).
---   * Ambient air traffic at City Airport, deterministic from server time (FlightPlan.ambient): arrivals land
---     east, roll out and taxi off at the east connector, departures line up at the east end and take off
---     west, airliners cross the sky high above the city. Placed in each timetable cycle where the shuttle does
---     not use the runway. Cheap: only events near the camera are built (medium LOD on the runway, low LOD in
---     the sky), at most a few at a time, faded in/out, one BulkMoveTo per aircraft per frame.
+--   * Ambient air traffic at City Airport, deterministic from server time (FlightPlan.ambient): a visiting
+--     airliner lands east, taxis to remote stand R2 on the east apron, stands there, pushes back and takes off
+--     west (one model per visit, so nothing pops in or out near the airport: a visit fades in and out only far
+--     out in the air); airliners cross the sky high above the city. Placed in each timetable cycle where the
+--     shuttle does not use the runway. Cheap: only events near the camera are built (full LOD within
+--     FULL_RANGE of the camera, medium beyond, low in the sky), at most a few at a time, one BulkMoveTo per
+--     moving aircraft per frame (none while it is parked).
 --   * VIP helicopter in Port Meridian: parked on the airport helipad ("Helipad", Purpose VIPAirport), flies
 --     transfers to the Meridian Grand roof pad when the server publishes one (ReplicatedStorage.Shuttle
 --     HeliStart / HeliMode / HeliRider; pads HeliFromPad / HeliToPad), rotor spinning. Local prompts on the
@@ -24,6 +26,7 @@ local Theme=require(script.Parent.Parent.UI.Theme)
 local Traffic={}
 local player=Players.LocalPlayer
 Traffic.RANGE=6500 -- ambient aircraft are built when the camera is this close (sky crossings: 9,000)
+Traffic.FULL_RANGE=600 -- runway traffic switches to the full model this close to the camera (back beyond 700)
 Traffic.HELI_RANGE=2500
 local rgb=Color3.fromRGB
 -- generic liveries (no real airlines): body, tail/engine colour, title
@@ -47,7 +50,7 @@ local MESSAGES: {[string]: string}={
 ------------------------------------------------------------------------------------------------ state
 local folder: Folder?=nil
 local client: Folder?=nil
-type Live={model: Model,mover: Mover.Mover,fade: number,fan: number}
+type Live={model: Model,mover: Mover.Mover,fade: number,fan: number,lod: string,livery: number,sky: boolean,last: CFrame?}
 local live: {[string]: Live}={}
 local cycleEvents: {[number]: {FP.AmbientEvent}}={}
 local function ensureFolder(): Folder
@@ -86,28 +89,40 @@ local function stepAmbient(t: number,dt: number,camPos: Vector3)
 	local I=FP.interval()
 	local cycle=math.floor((t-FP.CONFIG.epoch)/I)
 	local seen: {[string]: boolean}={}
-	for k=cycle-1,cycle do
+	for k=cycle-2,cycle do
 		for _,e in events(k) do
 			local pose=FP.ambientPose(e,t)
 			if not pose then continue end
-			local range=if e.kind=="sky" then 9000 else Traffic.RANGE
-			if (pose.cf.Position-camPos).Magnitude>range then continue end
-			seen[e.id]=true
-			local l=live[e.id]
+			local sky=e.kind=="sky"
+			local dist=(pose.cf.Position-camPos).Magnitude
+			local range=if sky then 9000 else Traffic.RANGE
+			if dist>range then continue end
+			local key=e.visit or e.id
+			if seen[key] then continue end -- the hand-over instant between two phases of one visit
+			seen[key]=true
+			local l: Live?=live[key]
+			-- distance LOD of runway traffic (with hysteresis); sky crossings stay low
+			local want=if sky then e.lod elseif dist<Traffic.FULL_RANGE then "full" elseif dist>Traffic.FULL_RANGE+100 then "medium" elseif l then l.lod else "medium"
+			if l and l.lod~=want then l.model:Destroy();live[key]=nil;l=nil end
 			if not l then
 				local lv=LIVERIES[e.livery] or LIVERIES[1]
-				local m=Aircraft.build(nil,pose.cf,{kind=if e.kind=="sky" then lv.kind else "320",scale=if lv.kind=="380" and e.kind=="sky" then 1.4 else FP.CONFIG.scale,
-					lod=e.lod,livery=lv.livery,body=lv.body,airline=lv.airline,name="TrafficAircraft",collide=false,mesh=false})
+				local m=Aircraft.build(nil,pose.cf,{kind=if sky then lv.kind else "320",scale=if lv.kind=="380" and sky then 1.4 else FP.CONFIG.scale,
+					lod=want,livery=lv.livery,body=lv.body,airline=lv.airline,name="TrafficAircraft",collide=false,mesh=false})
 				m.Parent=ensureFolder()
-				l={model=m,mover=Mover.new(m,pose.cf),fade=0,fan=0}
-				live[e.id]=l
+				l={model=m,mover=Mover.new(m,pose.cf),fade=0,fan=0,lod=want,livery=e.livery,sky=sky,last=nil}
+				live[key]=l
 			end
+			local cur=l :: Live
 			local tau=t-e.t0
-			local fadeIn=math.clamp(tau/3,0,1);local fadeOut=math.clamp((e.duration-tau)/3,0,1)
-			setFade(l,1-math.min(fadeIn,fadeOut))
-			l.fan=(l.fan+dt*22)%(math.pi*2)
-			Mover.move(l.mover,pose.cf,l.fan)
-			Mover.setGear(l.mover,pose.gearDown)
+			local fadeIn=if e.fadeIn then math.clamp(tau/3,0,1) else 1
+			local fadeOut=if e.fadeOut then math.clamp((e.duration-tau)/3,0,1) else 1
+			setFade(cur,1-math.min(fadeIn,fadeOut))
+			if pose.engines or cur.last~=pose.cf then
+				if pose.engines then cur.fan=(cur.fan+dt*22)%(math.pi*2) end
+				Mover.move(cur.mover,pose.cf,cur.fan)
+				cur.last=pose.cf
+			end
+			Mover.setGear(cur.mover,pose.gearDown)
 		end
 	end
 	for id in live do if not seen[id] then drop(id) end end
@@ -146,10 +161,13 @@ local function ensurePrompts(a: Vector3?,t: number)
 	if (not heliPrompt or not heliPrompt.Parent) and a and t>=nextPadSearch then
 		nextPadSearch=t+3
 		heliPrompt=nil
+		-- MetroBuilder: WorldCity/PortMeridian/.../VipHelipad/Helipad (a few dozen parts, not the whole world)
 		local world=workspace:FindFirstChild("WorldCity")
+		local pm=if world then world:FindFirstChild("PortMeridian") else nil
+		local group=if pm then pm:FindFirstChild("VipHelipad",true) else nil
 		local pad: BasePart?=nil
-		if world then
-			for _,d in world:GetDescendants() do
+		if group then
+			for _,d in group:GetDescendants() do
 				if d:IsA("BasePart") and d.Name=="Helipad" and d:GetAttribute("Purpose")=="VIPAirport" then pad=d;break end
 			end
 		end

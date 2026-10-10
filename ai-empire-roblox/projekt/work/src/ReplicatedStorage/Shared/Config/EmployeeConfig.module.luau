@@ -19,23 +19,41 @@ Config.ROLES={researcher="AI Researcher",engineer="ML Engineer",curator="Data Cu
 -- 17 "Training Lead" (staffops, CORE_SPEC 11.1): the apprentices' trainer; no OperationsStation post: the
 -- rig exists only while the company has apprentices and works from a free desk in the HR room
 -- (StaffAssignment), else at the reception. Its wage ($900/day) is CompanyOps.TRAINING_LEAD.
-Config.OPERATIONS_JOBS={"Reception","Reception","Security","Security","Facilities","IT Support","Barista","Chef","Kitchen Team","Cafe Host","Facilities","Fleet","Hotel Reception","Housekeeping","Cleaner","Mailroom","Training Lead"}
-Config.OPTIONAL_POSTS={[13]=true,[14]=true,[17]=true}
+-- 18 / 19: the stage-5 night rota (CORE_SPEC 5.5: "+ night rota: 1 security guard, 1 IT on call, no new
+-- station: they use posts 3 and 6 at night"). Two separate people (the 2 extra posts CompanyOps.STAGES[5].ops
+-- pays) who take over post 3 / post 6 from the evening to the morning while the day guard and the day IT
+-- go home; StaffAssignment places them only in the stage-5 building (NIGHT_ROTA).
+Config.OPERATIONS_JOBS={"Reception","Reception","Security","Security","Facilities","IT Support","Barista","Chef","Kitchen Team","Cafe Host","Facilities","Fleet","Hotel Reception","Housekeeping","Cleaner","Mailroom","Training Lead","Security","IT Support"}
+Config.OPTIONAL_POSTS={[13]=true,[14]=true,[17]=true,[18]=true,[19]=true}
 Config.TRAINING_LEAD_POST=17
+-- night rota person (OPERATIONS_JOBS index) -> the post (OpsIndex) whose station they use at night
+Config.NIGHT_ROTA={[18]=3,[19]=6}
+-- their shift: from the end of the day person's shift at that post to its start the next morning
+-- (StaffService hands the post over at exactly those hours); these seeded windows (= OPS_SHIFT) are only
+-- the fallback when the day person's rig is missing
+Config.NIGHT_ROTA_SHIFT={start={18.0,18.5},finish={7.25,7.5}}
 -- Pay of one operations post per game day (CORE_SPEC 5.5 / 11.5): CompanyOps.OPS_WAGE reads it, TalkService
 -- may quote it.
 Config.OPS_WAGE_PER_DAY=720
 -- Operations posts follow the day shift (CORE_SPEC 5.3 / 11.1): every post is staffed before the office opens
 -- (08:00) until after it closes (18:00); seeded per person inside these windows, breaks are covered in place.
--- From stage 5 the security guard (post 3) and IT (post 6) keep a night rota (no new station); security also
--- stays while a department runs a night crew (the night shift needs a security post on duty).
+-- At stage 5 the night rota people (NIGHT_ROTA) take over posts 3 and 6 at night; below stage 5 the day guard
+-- of post 3 stays on while a department runs a night crew (the night shift needs a security post on duty;
+-- CompanyOps pays no extra guard there).
 Config.OPS_SHIFT={start={7.25,7.5},finish={18.0,18.5}}
-Config.NIGHT_ROTA_POSTS={[3]=true,[6]=true}
+Config.NIGHT_ROTA_POSTS={[3]=true}
+-- The company day a shift belongs to (StaffRota.workday, Dialogue "Who's away today?"): from 06:00 until the
+-- office opens at 08:00 (when CompanyOps advances empire.calendar.day) it is already the coming day, so the
+-- people arriving at 07:45 are the ones who work today.
+function Config.workdayOffset(hour: number): number
+ return if hour>=6 and hour<8 then 1 else 0
+end
 -- Night crew of a department with empire.nightShift[dept] (stage >= 3): 22:00-06:00 company time.
 Config.NIGHT_CREW={start=22,finish=6}
 -- Apprentices (CORE_SPEC 11.1, user request 18): first day = a guided tour with the Training Lead, then one
 -- training session a day in a meeting room (TRAINING_HOURS), the rest of the day shadowing a senior colleague.
-Config.APPRENTICE={tourHours={8.3,16.0},tourStops={4,6},stopSeconds={9,13},trainingHours={10.0,11.5},shadowEvery=3,scale=.94}
+-- A big batch tours in groups of tourGroup (one tour run after another).
+Config.APPRENTICE={tourHours={8.3,16.0},tourStops={4,6},stopSeconds={9,13},tourGroup=4,trainingHours={10.0,11.5},shadowEvery=3,scale=.94,badgeWidth=190}
 -- Operations job steps (StaffJobs). Fields: at = post job point (JobPoint_<at>, world space on the post;
 -- nil = the post itself), via = points walked through first, sit = sit on the post seat, pose / item
 -- (rig attributes Pose / Holding; item=false clears), seconds = {min,max}, prop = use the point's

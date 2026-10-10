@@ -1,6 +1,7 @@
 --!nocheck
 -- Metro package: MetroBuilder (Port Meridian) through the real CityBuilder.build in the mock.
---   VIP markers (BusinessLounge, VipLimoStand, two Helipads + HelipadExit), landmark (Persistent, lit crown),
+--   VIP markers (BusinessLounge, VipLimoStand, two Helipads + HelipadExit), apron (ShuttleStand, ApronDoor, parked
+--   aircraft on stand 2, stand 1 hull space free, towers 75 studs off the runway), landmark (Persistent, lit crown),
 --   skyline towers (Atomic, cheap), client-life hooks (MetroSignal / MetroNightGlow / MetroWheel), budgets
 --   (parts, lights, decoration flags, Persistent parts), travel flow (Fly home check-ins, kiosks, meetings,
 --   arrival point, boundary walls), signage (districts, generic ads, no brand names, English), determinism.
@@ -50,6 +51,7 @@ local function body()
 		for _, d in all do if d.Name == name and (class == nil or d:IsA(class)) then table.insert(out, d) end end
 		return out
 	end
+	local blocks = pm:FindFirstChild("CityBlocks")
 	------------------------------------------------------------------ VIP
 	local lounge = find("BusinessLounge", "Model")[1]
 	local seats = 0
@@ -77,6 +79,57 @@ local function body()
 	end
 	check("hotel helipad deck rests on the hotel roof (no gap)", roofTop and math.abs(roofTop - Plan.HOTEL_ROOF) < 0.05, roofTop)
 	check("HelipadExit marker on the hotel roof", #find("HelipadExit") == 1 and find("HelipadExit")[1]:GetAttribute("To") == "intl_hotel")
+	------------------------------------------------------------------ apron (flight request #7)
+	local AP = Plan.APRON
+	local G0 = City.GROUND
+	local ss = find("ShuttleStand", "BasePart")
+	local s1 = ss[1]
+	check("ShuttleStand: one invisible, non-colliding marker at MetroPlan.APRON.stand (Stand PM1)", #ss == 1 and s1.Transparency == 1 and not s1.CanCollide and (s1.Position - AP.stand.Position).Magnitude < 0.01
+		and s1.CFrame.LookVector:Dot(AP.stand.LookVector) > 0.999 and s1:GetAttribute("Stand") == "PM1", #ss)
+	local ad = find("ApronDoor", "BasePart")
+	local d = AP.door
+	local adp = ad[1]
+	check("ApronDoor: one marker in the hall's east wall, facing the apron", #ad == 1 and adp.Transparency == 1 and not adp.CanCollide and math.abs(adp.Position.X - (t.x2 - 0.75)) < 0.01
+		and adp.Position.Z > d.z1 and adp.Position.Z < d.z2 and adp.CFrame.LookVector.X > 0.99 and math.abs(adp.Size.X - (d.z2 - d.z1)) < 0.01, #ad)
+	-- the opening is free (wall cut + lintel above 12 studs): no collidable part inside the door box (3 studs either side of the wall)
+	local blockDoor = {}
+	for _, p in parts do
+		if p.CanCollide and p.Transparency < 1 then
+			local hx, hy, hz = p.Size.X / 2, p.Size.Y / 2, p.Size.Z / 2
+			if math.abs(p.Position.X - t.x2) < hx + 3 and p.Position.Z + hz > d.z1 + 0.2 and p.Position.Z - hz < d.z2 - 0.2 and p.Position.Y + hy > G0 + 0.6 and p.Position.Y - hy < G0 + 11.5 then table.insert(blockDoor, p.Name) end
+		end
+	end
+	check("ApronDoor opening free (12 wide, 11.5 high)", #blockDoor == 0, table.concat(blockDoor, ","))
+	local plane = nil
+	for _, m in find("ParkedAircraft", "Model") do plane = m end
+	check("parked aircraft on stand 2 of the apron (off the runway)", plane and (plane:GetPivot().Position - AP.stand2.Position).Magnitude < 0.01 and plane:GetAttribute("Stand") == "PM2" and plane:GetPivot().Position.Z > City.ABROAD.runway.z2)
+	-- stand 1 hull (AircraftModel "320" at scale 1.8, measured bands: fuselage / tailplane |side| <= 20 from 60 ahead of
+	-- the pivot to 66 behind, inner wings |side| <= 35 from 25 ahead to 57 behind, outer wings to 57 from 18 ahead to
+	-- 17 behind; fin top 42) free of every visible part above the apron (the stand faces west: ahead = -x, side = z)
+	local hull = {}
+	local st = AP.stand
+	local bands = { { -60, 66, 20 }, { -25, 57, 35 }, { -18, 17, 57 } }
+	for _, p in parts do
+		if p.Transparency < 1 and not (plane and p:IsDescendantOf(plane)) then
+			local hx, hy, hz = p.Size.X / 2, p.Size.Y / 2, p.Size.Z / 2
+			local ex = math.abs(p.CFrame.RightVector.X) * hx + math.abs(p.CFrame.UpVector.X) * hy + math.abs(p.CFrame.LookVector.X) * hz
+			local ez = math.abs(p.CFrame.RightVector.Z) * hx + math.abs(p.CFrame.UpVector.Z) * hy + math.abs(p.CFrame.LookVector.Z) * hz
+			local ey = math.abs(p.CFrame.RightVector.Y) * hx + math.abs(p.CFrame.UpVector.Y) * hy + math.abs(p.CFrame.LookVector.Y) * hz
+			if p.Position.Y + ey > G0 + 0.6 and p.Position.Y - ey < G0 + 42 then
+				for _, b in bands do
+					if p.Position.X + ex > st.X + b[1] and p.Position.X - ex < st.X + b[2] and p.Position.Z + ez > st.Z - b[3] and p.Position.Z - ez < st.Z + b[3] then table.insert(hull, p.Name); break end
+				end
+			end
+		end
+	end
+	check("stand 1 free for the shuttle (nothing visible inside its hull box)", #hull == 0, table.concat(hull, ",", 1, math.min(8, #hull)))
+	-- runway strip: no building part within 75 studs of the runway centreline outside the hall (CityPlan terminal)
+	local rc = (City.ABROAD.runway.z1 + City.ABROAD.runway.z2) / 2
+	local strip = {}
+	for _, p in blocks and blocks:GetDescendants() or {} do
+		if p:IsA("BasePart") and p.Position.Z - p.Size.Z / 2 < rc + 75 then table.insert(strip, p:GetFullName()) end
+	end
+	check("airport-district towers keep 75 studs off the runway centreline", #strip == 0, table.concat(strip, ",", 1, math.min(4, #strip)))
 	------------------------------------------------------------------ landmark + skyline
 	local spire = find("MeridianSpire", "Model")[1]
 	local sparts, stop = 0, 0
@@ -90,7 +143,6 @@ local function body()
 		if d:IsA("Model") and d.ModelStreamingMode == Enum.ModelStreamingMode.Persistent then table.insert(persistent, d.Name); for _, x in d:GetDescendants() do if x:IsA("BasePart") then pparts += 1 end end end
 	end
 	check("Persistent only for the landmark", #persistent == 1 and pparts <= 90, table.concat(persistent, ","))
-	local blocks = pm:FindFirstChild("CityBlocks")
 	local nt, maxp, badMode = 0, 0, 0
 	for _, m in blocks:GetChildren() do
 		nt += 1

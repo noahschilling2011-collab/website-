@@ -125,13 +125,13 @@ end
 Plan.LANDMARK={name="Meridian Spire",x=0,z=8548,size=56,height=468,mast=74}
 -- Helipads (marker parts "Helipad", attribute Purpose). cf = centre of the landing surface (top face).
 -- The hotel roof (CityBuilder.building: roof top = GROUND + 126.2) gets a 1-stud deck; the airport pad stands
--- east of the arrival terminal.
+-- on the heliport east of the apron (fenced, VIP helicopter terminal beside it).
 local HOTEL=City.building("intl_hotel")
 local HOTEL_ROOF=G+17+((if HOTEL then HOTEL.floors else 10)-1)*12+1.2
 Plan.HOTEL_ROOF=HOTEL_ROOF
 Plan.HELIPADS={
 	hotel={id="pm_hotel",purpose="VIP",cf=CFrame.new(0,HOTEL_ROOF+1,8408),size=40,name="Meridian Grand Hotel roof"},
-	airport={id="pm_airport",purpose="VIPAirport",cf=CFrame.new(310,G+1,7648),size=44,name="Port Meridian Airport VIP helipad"},
+	airport={id="pm_airport",purpose="VIPAirport",cf=CFrame.new(604,G+1,7670),size=44,name="Port Meridian Airport VIP helipad"},
 }
 -- VIP limousine stand: lay-by on the north kerb of Arrivals Drive, right of the terminal exits. stand = bay 1
 -- (kept free for the chauffeur service), bay2 holds a waiting (decorative) limousine. Cars face west.
@@ -143,6 +143,19 @@ Plan.VIP_LIMO={
 Plan.TAXI_RANK={x1=-200,x2=-104,z1=7756,z2=7768}
 -- Business lounge in the west end of the arrival terminal (partition at x = -104 with a door gap).
 Plan.LOUNGE={x1=-158.5,x2=-104,z1=A.terminal.z1+.8,z2=A.terminal.z2-.8,doorZ1=7644,doorZ2=7656}
+-- Apron east of the arrival hall (flight request #7): concrete at APRON.top between the runway and the city, two
+-- stands facing west - stand 1 (marker part "ShuttleStand", CFrame = the shuttle's pivot) nose-in towards the
+-- hall's east wall with the door "ApronDoor" (12 wide), stand 2 holds the parked aircraft. Wings (half span 56.8 at
+-- scale 1.8) stay inside the apron; the hall side keeps clear of the arrival plaza (x <= 200 from z 7690).
+-- Fenced towards the city; the runway side stays open (taxi line from the runway at x = 340).
+Plan.APRON={
+	rects={{x1=A.terminal.x2,x2=548,z1=A.runway.z2,z2=7688},{x1=204,x2=548,z1=7688,z2=7721.5}} :: {Rect}, -- fence on the edges
+	top=G+.25,
+	stand=CFrame.lookAt(Vector3.new(252,G+.25,7664),Vector3.new(212,G+.25,7664)), -- stand 1: the shuttle (nose x ~192)
+	stand2=CFrame.lookAt(Vector3.new(480,G+.25,7664),Vector3.new(440,G+.25,7664)), -- stand 2: the parked aircraft
+	door={x=A.terminal.x2,z1=7655,z2=7667}, -- opening in the hall's east wall (between baggage claim and the news kiosk)
+	taxiX=340, -- taxi line: runway edge -> stand centreline (z of the stands)
+}
 -- Observation wheel at the east end of the waterfront.
 Plan.WHEEL={x=540,z=8556,radius=52,hub=G+62}
 
@@ -202,7 +215,7 @@ for _,b in Plan.BUS_STOPS do spot(stops,b.x,b.stand,City.WALK_TOP,b.face,"bus") 
 -- view points: fountains on the median, the spire, the wheel, the quay
 for _,z in Plan.FOUNTAINS do spot(views,-15,z,Plan.MEDIAN_TOP,E,"view");spot(views,15,z,Plan.MEDIAN_TOP,W,"view") end
 spot(views,574,8604,Plan.PLAZA_TOP,Vector3.new(-34,0,-48).Unit,"view") -- the Harbour Wheel
-spot(views,286,7686,Plan.PLAZA_TOP,Vector3.new(24,0,-38).Unit,"view") -- helipad gate
+spot(views,576,7714,Plan.PLAZA_TOP,N,"view") -- heliport gate (people waiting for the VIP transfer)
 Plan.BENCHES=benches
 Plan.SHOPS=shops
 Plan.STOPS=stops
@@ -238,8 +251,9 @@ local BLOCKS: {{any}}={
 	{"xw","exchange",{x1=-694,x2=-450,z1=7814,z2=8040},"mid"},
 	{"xs","exchange",{x1=-694,x2=-450,z1=8120,z2=8306},"mid"},
 	{"ps","parkside",{x1=450,x2=694,z1=8120,z2=8306},"mid"},
-	{"aw","arrivals",{x1=-694,x2=-214,z1=7612,z2=7716},"airport"},
-	{"ae","arrivals",{x1=384,x2=694,z1=7612,z2=7716},"airport"},
+	-- low airport buildings west of the hall; north faces at z >= 7632 (75+ studs off the runway centreline, no
+	-- awnings on that side). East of the hall: the apron and the heliport (no lots).
+	{"aw","arrivals",{x1=-694,x2=-214,z1=7632,z2=7716},"airport"},
 	{"h1","harbour",{x1=-694,x2=-574,z1=8366,z2=8500},"harbour"},
 	{"h2","harbour",{x1=-546,x2=-314,z1=8366,z2=8500},"harbour"},
 	{"h3","harbour",{x1=-286,x2=-124,z1=8366,z2=8500},"harbour"},
@@ -300,7 +314,7 @@ local function makeLots(): {Lot}
 					local crowns=pf.crowns or CROWNS
 					table.insert(out,{id=id.."_"..n,block=id,x=(l.x1+l.x2)/2,z=(l.z1+l.z2)/2,w=w,d=d,h=hgt,
 						style=pf.styles[(math.floor(h/13)%#pf.styles)+1],crown=crowns[(math.floor(h/17)%#crowns)+1],
-						tone=math.floor(h/19)%6+1,face=faces[1][1],district=district,glow=(math.floor(h/23)%3)~=0})
+						tone=math.floor(h/19)%6+1,face=if b[4]=="airport" then "s" else faces[1][1],district=district,glow=(math.floor(h/23)%3)~=0})
 				end
 			end
 		end
@@ -808,6 +822,8 @@ Plan.HARBOUR_KIOSK=Vector3.new(24,0,8604) -- GPS kiosk south of the spire plaza 
 Plan.SCULPTURE=Vector3.new(-36,0,8616) -- "Meridian Sail", promenade head
 Plan.SPLASH={Vector3.new(-64,0,8560),Vector3.new(64,0,8560)} -- ground-jet splash fountains on the spire plaza (radius 9)
 Plan.CARTS={Vector3.new(-520,0,8657),Vector3.new(-250,0,8657),Vector3.new(120,0,8657),Vector3.new(380,0,8657)} -- food carts
+Plan.CART_TABLES={} :: {Vector3} -- bistro tables with umbrellas either side of every cart (north of the lamp row)
+for _,c in Plan.CARTS do for _,dx in {-9,9} do table.insert(Plan.CART_TABLES,Vector3.new(c.X+dx,0,8651)) end end
 Plan.PROM_TREES={} :: {Prop} -- row in planter beds at z 8614 (between the harbour walk and the promenade walk)
 do
 	local k=950
@@ -945,6 +961,7 @@ function Plan.obstacles(): {Obstacle}
 	boxO(o,Wh.x-14,Wh.x+14,Wh.z-6,Wh.z+6,"wheel")
 	for _,x in Plan.HARBOUR_LAMPS do sq(o,x,8662,.3,"lamp") end
 	for _,p in Plan.CARTS do boxO(o,p.X-3.6,p.X+3.6,p.Z-1.8,p.Z+1.8,"cart") end
+	for _,p in Plan.CART_TABLES do sq(o,p.X,p.Z,2.4,"table") end -- table + chairs
 	sq(o,Plan.SCULPTURE.X,Plan.SCULPTURE.Z,4,"sculpture")
 	for _,x in Plan.BOLLARDS do sq(o,x,8699.3,.35,"bollard") end
 	for _,b in Plan.BEDS do boxO(o,b.x1,b.x2,b.z1,b.z2,"bed") end
@@ -952,6 +969,11 @@ function Plan.obstacles(): {Obstacle}
 	for _,p in Plan.PARK_LAMPS do sq(o,p.X,p.Z,.3,"lamp") end
 	for _,p in Plan.PARK_TREE_POS do sq(o,p[1],p[2],.65,"tree") end
 	sq(o,660,7974,8,"bandstand");sq(o,452,7940,.3,"post")
+	-- apron fence (city side) and the heliport fence / VIP terminal beside the district walk
+	local ap=Plan.APRON.rects
+	boxO(o,ap[2].x1,ap[2].x2+.3,ap[2].z2,ap[2].z2+.3,"fence");boxO(o,ap[2].x1,ap[2].x1+.3,ap[2].z1,ap[2].z2,"fence")
+	local hp=Plan.HELIPADS.airport.cf
+	boxO(o,hp.X-20,hp.X+36,hp.Z+35.6,hp.Z+36,"fence");boxO(o,hp.X+45,hp.X+86,hp.Z-4,hp.Z+39.3,"terminal")
 	-- district gateway signs
 	for _,d in Plan.DISTRICT_SIGNS do boxO(o,d.x-Plan.SIGN_W/2-.4,d.x+Plan.SIGN_W/2+.4,d.z-.9,d.z+.9,"sign") end
 	return o
@@ -972,10 +994,10 @@ local function pmPaths(): {Path}
 	add(2.5,{v(0,7764,Wk),v(0,7804,M)},{[1]="pm_arrivals"})
 	-- airport district promenade along the north strip (lots stop at z 7716)
 	add(4,{v(-196,7728),v(-450,7728),v(-690,7728)})
-	add(4,{v(196,7728),v(450,7728),v(690,7728)})
+	add(4,{v(196,7728),v(450,7728),v(576,7728),v(690,7728)})
 	for _,x in {-450,450} do add(2.5,{v(x,7728),v(x,7764,Wk)}) end
-	-- helipad gate (people waiting for the VIP transfer)
-	add(2,{v(196,7728),v(262,7700),v(286,7686)})
+	-- heliport gate (people waiting for the VIP transfer)
+	add(2,{v(576,7728),v(576,7714)})
 	-- boulevard median: two paths around the fountains, joined at the noses on the crossings
 	for _,sx in {-15,15} do
 		add(3,{v(0,7804,M),v(sx,7814,M),v(sx,7880,M),v(sx,8000,M),v(sx,8042,M),v(0,8051,M)})
@@ -1115,14 +1137,107 @@ function Plan.downtown(): Net
 	dtNet=n
 	return n
 end
--- Activation regions of the client city life (camera position). Business City ends at Airport Road's south
--- sidewalk (z 2408): City Airport (terminal z 2430+, check-in z 2461, car park bays z 2421) stays quiet.
+-- City Airport terminal (airport request #5): the airport package's walk graph (CityPlan.AIRPORT.walk, read-only;
+-- its node links are node ids, ours are edge ids) plus seat spurs - the first row of gate A1 (the shuttle gate) facing
+-- the concourse and the north sides of the two landside seating islands, each spur node serving a pair of seats
+-- like a bench (seat = the pair centre at floor level). The shuttle gate's boarding point is a portal (walkers board /
+-- arrive through the jet bridge); the closed gates A2 / A3 keep no boarding idle. No roads, cars or crossings.
+local apNet: Net?=nil
+function Plan.airportNet(): Net
+	local cached=apNet
+	if cached then return cached end
+	local a=City.AIRPORT
+	local src=a.walk
+	local F=City.GROUND+.5
+	local nodes: {WalkNode}={};local edges: {WalkEdge}={}
+	for i,n in src.nodes do nodes[i]={id=i,p=n.p,links={},idle=n.idle,face=n.face,portal=n.portal} end
+	local function addE(i: number,j: number,half: number)
+		local pa,pb=nodes[i].p,nodes[j].p
+		local e: WalkEdge={id=#edges+1,a=i,b=j,half=half,len=math.sqrt((pb.X-pa.X)^2+(pb.Z-pa.Z)^2)}
+		edges[e.id]=e
+		table.insert(nodes[i].links,e.id);table.insert(nodes[j].links,e.id)
+		return e
+	end
+	-- the airport graph guarantees clearance for a radius-1 walker on the centre line: walk close to it (lateral <= 0.25)
+	for _,e in src.edges do addE(e.a,e.b,math.min(e.half,.25)) end
+	local function addN(x: number,z: number): number
+		local n: WalkNode={id=#nodes+1,p=Vector3.new(x,F,z),links={}}
+		nodes[n.id]=n
+		return n.id
+	end
+	-- split edge e at point (x, z) (on it); returns the new node
+	local function split(e: WalkEdge,x: number,z: number): number
+		local n=addN(x,z)
+		local b=e.b
+		local li=table.find(nodes[b].links,e.id);if li then table.remove(nodes[b].links,li) end
+		e.b=n
+		local pa=nodes[e.a].p;e.len=math.sqrt((x-pa.X)^2+(z-pa.Z)^2)
+		table.insert(nodes[n].links,e.id)
+		addE(n,b,e.half)
+		return n
+	end
+	-- node on the concourse line (z 2503) at x: an existing node within 1.5 studs or a split of the edge under x
+	local function concourseAt(x: number): number?
+		for _,n in nodes do if math.abs(n.p.Z-2503)<.01 and math.abs(n.p.X-x)<1.5 then return n.id end end
+		for _,e in edges do
+			local pa,pb=nodes[e.a].p,nodes[e.b].p
+			if math.abs(pa.Z-2503)<.01 and math.abs(pb.Z-2503)<.01 and x>math.min(pa.X,pb.X) and x<math.max(pa.X,pb.X) then return split(e,x,2503) end
+		end
+		return nil
+	end
+	local function seatSpot(link: number,x: number,seatZ: number,face: Vector3)
+		local n=addN(x,seatZ+face.Z*1.6)
+		local node=nodes[n];node.idle="bench";node.face=face;node.seat=Vector3.new(x,F,seatZ)
+		addE(link,n,.6)
+	end
+	-- pairs of seats in a row side (CityPlan seat formula: n = floor(len / 2.6) seats, evenly spread)
+	local function pairs(x1: number,x2: number): {number}
+		local n=math.max(1,math.floor((x2-x1)/2.6));local w=(x2-x1)/n
+		local out: {number}={}
+		for k=0,n-2,2 do table.insert(out,x1+(k+1)*w) end
+		return out
+	end
+	local N,S=Vector3.new(0,0,-1),Vector3.new(0,0,1)
+	local gx=a.stands[a.shuttleStand]
+	for _,row in {{gx-34,gx-17.4},{gx+5.8,gx+34}} do
+		for _,x in pairs(row[1],row[2]) do
+			local c=concourseAt(x)
+			if c then seatSpot(c,x,2511.5-1.4,N) end
+		end
+	end
+	for _,ix in {-150,150} do
+		local l=src.byName["L"..ix]
+		if l then
+			local j=addN(ix,2470)
+			addE(l,j,1)
+			for _,x in pairs(ix-9.1,ix+9.1) do seatSpot(j,x,2479.5-1.4,N) end
+		end
+	end
+	-- boarding: the shuttle gate's bridge door is a portal, the closed gates keep no boarding idle
+	for i=1,#a.stands do
+		local b=src.byName["A"..i.."board"]
+		if b then
+			if i==a.shuttleStand then nodes[b].portal=true;nodes[b].idle=nil else nodes[b].idle=nil end
+		end
+	end
+	local t=a.terminal
+	local n: Net={id="airport",bounds={x1=t.x1,x2=t.x2,z1=t.z1,z2=t.z2},signals=false,roads={},junctions={},byRoad={},nodes=nodes,edges=edges,lanes={},roadY=City.ROAD_TOP,obs={}}
+	apNet=n
+	return n
+end
+-- Activation regions of the client city life (camera position; y2 = optional ceiling). Business City ends at Airport
+-- Road's south sidewalk (z 2408); the City Airport terminal (x +-300, z 2430..2530, check-in z 2461) has its own
+-- small crowd (no cars) from the forecourt (z 2417, so the hall is filled before the doors) to the jet bridges
+-- (z 2560, docked shuttle), below the roof line; the car park lot west of the terminal and the apron stay quiet.
 Plan.REGIONS={
 	{id="metro",x1=-2600,x2=2600,z1=6500,z2=10200},
 	{id="downtown",x1=-1260,x2=1260,z1=700,z2=2416},
-} :: {{id: string,x1: number,x2: number,z1: number,z2: number}}
+	{id="airport",x1=City.AIRPORT.terminal.x1,x2=City.AIRPORT.terminal.x2,z1=2417,z2=City.AIRPORT.terminal.z2+30,y2=City.GROUND+City.AIRPORT.height},
+} :: {{id: string,x1: number,x2: number,z1: number,z2: number,y2: number?}}
 function Plan.regionAt(p: Vector3): string?
-	for _,r in Plan.REGIONS do if p.X>=r.x1 and p.X<=r.x2 and p.Z>=r.z1 and p.Z<=r.z2 then return r.id end end
+	for _,r in Plan.REGIONS do
+		if p.X>=r.x1 and p.X<=r.x2 and p.Z>=r.z1 and p.Z<=r.z2 and (r.y2==nil or p.Y<=r.y2) then return r.id end
+	end
 	return nil
 end
 return Plan

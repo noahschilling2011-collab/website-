@@ -3,6 +3,8 @@
 gen/     : work/src + staff_harness/stubs (DoorService/LiftService/PlotService/SessionService/Remote doubles)
 gen_neg/ : the same, but the staffops files replaced by the versions BEFORE the package (agents/staffops/orig):
            negative check, the suites must FAIL there.
+gen_prev/: the same, but the staffops files of review round 1 (agents/staffops/round1): regression negative
+           check of the fix round (tests/staffops/negative_round2.sh), the round-2 checks must FAIL there.
 SRC can be overridden with STAFFOPS_SRC (e.g. a sandbox copy)."""
 import os, shutil, json, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +30,18 @@ def lstr(s):
     eq = "=" * lvl
     return "[" + eq + "[\n" + s + "]" + eq + "]"
 
-def build(name, negative=False):
+ROUND1 = os.path.join(ROOT, "agents", "staffops", "round1")
+ROUND1_FILES = {
+    "StaffService.module.luau": "ServerScriptService/Server/Services",
+    "StaffEvents.module.luau": "ServerScriptService/Server/Services",
+    "StaffRota.module.luau": "ServerScriptService/Server/Services",
+    "StaffAssignment.module.luau": "ServerScriptService/Server/Services",
+    "EmployeeConfig.module.luau": "ReplicatedStorage/Shared/Config",
+    "Dialogue.module.luau": "ReplicatedStorage/Shared",
+    "PropFxController.module.luau": "StarterPlayer/StarterPlayerScripts/Client/Controllers",
+}
+
+def build(name, negative=False, prev=False):
     out = os.path.join(HERE, name)
     tree = os.path.join(out, "tree")
     if os.path.exists(out): shutil.rmtree(out)
@@ -38,6 +51,9 @@ def build(name, negative=False):
         src = os.path.join(STUBS, sub)
         for fn in os.listdir(src):
             shutil.copy(os.path.join(src, fn), os.path.join(dst, fn))
+    if prev:
+        for fn, rel in ROUND1_FILES.items():
+            shutil.copy(os.path.join(ROUND1, fn), os.path.join(tree, rel, fn))
     if negative:
         for fn, rel in ORIG_FILES.items():
             shutil.copy(os.path.join(ORIG, fn), os.path.join(tree, rel, fn))
@@ -74,3 +90,4 @@ def build(name, negative=False):
 
 build("gen")
 if "--neg" in sys.argv: build("gen_neg", negative=True)
+if "--prev" in sys.argv: build("gen_prev", prev=True)

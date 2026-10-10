@@ -5,8 +5,12 @@
 -- its progress (have / need) and the ETA in minutes; this module only words it and adds the concrete hint from
 -- real state (journey step, client trip, Save mode, research, Lab level). A pending training decision is the
 -- only thing shown instead of the goal (it auto-resolves within seconds). A tap opens the relevant app.
--- Phones (small HUD scale): the card is compact (no hint line, larger title), the column width stays 300 so
--- the company phone keeps its lane (Screens/Phone: HUD_WIDTH = 300 + 16).
+-- Phones (small HUD scale, UIRoot < COMPACT_SCALE): the whole column gets its own UIScale COMPACT_BOOST and larger
+-- compact text, so the goal title reads at about 13 pt and the progress at about 11 pt on an iPhone in landscape
+-- (UIRoot 0.432 x 1.5), and the buttons are real touch targets (>= 44 pt); the card drops its hint line and shows the
+-- step name in the progress text instead. The column is 300 design px wide at -16 from the right edge; the lane it
+-- takes (300 x boost + 16, in HUD-layer px) is published as the HUD frame's attribute "LaneWidth" for the company
+-- phone (Screens/Phone should keep left of it; design/requests/apps.md #4).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,8 +48,10 @@ export type GoalView = {
 	caption: string,
 	title: string,
 	body: string, -- hint line (hidden on phones)
-	progress: string, -- left text under the bar ("$18,400 / $27,000", "Trust 50 %", "Step 2 of 7")
-	eta: string, -- right text ("~2 min", "ready", "back in 1:20", "")
+	progress: string, -- left text under the bar on desktops ("Client ✓ · $18,400 / $27,000", "Step 2 of 7")
+	compactProgress: string, -- the same on the compact phone card ("Step 1 of 7 · Get training data", "Client ✓ · $18.4K / $27K")
+	shortProgress: string, -- used when the text above does not fit beside the ETA ("Step 1/7 · Get training data", "$18.4K / $27K")
+	eta: string, -- right text ("~2 min", "ready", "back in 1 min 20 s", "")
 	fraction: number?, -- bar fill 0..1 (nil = no bar)
 	training: boolean, -- bar follows the running training (smooth, client-side)
 	warn: boolean,
@@ -55,15 +61,39 @@ export type GoalView = {
 	releaseId: string?,
 }
 
-local WIDTH = 300 -- Screens/Phone.HUD_WIDTH depends on this width and the 16 px margin
+local WIDTH = 300 -- Screens/Phone.HUD_WIDTH depends on this width and the 16 px margin (x COMPACT_BOOST on phones)
+local MARGIN = 16
 local COMPACT_SCALE = 0.62 -- UIRoot scale below which the HUD is drawn compact (phones in landscape)
+local COMPACT_BOOST = 1.5 -- the column's own UIScale in compact mode (0.432 x 1.5 = 0.65 on an iPhone 12-14)
+local TOUCH_BUTTON = 70 -- compact touch buttons: 70 x 1.5 x 0.432 = 45 pt (Apple's 44 pt minimum)
 
 local HUD = {}
+HUD.WIDTH = WIDTH
+HUD.MARGIN = MARGIN
+HUD.COMPACT_BOOST = COMPACT_BOOST
 
 local root: Frame? = nil
 
 local function dollars(n: number): string
 	return (if n < 0 then "-$" else "$") .. Format.int(math.abs(n))
+end
+-- "Client ✓ · $18,400 / $27,000" (the first client is signed), the compact form "Client ✓ · $18.4K / $27K" and the shortest
+-- "$18.4K / $27K": the card shows the first one that fits beside the ETA, so the goal amount is never cut off
+local function moneyProgress(prefix: string, have: number, need: number): (string, string, string)
+	local short = Format.money(have) .. " / " .. Format.money(need)
+	return prefix .. dollars(have) .. " / " .. dollars(need), prefix .. short, short
+end
+-- about how wide a line of text is (Gotham-like UI fonts average ~0.55 em per character)
+local function textWidth(text: string, size: number): number
+	return (utf8.len(text) or #text) * size * 0.55
+end
+HUD.textWidth = textWidth
+-- no live model at all (released ones may have been retired): the hint asks for a release, never "best: 0"
+local function needsText(c: any, best: number): string
+	if best <= 0 then
+		return `{c.name} needs {c.stat} {c.minimum}. No model is live: release one first.`
+	end
+	return `{c.name} needs {c.stat} {c.minimum}. Your best live model: {math.floor(best)}.`
 end
 
 -- "~3 min", "~1.4 h", "<1 min", "" (no profit = no ETA)
@@ -94,11 +124,6 @@ local function trainedModel(data: any): ModelData?
 		end
 	end
 	return nil
-end
-
-local function lineLabel(target: string?): string
-	local line = ModelConfig.getLine(target or "general")
-	return if line then line.label else "Consumer Chat"
 end
 
 local JOURNEY_HINT: { [string]: string } = {
@@ -133,7 +158,7 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 	local ops = if typeof(live.ops) == "table" then live.ops else {}
 	local saving = ops.saveMode == true
 	local view: GoalView = {
-		id = "done", caption = "Next goal", title = "", body = "", progress = "", eta = "", fraction = nil,
+		id = "done", caption = "Next goal", title = "", body = "", progress = "", compactProgress = "", shortProgress = "", eta = "", fraction = nil,
 		training = false, warn = false, saving = saving, app = "empire", section = nil, releaseId = nil,
 	}
 	local training = data.training
@@ -158,6 +183,8 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 	view.title = goal.text
 	local have, need = tonumber(goal.have) or 0, math.max(1, tonumber(goal.need) or 1)
 	local id = goal.id
+	local compact: string? = nil
+	local short: string? = nil
 	if id == "train" then
 		local journey = Journey.progress(data, selection)
 		view.app = journey.step.app
@@ -171,6 +198,8 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 		else
 			view.body = JOURNEY_HINT[journey.step.id] or journey.step.body
 			view.progress = `Step {journey.index} of {#Journey.STEPS}`
+			compact = `Step {journey.index} of {#Journey.STEPS} · {journey.step.title}`
+			short = `Step {journey.index}/{#Journey.STEPS} · {journey.step.title}`
 			view.fraction = (journey.index - 1) / #Journey.STEPS
 		end
 	elseif id == "release" then
@@ -180,6 +209,8 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 		view.releaseId = if ready then ready.id else nil
 		view.body = if ready then `{ready.name} v{ready.version} is trained. Pick the Recommended price and launch it.` else "Train a model, then launch it with the Recommended price."
 		view.progress = `Step 6 of {#Journey.STEPS}`
+		compact = `Step 6 of {#Journey.STEPS} · Release your model`
+		short = `Step 6/{#Journey.STEPS} · Release your model`
 		view.fraction = 5 / #Journey.STEPS
 	elseif id == "client" then
 		local first = CompanyOps.CLIENTS[1]
@@ -191,19 +222,42 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 		local best = CompanyOps.liveBest(data, first.stat)
 		if trip then
 			view.body = `You drive to {first.name} for the pilot visit. Signing pays {dollars(first.retainer)} at once and every day.`
-			view.eta = "back in " .. Format.duration(math.max(0, (tonumber(trip.back) or 0) - (tonumber(e.seconds) or 0)))
+			view.eta = "back in " .. Kit.countdown(math.max(0, (tonumber(trip.back) or 0) - (tonumber(e.seconds) or 0)))
 		elseif best < first.minimum then
-			view.body = `{first.name} needs {first.stat} {first.minimum}. Your best live model: {math.floor(best)}.`
+			view.body = needsText(first, best)
+			if best <= 0 then
+				view.app = "lab"
+				view.section = "release"
+			end
 		else
-			view.body = `{first.name} wants a pilot. You drive over by yourself as soon as cash covers the trip.`
+			-- trips start 08:00-15:00 (CompanyOps.DEPART) and only while cash covers the trip + CASH_MARGIN
+			local hour = CompanyOps.hour(tonumber(snapshot.serverTime) or 0)
+			local _, _, cost = CompanyOps.tripPlan(first.trip, 1, false)
+			local tripCash = cost + CompanyOps.CASH_MARGIN
+			if hour < CompanyOps.DEPART.from or hour >= CompanyOps.DEPART.to then
+				view.body = `{first.name} wants a pilot. Visits start 08:00–15:00: you drive over at 08:00.`
+			elseif (tonumber(data.money) or 0) < tripCash then
+				view.body = `{first.name} wants a pilot. You drive over once cash covers the trip ({dollars(tripCash)}).`
+			else
+				view.body = `{first.name} wants a pilot. You drive over by yourself in a moment.`
+			end
 		end
 	elseif id == "office2" or id == "office3" or id == "office4" or id == "office5" or id == "jet" then
 		view.app = "empire"
 		view.section = if id == "jet" then "settings" else "office"
-		view.progress = (if id == "office2" then "First client ✓ · " else "") .. dollars(have) .. " / " .. dollars(need)
+		view.progress, compact, short = moneyProgress(if id == "office2" then "Client ✓ · " else "", have, need)
 		view.fraction = have / need
 		view.eta = if have >= need then "ready" else HUD.etaText(goal.etaMinutes)
-		if saving then
+		local revenue, cost = tonumber(live.revenue) or 0, tonumber(live.cost) or 0
+		local earning = revenue > 0 or (typeof(e.deals) == "table" and typeof(e.deals.accounts) == "table" and next(e.deals.accounts) ~= nil)
+		if have < need and goal.etaMinutes == nil and earning and cost > revenue then
+			-- a company that sells but spends more: the real lever is costs and prices, not "release a model" (and it
+			-- comes before a Save-mode line that is about to switch off)
+			local wages = (tonumber(ops.wagesCost) or 0) / 60
+			view.body = `Costs exceed income by {dollars((cost - revenue) * CompanyOps.DAY)}/day (wages {dollars(wages * CompanyOps.DAY)}/day): raise prices, set the HR budget lower or pause HR in Settings.`
+			view.warn = true
+			view.section = "settings"
+		elseif saving then
 			view.body = "Save mode: research, Lab levels and big buys wait until the move."
 		elseif have < need and goal.etaMinutes == nil then
 			view.body = "No profit right now. Release models and sign clients to get there."
@@ -243,7 +297,7 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 					local best = CompanyOps.liveBest(data, c.stat)
 					local trust = if typeof(e.deals) == "table" and typeof(e.deals.trust) == "table" then tonumber(e.deals.trust[c.id]) else nil
 					if best < c.minimum then
-						hint = `{c.name} needs {c.stat} {c.minimum}. Your best live model: {math.floor(best)}.`
+						hint = needsText(c, best)
 					elseif trust then
 						hint = `{c.name}: trust {math.floor(math.min(1, trust) * 100)} %. Reps keep visiting.`
 						view.fraction = math.min(1, trust)
@@ -283,7 +337,26 @@ function HUD.describe(snapshot: Snapshot, selection: any?): GoalView
 	if view.fraction then
 		view.fraction = math.clamp(view.fraction :: number, 0, 1)
 	end
+	view.compactProgress = compact or view.progress
+	view.shortProgress = short or view.compactProgress
 	return view
+end
+
+-- The safety rules (CORE_SPEC 8.3) as one HUD badge: "" when nothing applies.
+function HUD.safetyText(snapshot: Snapshot): string
+	local data: any = snapshot.data
+	local live: any = snapshot.live
+	local e = data.empire
+	local ops = if typeof(live.ops) == "table" then live.ops else {}
+	local leave = math.max(0, math.floor(tonumber(e.unpaidLeave) or 0))
+	if ops.paused == true then
+		return "Cash below $0 for a day · trips paused"
+	elseif leave > 0 then
+		return `{leave} on unpaid leave · cash below $0`
+	elseif (tonumber(data.money) or 0) < 0 then
+		return "Cash below $0"
+	end
+	return ""
 end
 
 local function travelState(): string?
@@ -300,12 +373,17 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 	frame.Visible = false
 	root = frame
 
-	local column = Kit.frame(frame, UDim2.fromOffset(WIDTH, 0), UDim2.new(1, -16, 0, 12))
+	local column = Kit.frame(frame, UDim2.fromOffset(WIDTH, 0), UDim2.new(1, -MARGIN, 0, 12))
 	column.Name = "Column"
 	column.AnchorPoint = Vector2.new(1, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	local layout = Kit.list(column, 8)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	-- phones: the column's own scale (around its top-right anchor), see COMPACT_BOOST
+	local boost = Instance.new("UIScale")
+	boost.Name = "CompactBoost"
+	boost.Parent = column
+	frame:SetAttribute("LaneWidth", WIDTH + MARGIN)
 
 	-- Firma und Zahlen in einem Glas-Panel: Geld groß, Nutzer und Reputation als Nebenwerte
 	local panel = Kit.panel(column, UDim2.new(1, 0, 0, 0))
@@ -362,6 +440,9 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 	travelBadge.Visible = false
 	local saveBadge = Kit.tag(badges, "Saving off (Studio test)", C.warn, 2)
 	saveBadge.Visible = false
+	local safetyBadge = Kit.tag(badges, "", C.bad, 0)
+	safetyBadge.Name = "Safety"
+	safetyBadge.Visible = false
 
 	-- Next goal: one goal with progress and ETA; a tap opens the matching app
 	local step = Instance.new("TextButton")
@@ -406,7 +487,7 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 	local progressText = Kit.text(progressRow, "", 13, F.medium, C.muted)
 	progressText.Name = "Have"
 	progressText.AutomaticSize = Enum.AutomaticSize.None
-	progressText.Size = UDim2.new(0.7, 0, 1, 0)
+	progressText.Size = UDim2.new(1, -60, 1, 0)
 	progressText.TextTruncate = Enum.TextTruncate.AtEnd
 	local etaText = Kit.text(progressRow, "", 13, F.bold, C.text)
 	etaText.Name = "Eta"
@@ -427,20 +508,27 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 		end
 	end)
 
-	-- milestone rewards are claimed by hand (EmpireAction ClaimQuest in Company → Goals): a small nudge
-	local reward = Kit.button(column, "Milestone reward ready · Collect", "secondary", UDim2.new(1, 0, 0, 34))
+	-- milestone rewards are claimed by hand (EmpireAction ClaimQuest in Company → Goals): a small nudge. On phones it
+	-- sits beside "Open company" in one row of touch-sized buttons (the column must stay clear of the phone button).
+	local buttonRow = Kit.frame(column, UDim2.new(1, 0, 0, 0))
+	buttonRow.Name = "Buttons"
+	buttonRow.AutomaticSize = Enum.AutomaticSize.Y
+	buttonRow.LayoutOrder = 4
+	local buttonLayout = Kit.list(buttonRow, 8)
+	local reward = Kit.button(buttonRow, "Milestone reward ready · Collect", "secondary", UDim2.new(1, 0, 0, 34))
 	reward.Name = "RewardReady"
-	reward.LayoutOrder = 4
+	reward.LayoutOrder = 1
 	reward.TextSize = 14
+	reward.TextWrapped = true
 	reward.Visible = false
 	Kit.onClick(reward, function()
 		Computer.open("empire", "milestones")
 	end)
 
 	-- Computer-Button, für Tastatur mit Tastenkappe "C"
-	local computerButton = Kit.button(column, "Open company", "primary", UDim2.new(1, 0, 0, 50))
+	local computerButton = Kit.button(buttonRow, "Open company", "primary", UDim2.new(1, 0, 0, 50))
 	computerButton.Name = "OpenCompany"
-	computerButton.LayoutOrder = 5
+	computerButton.LayoutOrder = 2
 	computerButton.TextSize = 17
 	Kit.onClick(computerButton, Computer.toggle)
 	if UserInputService.KeyboardEnabled then
@@ -460,19 +548,49 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 		Kit.onClick(dev, onDev)
 	end
 
-	-- Phones: the whole HUD layer is scaled down a lot (UIRoot), so the goal card drops its hint line and uses a
-	-- larger title. Read the scale of the HUD layer (sibling UIScale of this frame's parent).
+	-- Phones: the whole HUD layer is scaled down a lot (UIRoot), so the column gets its own UIScale (COMPACT_BOOST),
+	-- the goal card drops its hint line (the step name moves into the progress text) and the buttons become touch
+	-- sized. Read the scale of the HUD layer (sibling UIScale of this frame's parent).
 	local compact = false
+	local function layoutButtons()
+		local touch = compact and Kit.isTouch()
+		local h = if touch then TOUCH_BUTTON elseif compact then 56 else 50
+		if compact then
+			-- one row: [Collect reward | Open company]
+			buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+			reward.Text = "Collect reward"
+			reward.Size = UDim2.new(0.42, -4, 0, h)
+			computerButton.Size = if reward.Visible then UDim2.new(0.58, -4, 0, h) else UDim2.new(1, 0, 0, h)
+		else
+			buttonLayout.FillDirection = Enum.FillDirection.Vertical
+			reward.Text = "Milestone reward ready · Collect"
+			reward.Size = UDim2.new(1, 0, 0, 34)
+			computerButton.Size = UDim2.new(1, 0, 0, h)
+		end
+		computerButton.TextSize = if compact then 18 else 17
+		reward.TextSize = if compact then 16 else 14
+	end
 	local function applyCompact()
 		local scale = parent:FindFirstChildOfClass("UIScale")
 		compact = scale ~= nil and scale.Scale < COMPACT_SCALE
-		stepTitle.TextSize = if compact then 19 else 17
-		stepCaption.TextSize = if compact then 14 else 13
-		progressText.TextSize = if compact then 15 else 13
-		etaText.TextSize = if compact then 15 else 13
+		boost.Scale = if compact then COMPACT_BOOST else 1
+		frame:SetAttribute("LaneWidth", WIDTH * boost.Scale + MARGIN)
+		frame:SetAttribute("Compact", compact)
+		stepTitle.TextSize = if compact then 20 else 17
+		stepCaption.TextSize = if compact then 15 else 13
+		progressText.TextSize = if compact then 17 else 13
+		etaText.TextSize = if compact then 17 else 13
+		progressRow.Size = UDim2.new(1, 0, 0, if compact then 20 else 16)
+		captionRow.Size = UDim2.new(1, 0, 0, if compact then 18 else 16)
+		usersValue.TextSize = if compact then 16 else 14
+		repValue.TextSize = if compact then 16 else 14
+		statsRow.Size = UDim2.new(1, 0, 0, if compact then 20 else 18)
+		moneySub.TextSize = if compact then 15 else 13
+		rankLabel.TextSize = if compact then 14 else 13
 		stepPadding.PaddingTop = UDim.new(0, if compact then 9 else 12)
 		stepPadding.PaddingBottom = UDim.new(0, if compact then 10 else 13)
 		stepBody.Visible = not compact and stepBody.Text ~= ""
+		layoutButtons()
 	end
 	local layerScale = parent:FindFirstChildOfClass("UIScale")
 	if layerScale then
@@ -505,7 +623,10 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 		local travel = travelState()
 		travelBadge.Visible = travel ~= nil
 		travelBadge.Text = if travel == "flying" then "IN THE AIR" elseif travel == "abroad" then "ABROAD · PORT MERIDIAN" else ""
-		badges.Visible = travelBadge.Visible or saveBadge.Visible
+		local safety = HUD.safetyText(snapshot)
+		safetyBadge.Text = string.upper(safety)
+		safetyBadge.Visible = safety ~= ""
+		badges.Visible = travelBadge.Visible or saveBadge.Visible or safetyBadge.Visible
 		local claimable = false
 		for _, quest in EmpireConfig.QUESTS do
 			if not data.empire.quests[quest.id] and EmpireMath.progress(data, quest) >= quest.target then
@@ -513,7 +634,10 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 				break
 			end
 		end
-		reward.Visible = claimable
+		if reward.Visible ~= claimable then
+			reward.Visible = claimable
+			layoutButtons()
+		end
 
 		-- money per game day (CORE_SPEC 6: the UI shows running money per game day)
 		local live = snapshot.live
@@ -539,8 +663,20 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 			stepBar.set(view.fraction :: number)
 		end
 		progressRow.Visible = view.progress ~= "" or view.eta ~= ""
-		progressText.Text = view.progress
 		etaText.Text = view.eta
+		-- the progress text takes what the ETA leaves: the first form that fits (desktop text, phone text, shortest)
+		local etaWidth = if view.eta == "" then 0 else math.ceil(textWidth(view.eta, etaText.TextSize)) + 10
+		progressText.Size = UDim2.new(1, -etaWidth, 1, 0)
+		local room = WIDTH - stepPadding.PaddingLeft.Offset - stepPadding.PaddingRight.Offset - etaWidth
+		local choice = view.shortProgress
+		local candidates: { string } = if compact then { view.compactProgress } else { view.progress, view.compactProgress }
+		for _, candidate in candidates do
+			if textWidth(candidate, progressText.TextSize) <= room then
+				choice = candidate
+				break
+			end
+		end
+		progressText.Text = choice
 		stepStroke.Color = if view.warn then C.warn else C.line
 		stepStroke.Transparency = if view.warn then 0.45 else 0.87
 	end)
@@ -568,7 +704,7 @@ function HUD.mount(parent: Frame, devAllowed: boolean, onDev: () -> ())
 			stepBar.set(fraction)
 			progressText.Text = string.format("Training %d %%", math.floor(fraction * 100))
 			local eta = StateController.trainingEta()
-			etaText.Text = if eta > 0 and eta < math.huge then Format.duration(eta) .. " left" else ""
+			etaText.Text = if eta > 0 and eta < math.huge then Kit.countdown(eta) .. " left" else ""
 		end
 	end)
 

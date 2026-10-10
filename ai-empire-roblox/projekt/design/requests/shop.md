@@ -81,6 +81,7 @@ DebugService now accepts (Studio only, never live): `{cmd="pass", key="vip"|"lim
 ## 7. Kit.module.luau (client, owner of Kit) — sidebar icon (optional)
 `Kit.icon(parent, "shop")` falls back to the market bars. A small bag icon would fit, e.g.
 `elseif kind=="shop" then ring(.16,.3,.68,.64,3);ring(.34,.06,.32,.32,6)`.
+STATUS: already present (Kit.icon has the shopping-bag branch for "shop"; checked by apps)
 
 ## 8. life / talk packages — react to shop moments (optional, attributes only)
 * Office attribute `TeamPartyUntil` (number, `workspace:GetServerTimeNow()` deadline) is set while a team party

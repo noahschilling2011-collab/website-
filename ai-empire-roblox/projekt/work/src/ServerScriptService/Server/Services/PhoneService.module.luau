@@ -7,16 +7,23 @@
 --   * hooks for later packages: PhoneService.onAction("itinerary" | "driver" | ..., handler). Until the itinerary
 --     package registers "itinerary", accepting a trip call answers honestly "The travel desk opens soon".
 --   * extra calendar items and messages from other packages (addCalendarItem / message) -> Notify "PHONE_UPDATE"
+--     that carries the new item / message (the client applies it without a refetch); a ringing call that was not
+--     answered within PhoneMath.CALL_RING s becomes "missed" -> PHONE_UPDATE {what = "calls", call}
 --   * contacts: the assistant (opens her existing briefing panel through the Notify ASSISTANT_OPEN the client
 --     already handles), the driver hook, reception and the IT desk (answers from real state)
 --   * settings: "Join business trips automatically" (default off). Saved in empire.prefs when the econ owner adds
 --     that field (request design/requests/phone.md); until then per session only.
 --   * AI chat with the player's own released models (user request 16): Roblox TextGenerator on the server,
 --     system prompt from the model's real data (PhoneMath.systemPrompt), input checked (Guard) and filtered
---     (TextService) first, per-player limits (1 request / 4 s, 10 / min), a global budget below 100 / min, a
---     breaker after errors, and an honest offline demo reply (PhoneMath.demoReply, labelled "Demo reply (offline)")
---     whenever TextGenerator is unavailable, busy or failing. History stays in memory (never saved), no economic
---     effect (CORE_SPEC 11.6).
+--     (TextService) first, per-player limits (1 request / 4 s, 10 / min), a global budget below 100 / min, and an
+--     honest offline demo reply (PhoneMath.demoReply, labelled "Demo reply (offline)") whenever TextGenerator is
+--     unavailable, busy or failing. Breakers: a failed / empty / blocked reply pauses TextGenerator for THAT player
+--     only (PLAYER_BREAKER_*); the server-wide breaker opens only when TextGenerator itself looks unavailable (it
+--     cannot be created, or says "not available / not eligible ..."), or when requests of GLOBAL_PLAYERS different
+--     players fail within GLOBAL_WINDOW s with no success in between - one player can never switch the AI off
+--     for everybody. The ContextToken keeps ~20 messages of context; when it is lost (error, new generator after
+--     the model changed) the last turns are re-sent inside UserPrompt (PhoneMath.recapPrompt). History stays in
+--     memory (never saved), no economic effect (CORE_SPEC 11.6).
 -- Remote PhoneAction {action = inbox | read | calendar | chat | call | setting, ...}.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -35,8 +42,14 @@ local Session = require(script.Parent.SessionService)
 local Phone = {}
 
 Phone.SCAN_EVERY = 1 -- seconds between two looks at every company (calls)
-Phone.BREAKER_BASE = 30 -- seconds without TextGenerator after the first error (doubles, at most BREAKER_MAX)
+Phone.BREAKER_BASE = 30 -- server-wide: seconds without TextGenerator once it looks unavailable (doubles, at most BREAKER_MAX)
 Phone.BREAKER_MAX = 600
+Phone.PLAYER_BREAKER_BASE = 20 -- one player whose own requests fail (blocked, empty, erroring): demo replies for him only
+Phone.PLAYER_BREAKER_MAX = 300
+Phone.GLOBAL_PLAYERS = 2 -- request errors of this many different players ...
+Phone.GLOBAL_WINDOW = 60 -- ... within this many seconds (no success in between) open the server-wide breaker
+-- error texts that mean "TextGenerator does not work here at all" (place / region / eligibility), lower case
+Phone.UNAVAILABLE = { "not available", "unavailable", "not eligible", "ineligible", "not enabled", "not supported", "unsupported" }
 Phone.CONTACTS = { assistant = true, driver = true, reception = true, it = true } :: { [string]: boolean }
 Phone.SETTINGS = { autoTrips = true } :: { [string]: boolean }
 -- The built-in assistant call for a new region / abroad pilot trip. The itinerary package sets this to false when it
@@ -62,6 +75,7 @@ type Call = {
 	data: any?, -- what the hook gets (trip details)
 }
 type ChatState = { gen: any?, sig: string, token: string?, turns: { any }, n: number }
+type Breaker = { until_: number, fails: number }
 type State = {
 	calls: { Call },
 	seq: number,
@@ -71,13 +85,15 @@ type State = {
 	chat: { [string]: ChatState },
 	times: { number },
 	busy: boolean,
+	breaker: Breaker, -- this player's own TextGenerator pause
 	seen: { ready: boolean, signed: number, trips: { [string]: boolean }, offices: { [string]: boolean } },
 }
 
 local states: { [any]: State } = setmetatable({}, { __mode = "k" }) :: any
 local hooks: { [string]: Hook } = {}
 local globalTimes: { number } = {}
-local breaker = { until_ = 0, fails = 0 }
+local breaker: Breaker = { until_ = 0, fails = 0 } -- server-wide
+local failLog: { { user: any, at: number } } = {} -- request errors since the last success (GLOBAL_WINDOW)
 
 -- seams for headless tests: generator factory, input filter, clocks
 local function defaultGenerator(prompt: string, temperature: number, topP: number, seed: number): any
@@ -109,15 +125,23 @@ function Phone._seams(opt: { [string]: any })
 end
 function Phone._reset()
 	table.clear(globalTimes)
+	table.clear(failLog)
 	breaker.until_ = 0
 	breaker.fails = 0
+	for _, st in states do
+		st.breaker.until_ = 0
+		st.breaker.fails = 0
+	end
+end
+function Phone._breaker(): Breaker
+	return breaker
 end
 
 local function stateOf(s: any): State
 	local st = states[s]
 	if not st then
 		st = { calls = {}, seq = 0, settings = { autoTrips = false }, messages = {}, calendar = {}, chat = {}, times = {}, busy = false,
-			seen = { ready = false, signed = 0, trips = {}, offices = {} } }
+			breaker = { until_ = 0, fails = 0 }, seen = { ready = false, signed = 0, trips = {}, offices = {} } }
 		states[s] = st
 	end
 	return st :: State
@@ -126,13 +150,6 @@ Phone._state = stateOf
 
 local function fire(s: any, kind: string, payload: any)
 	if s.player then Remote.fire(s.player, "Notify", kind, payload) end
-end
-
-local function firstName(name: any): string?
-	if typeof(name) ~= "string" then return nil end
-	local text: string = name
-	local first: string? = string.match(text, "^(%S+)")
-	return first
 end
 
 local function callPayload(c: Call): { [string]: any }
@@ -186,22 +203,27 @@ function Phone.message(s: any, msg: { [string]: any })
 	local st = stateOf(s)
 	st.seq += 1
 	local day, hour = PhoneMath.now(s.data.empire, seams.clock())
-	table.insert(st.messages, 1, { id = "m" .. st.seq, from = tostring(msg.from or "Company"), title = tostring(msg.title or ""), body = tostring(msg.text or ""),
-		tone = if typeof(msg.tone) == "string" then msg.tone else "info", day = day, hour = hour })
+	local m = { id = "m" .. st.seq, from = tostring(msg.from or "Company"), title = tostring(msg.title or ""), body = tostring(msg.text or ""),
+		tone = if typeof(msg.tone) == "string" then msg.tone else "info", day = day, hour = hour }
+	table.insert(st.messages, 1, m)
 	while #st.messages > PhoneMath.INBOX_MAX do table.remove(st.messages) end
-	fire(s, "PHONE_UPDATE", { what = "messages" })
+	fire(s, "PHONE_UPDATE", { what = "messages", message = m })
 end
 
 -- A calendar item of another package (itinerary: flight, hotel, meeting, driver). item = {key, title, detail?,
 -- at = server clock (workspace:GetServerTimeNow()) | day + hour, kind?}. Same key replaces the old item.
+-- Prefer `at`. day + hour mean exactly what the phone's status bar shows at that moment: company days turn at
+-- 08:00, so {day = 13, hour = 7} is 07:00 at the END of company day 13 (the night before day 14 starts) and
+-- sorts after {day = 13, hour = 9}.
 function Phone.addCalendarItem(s: any, item: { [string]: any }): boolean
 	if typeof(item.key) ~= "string" or typeof(item.title) ~= "string" then return false end
 	local st = stateOf(s)
 	for i, old in st.calendar do if old.key == item.key then table.remove(st.calendar, i); break end end
 	if #st.calendar >= PhoneMath.CALENDAR_MAX then table.remove(st.calendar, 1) end
-	table.insert(st.calendar, { key = item.key, title = item.title, detail = if typeof(item.detail) == "string" then item.detail else nil,
-		at = if typeof(item.at) == "number" then item.at else nil, day = tonumber(item.day), hour = tonumber(item.hour), kind = if typeof(item.kind) == "string" then item.kind else nil })
-	fire(s, "PHONE_UPDATE", { what = "calendar" })
+	local entry = { key = item.key, title = item.title, detail = if typeof(item.detail) == "string" then item.detail else nil,
+		at = if typeof(item.at) == "number" then item.at else nil, day = tonumber(item.day), hour = tonumber(item.hour), kind = if typeof(item.kind) == "string" then item.kind else nil }
+	table.insert(st.calendar, entry)
+	fire(s, "PHONE_UPDATE", { what = "calendar", item = entry })
 	return true
 end
 function Phone.removeCalendarItem(s: any, key: string)
@@ -209,7 +231,7 @@ function Phone.removeCalendarItem(s: any, key: string)
 	for i, old in st.calendar do
 		if old.key == key then
 			table.remove(st.calendar, i)
-			fire(s, "PHONE_UPDATE", { what = "calendar" })
+			fire(s, "PHONE_UPDATE", { what = "calendar", removed = key })
 			return
 		end
 	end
@@ -254,35 +276,12 @@ local function nextShuttle(clock: number): string?
 	return if ok and typeof(text) == "string" then text else nil
 end
 
--- names of the travellers of a new pilot trip: the k-th field rep for the k-th trip of the reps, the
--- engineers CompanyOps.presence marks as travelling (same order)
-local function travellers(e: any, trip: any): (string?, string?)
-	local deals = e.deals
-	local k, m = 0, 0
-	for _, t in deals.tripList do
-		if typeof(t) ~= "table" or t.founder == true then continue end
-		k += 1
-		local c = Ops.client(t.client)
-		if c and t.kind == "sign" and not t.hosted and c.trip ~= "city" then m += 1 end
-		if t == trip then break end
-	end
-	local reps = if typeof(e.staffProfiles) == "table" then e.staffProfiles.marketer else nil
-	local rep = if typeof(reps) == "table" and k >= 1 and k <= Ops.fieldReps(e) and typeof(reps[k]) == "table" then firstName(reps[k].n) else nil
-	local engineers = if typeof(e.staffProfiles) == "table" then e.staffProfiles.engineer else nil
-	local away = {}
-	for i, state in Ops.presence(e, "engineer") do
-		if state == "trip" and typeof(engineers) == "table" and typeof(engineers[i]) == "table" then table.insert(away, firstName(engineers[i].n) or "") end
-	end
-	local eng = away[m]
-	return rep, if eng ~= "" then eng else nil
-end
-
 local function tripCall(s: any, trip: any, clock: number)
 	local e = s.data.empire
 	local c = Ops.client(trip.client)
 	if not c then return end
 	local cityHotel, intlHotel = hotelNames()
-	local rep, eng = travellers(e, trip)
+	local rep, eng = PhoneMath.travellers(e, trip)
 	local day = Ops.day(e)
 	local backDay, backHour = PhoneMath.atPlay(e, clock, tonumber(trip.back) or 0)
 	local title, text = PhoneMath.tripCall({
@@ -303,7 +302,10 @@ function Phone.scan(s: any)
 	local seen = st.seen
 	local clock = seams.clock()
 	for _, c in st.calls do
-		if c.state == "ringing" and clock - c.at > PhoneMath.CALL_RING then c.state = "missed" end
+		if c.state == "ringing" and clock - c.at > PhoneMath.CALL_RING then
+			c.state = "missed"
+			fire(s, "PHONE_UPDATE", { what = "calls", call = callPayload(c) })
+		end
 	end
 	local deals = if typeof(e.deals) == "table" then e.deals else nil
 	local signed = if deals then tonumber(deals.signed) or 0 else 0
@@ -321,7 +323,7 @@ function Phone.scan(s: any)
 		if goal and string.find(tostring(goal.id), "^office") and goal.etaMinutes == 0 then seen.offices[goal.id] = true end
 		return
 	end
-	if seen.signed == 0 and signed >= 1 and deals then
+	if seen.signed == 0 and signed >= 1 and deals and typeof(deals.accounts) == "table" then
 		local first = nil
 		for id in deals.accounts do
 			local c = Ops.client(id)
@@ -346,7 +348,7 @@ function Phone.scan(s: any)
 		local def = EmpireConfig.OFFICES[Ops.stageIndex(e) + 1]
 		if def then
 			local title, text = PhoneMath.officeCall(def.name, def.price)
-			Phone.ring(s, { from = "Assistant", title = title, text = text, kind = "office", accept = "Open offices", decline = "Later", open = "empire" })
+			Phone.ring(s, { from = "Assistant", title = title, text = text, kind = "office", accept = "Open Office", decline = "Later", open = "empire", section = "office" })
 		end
 	end
 end
@@ -443,12 +445,14 @@ local function allow(times: { number }, now: number, perMinute: number): boolean
 	return #times < perMinute
 end
 
+-- the chat with one model; a changed model (new overall, retired, company renamed) gets a NEW generator with a
+-- new system prompt and starts a fresh conversation (the old ContextToken belongs to the old prompt)
 local function chatState(st: State, model: any, company: string?): ChatState
 	local sig = tostring(model.version) .. ":" .. tostring(model.overall) .. ":" .. tostring(model.status) .. ":" .. tostring(company)
 	local cs = st.chat[model.id]
 	if not cs or cs.sig ~= sig then
 		if cs and cs.gen and typeof(cs.gen) == "Instance" then (cs.gen :: Instance):Destroy() end
-		cs = { gen = nil, sig = sig, token = if cs then cs.token else nil, turns = if cs then cs.turns else {}, n = if cs then cs.n else 0 }
+		cs = { gen = nil, sig = sig, token = nil, turns = {}, n = if cs then cs.n else 0 }
 		st.chat[model.id] = cs :: ChatState
 	end
 	return cs :: ChatState
@@ -459,32 +463,80 @@ local function remember(cs: ChatState, who: string, text: string)
 	while #cs.turns > PhoneMath.CHAT_HISTORY do table.remove(cs.turns, 1) end
 end
 
+local function trip(b: Breaker, now: number, base: number, max: number)
+	b.fails += 1
+	b.until_ = now + math.min(max, base * 2 ^ (b.fails - 1))
+end
+
+local function unavailable(err: string): boolean
+	local low = string.lower(err)
+	for _, needle in Phone.UNAVAILABLE do
+		if string.find(low, needle, 1, true) then return true end
+	end
+	return false
+end
+
+-- a request error of `user`: opens the server-wide breaker once GLOBAL_PLAYERS different players failed within
+-- GLOBAL_WINDOW s (failLog is cleared by every success)
+local function logFailure(user: any, now: number)
+	while #failLog > 0 and now - failLog[1].at > Phone.GLOBAL_WINDOW do table.remove(failLog, 1) end
+	table.insert(failLog, { user = user, at = now })
+	local seen: { [any]: boolean } = {}
+	local n = 0
+	for _, f in failLog do
+		if not seen[f.user] then seen[f.user] = true; n += 1 end
+	end
+	if n >= Phone.GLOBAL_PLAYERS then
+		trip(breaker, now, Phone.BREAKER_BASE, Phone.BREAKER_MAX)
+		table.clear(failLog)
+	end
+end
+
 -- (reply, source "ai" | "demo", reason?)
-local function generate(cs: ChatState, model: any, company: string?, text: string, now: number): (string, string, string?)
+local function generate(st: State, user: any, cs: ChatState, model: any, company: string?, text: string, now: number): (string, string, string?)
 	local function demo(reason: string): (string, string, string?)
 		return PhoneMath.demoReply(model, company, text, cs.n), "demo", reason
 	end
-	if now < breaker.until_ then return demo("offline") end
+	if now < breaker.until_ or now < st.breaker.until_ then return demo("offline") end
 	if not allow(globalTimes, now, PhoneMath.CHAT_GLOBAL_PER_MINUTE) then return demo("busy") end
 	table.insert(globalTimes, now)
+	local created = true
 	local ok, result = pcall(function(): any
 		if not cs.gen then
 			local prompt, temperature, topP, seed = PhoneMath.systemPrompt(model, company)
-			cs.gen = seams.generator(prompt, temperature, topP, seed)
+			local okGen, g = pcall(seams.generator, prompt, temperature, topP, seed)
+			if not okGen then
+				created = false
+				error(g, 0)
+			end
+			cs.gen = g
 		end
-		local request: { [string]: any } = { UserPrompt = text, MaxTokens = PhoneMath.CHAT_MAX_TOKENS }
+		-- with a ContextToken TextGenerator remembers the conversation; without one (first message, after an
+		-- error) the last turns travel inside the prompt
+		local request: { [string]: any } = { UserPrompt = if cs.token then text else PhoneMath.recapPrompt(cs.turns, text), MaxTokens = PhoneMath.CHAT_MAX_TOKENS }
 		if cs.token then request.ContextToken = cs.token end
 		return (cs.gen :: any):GenerateTextAsync(request)
 	end)
 	local reply = if ok and typeof(result) == "table" then result.GeneratedText else nil
 	if typeof(reply) ~= "string" or not string.match(reply, "%S") then
-		breaker.fails += 1
-		breaker.until_ = now + math.min(Phone.BREAKER_MAX, Phone.BREAKER_BASE * 2 ^ (breaker.fails - 1))
-		if not ok then warn("[Phone] TextGenerator unavailable: " .. tostring(result)) end
 		cs.token = nil
+		-- this player's requests pause first (a blocked / moderated / empty reply is about his prompt) ...
+		trip(st.breaker, now, Phone.PLAYER_BREAKER_BASE, Phone.PLAYER_BREAKER_MAX)
+		if not ok then
+			local err = tostring(result)
+			warn("[Phone] TextGenerator failed: " .. err)
+			-- ... the whole server only when TextGenerator itself is unavailable, or several players fail
+			if not created or unavailable(err) then
+				trip(breaker, now, Phone.BREAKER_BASE, Phone.BREAKER_MAX)
+			else
+				logFailure(user, now)
+			end
+		end
 		return demo(if ok then "empty" else "error")
 	end
 	breaker.fails = 0
+	st.breaker.fails = 0
+	table.clear(failLog)
 	cs.token = if typeof(result.ContextToken) == "string" then result.ContextToken else nil
 	local trimmed = string.match(reply, "^%s*(.-)%s*$") or reply
 	return Ops.clip(trimmed, PhoneMath.CHAT_REPLY_CHARS), "ai", nil
@@ -520,8 +572,9 @@ function Phone.chat(s: any, modelId: string, raw: any, reset: boolean?): { [stri
 		local company = if data.company then data.company.name else nil
 		local cs = chatState(st, model, company)
 		cs.n += 1
+		local reply, source, reason = generate(st, s.userId, cs, model, company, filtered, now)
+		-- memory only: re-sent inside UserPrompt when the ContextToken is lost (PhoneMath.recapPrompt)
 		remember(cs, "you", filtered)
-		local reply, source, reason = generate(cs, model, company, filtered, now)
 		remember(cs, source, reply)
 		return { ok = true, reply = reply, source = source, reason = reason, user = filtered, model = modelId,
 			label = if source == "ai" then PhoneMath.AI_LABEL else PhoneMath.DEMO_LABEL }

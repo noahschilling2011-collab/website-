@@ -11,6 +11,7 @@ local Journey=require(ReplicatedStorage.Shared.JourneyMath)
 local Format=require(ReplicatedStorage.Shared.Format)
 local MarketMath=require(ReplicatedStorage.Shared.MarketMath)
 local ModelConfig=require(ReplicatedStorage.Shared.Config.ModelConfig)
+local MarketConfig=require(ReplicatedStorage.Shared.Config.MarketConfig)
 local HardwareConfig=require(ReplicatedStorage.Shared.Config.HardwareConfig)
 local CampusConfig=require(ReplicatedStorage.Shared.Config.CampusConfig)
 local EmpireConfig=require(ReplicatedStorage.Shared.Config.EmpireConfig)
@@ -92,6 +93,26 @@ local function tripShort(t: any): string
 	if t.hosted then return name.." team at the guest house" end
 	local who=if t.founder then "Founder" elseif (tonumber(t.crew) or 1)>=2 then "Rep + engineer" else "Rep"
 	return string.format("%s → %s (%s)",who,name,if t.kind=="renew" then "check-in" else "pilot")
+end
+-- who is in today per role (CompanyOps.presence), computed at most once per second per company: a tier-4 HQ has
+-- ~16 HR screens and 2 receptions refreshing every second near the player
+type Presence={present: number,vacation: number,sick: number,total: number}
+local presenceMemo: {[any]:{at: number,roles: {[string]:Presence}}}=setmetatable({},{__mode="k"}) :: any
+local function presenceOf(e: any): {[string]:Presence}
+	local now=math.floor(workspace:GetServerTimeNow())
+	local memo=presenceMemo[e]
+	if memo and memo.at==now then return memo.roles end
+	local roles: {[string]:Presence}={}
+	for _,role in EmpireConfig.ROLES do
+		local p: Presence={present=0,vacation=0,sick=0,total=0}
+		for _,st in Ops.presence(e,role.id) do
+			p.total+=1
+			if st=="present" then p.present+=1 elseif st=="vacation" then p.vacation+=1 elseif st=="sick" then p.sick+=1 end
+		end
+		roles[role.id]=p
+	end
+	presenceMemo[e]={at=now,roles=roles}
+	return roles
 end
 -- the company day an account ends on (the calendar moves with the server day)
 local function endDay(e: any,expires: number): number
@@ -346,11 +367,32 @@ P.compute=function(c)
 	if waiting>0 then table.insert(lines,string.format("%s users waiting for capacity",Format.int(waiting))) end
 	table.insert(lines,string.format("GPUs %d / %d slots · %.1f units · cooling %d%%",fleet.slotsUsed,HardwareConfig.slots(e),fleet.throughput,math.floor(HardwareConfig.thermal(e,fleet.throughput)*100+.5)))
 	table.insert(lines,string.format("Reserved for clients %.1f units · %d account%s",tonumber(compute.reserved) or 0,#accounts,if #accounts==1 then "" else "s"))
+	-- which model uses the serving compute (LOGIC_BRIEF 23a): share of the load = users x SERVE_UNITS of its size
+	if serving then
+		local units=(MarketConfig :: any).SERVE_UNITS or {}
+		local loads,total={},0
+		for _,m in liveModels(d) do local l=usersOf(s,m)*(units[m.sizeId] or 1);total+=l;table.insert(loads,{m=m,l=l}) end
+		table.sort(loads,function(a,b) return a.l>b.l end)
+		if total>0 then
+			local parts={}
+			for i=1,math.min(3,#loads) do table.insert(parts,string.format("%s v%d %d%%",tostring(loads[i].m.name),tonumber(loads[i].m.version) or 1,math.floor(loads[i].l/total*100+.5))) end
+			table.insert(lines,"Serving  "..table.concat(parts," · "))
+		end
+	end
 	if #faults==0 then table.insert(lines,"Rack faults  none · every blade online")
 	else
+		-- who repairs it: StaffEvents writes FaultWorker (job title, nil = nobody yet) and FaultFix ("walk" / "rack" /
+		-- "remote") on the blade of each fault slot (staffops request #8; same words as the rack label)
+		local blades=if c.office then c.office:FindFirstChild("Blades") else nil
+		local bladeList=if blades then blades:GetChildren() else {}
 		for i=1,math.min(2,#faults) do
 			local f=faults[i];local gpu=HardwareConfig.getGPU(tostring(f.gpu))
-			table.insert(lines,string.format("Rack R%d fault · %s · %s",tonumber(f.slot) or 0,if gpu then gpu.label else tostring(f.gpu),if compute.it then "IT on the way" else "no IT on duty"))
+			local blade=bladeList[tonumber(f.slot) or 0]
+			local who=if blade then blade:GetAttribute("FaultWorker") else nil
+			local fix=if blade then blade:GetAttribute("FaultFix") else nil
+			local state=if typeof(who)~="string" then (if compute.it then "waiting for IT" else "no IT on duty")
+				elseif fix=="walk" then who.." on the way" elseif fix=="remote" then who.." · remote fix" else who.." repairing"
+			table.insert(lines,string.format("Rack R%d fault · %s · %s",tonumber(f.slot) or 0,if gpu then gpu.label else tostring(f.gpu),state))
 		end
 		if #faults>2 then table.insert(lines,string.format("+ %d more rack faults",#faults-2)) end
 	end
@@ -437,7 +479,7 @@ P.reception=function(c)
 		return "GUEST HOUSE · RECEPTION",table.concat(lines,"\n"),"Client teams of hosted pilots stay two nights",0
 	end
 	local present,total=0,0
-	for _,role in EmpireConfig.ROLES do for _,st in Ops.presence(e,role.id) do total+=1;if st=="present" then present+=1 end end end
+	for _,p in presenceOf(e) do total+=p.total;present+=p.present end
 	local applicants,waiting=0,0
 	for _,a in e.applicants or {} do if a.st=="new" then applicants+=1 else waiting+=1 end end
 	local lines={
@@ -533,9 +575,10 @@ P.hr=function(c)
 	local e=c.e;local b=EmpireMath.bonuses(e);local staff=EmpireMath.staff(e);local stage=Ops.stageIndex(e);local cap=EmpireConfig.OFFICES[stage].staff
 	local lines={string.format("Team  %d / %d desks  ·  %d operations staff",staff,cap,Ops.opsPosts(e))}
 	local vacation,sick=0,0
+	local today=presenceOf(e)
 	for _,role in EmpireConfig.ROLES do
-		local here=0
-		for _,st in Ops.presence(e,role.id) do if st=="present" then here+=1 elseif st=="vacation" then vacation+=1 elseif st=="sick" then sick+=1 end end
+		local p=today[role.id];local here=p.present
+		vacation+=p.vacation;sick+=p.sick
 		table.insert(lines,string.format("%s  %d / %d desks  ·  %d in today",if string.sub(role.name,-5)=="Sales" then role.name else role.name.."s",e.employees[role.id] or 0,Ops.seats(e,role.id),here))
 	end
 	table.insert(lines,string.format("Today  %d on vacation · %d sick · morale %d%%",vacation,sick,math.floor(Ops.morale(e)*100+.5)))

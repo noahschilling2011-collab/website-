@@ -2,10 +2,12 @@
 -- Port Meridian (the far business capital, CityPlan.ABROAD; layout data in MetroPlan): built once per server by
 -- CityBuilder.build, which passes its shared helpers in `kit` (real lights per zone via kit.light - 40 for the
 -- whole city -, decor parts never collide/touch/query and cast no shadow).
---   * Airport district: runway with the parked aircraft, arrival terminal (check-in "Fly home", GPS kiosk,
---     departures board, baggage claim, café, seating), the BUSINESS LOUNGE (Atomic model "BusinessLounge":
---     bar, sofa groups with Seats, work pods, buffet, concierge marker), the VIP helipad (marker part
---     "Helipad", Purpose = "VIPAirport"), low airport buildings.
+--   * Airport district: runway, arrival terminal (check-in "Fly home", GPS kiosk, departures board, baggage claim,
+--     café, seating), the BUSINESS LOUNGE (Atomic model "BusinessLounge": bar, sofa groups with Seats, work pods,
+--     buffet, concierge marker), the apron east of the hall (MetroPlan.APRON: stand 1 = marker "ShuttleStand",
+--     the hall's "ApronDoor", stand 2 with the parked aircraft, markings, fence), the heliport with the VIP
+--     helipad (marker part "Helipad", Purpose = "VIPAirport") and the VIP helicopter terminal, low airport
+--     buildings west of the hall (75+ studs off the runway centreline).
 --   * Arrival plaza: flag row, benches, planters, metro entrance (decor), taxi rank and the VIP limousine lay-by
 --     with canopy, red carpet and the marker part "VipLimoStand" (bay 1 free for the chauffeur service).
 --   * Streets (MetroPlan.ROADS): asphalt, sidewalks with corner pads, lane lines, stop lines, zebra crossings,
@@ -16,7 +18,7 @@
 --     at Exchange Street and tower forecourts; the four client towers and the Meridian
 --     Grand Hotel (CityBuilder.building, enterable, meeting rooms unchanged) with the rooftop VIP helipad
 --     (marker "Helipad", Purpose = "VIP") and a roof exit marker "HelipadExit".
---   * Skyline: 85 background towers from MetroPlan.LOTS, each an Atomic model "Tower_<lot id>" (6-19 parts:
+--   * Skyline: 82 background towers from MetroPlan.LOTS, each an Atomic model "Tower_<lot id>" (6-19 parts:
 --     podium with shop glass + awning, a style - glass / stone / slab / stepped / residential / drum / twist -
 --     with floor bands, and a crown); window and shop glass tagged "MetroNightGlow" (attribute GlowColor) light
 --     up at night on the client. The landmark "Meridian Spire" (468 studs + mast; stepped glass lantern between
@@ -24,13 +26,14 @@
 --     city's identity and must show from everywhere in Port Meridian beyond the 512-stud streaming radius (the
 --     terminal is 900 studs away; ~80 parts). The far skyline beyond the walls and impostors of streamed-out
 --     towers are client-only (CityLifeController).
---   * Budget: ~5,100 parts for the whole city (+4,300 over the pre-phase-2 Port Meridian; package budget +4,500),
+--   * Budget: ~5,250 parts for the whole city (+4,470 over the pre-phase-2 Port Meridian; package budget +4,500),
 --     40 real lights.
 --   * Harbour Quarter: spire plaza (granite bands, two ground-jet splash fountains, steps up to the spire door),
 --     harbour walk with cafés and planting beds (lawn, flower edges, trees, bench pairs), promenade with a tree row
---     in granite planters on a lawn strip, granite paving bands, food carts, the "Meridian Sail" sculpture, benches,
---     lamps, mooring bollards along the quay, marina with yachts and a harbour cruiser, lighthouse, the Harbour
---     Wheel (model "HarbourWheel", rotated by the client); Parkside park with pond and bandstand.
+--     in granite planters on a lawn strip with a flower edge, granite paving bands, food carts with bistro tables, the
+--     "Meridian Sail" sculpture, benches, lamps, mooring bollards along the quay, marina with yachts and a harbour
+--     cruiser, lighthouse, the Harbour Wheel (model "HarbourWheel", rotated by the client); Parkside park with pond
+--     and bandstand.
 --   * Greenery between the towers: lawn verges with tree rows in the gaps of every block, the airport district's
 --     tree row in planters. District gateway signs (14 x 5 name panel under a kicker strip, both faces lettered,
 --     glowing) and billboards (generic, invented ads).
@@ -158,6 +161,84 @@ local function ground(m: Model)
 	bx(m,"MeridianGround",R.x1,R.x2,-2,G,R.z1,R.z2,BASE_STONE,Enum.Material.Concrete)
 	bx(m,"MeridianPaving",R.x1,R.x2,G,G+.1,R.z1,R.z2,PM.paver,Enum.Material.Pavement)
 end
+-- Apron east of the arrival hall (MetroPlan.APRON, flight request #7): concrete between the runway and the city,
+-- taxi line and stand centreline, stop bars and stand numbers, red safety boxes, the passenger walkway from the
+-- hall's ApronDoor, the marker part "ShuttleStand" (stand 1, CFrame = the shuttle's pivot), the parked aircraft on
+-- stand 2 with an airstair and ground equipment, and a fence towards the city (the runway side stays open).
+local function apron(field: Model)
+	local rw=A.runway;local ap=Plan.APRON;local Y=ap.top
+	-- runway shoulder west of the hall and east of the apron, then the apron itself
+	bx(field,"Apron",-420,A.terminal.x2,G+.02,Y,rw.z2,A.terminal.z1,C.concrete,Enum.Material.Concrete)
+	bx(field,"Apron",ap.rects[1].x2,650,G+.02,Y,rw.z2,A.terminal.z1,C.concrete,Enum.Material.Concrete)
+	for _,r in ap.rects do bx(field,"Apron",r.x1,r.x2,G+.02,Y,r.z1,r.z2,C.concrete,Enum.Material.Concrete) end
+	local function paint(name: string,x1: number,x2: number,z1: number,z2: number,color: Color3): BasePart return bx(field,name,x1,x2,Y,Y+.03,z1,z2,color,nil,true) end
+	local function stripe(name: string,a: Vector3,b: Vector3,w: number,color: Color3,dy: number?): BasePart
+		local y=Y+.015+(dy or 0)
+		local pa,pb=Vector3.new(a.X,y,a.Z),Vector3.new(b.X,y,b.Z)
+		return mk(field,name,Vector3.new(w,.03,(pb-pa).Magnitude),CFrame.lookAt((pa+pb)/2,pb),color,nil,true)
+	end
+	local sz=ap.stand.Z;local tx=ap.taxiX
+	-- taxi line from the runway edge, bend, stand centreline under both stands (yellow)
+	paint("TaxiLine",tx-.35,tx+.35,rw.z2,sz-8,PM.yellow)
+	stripe("TaxiLine",Vector3.new(tx,0,sz-8),Vector3.new(tx-8,0,sz),.7,PM.yellow)
+	paint("StandLine",ap.stand.X-58,ap.rects[1].x2-6,sz-.35,sz+.35,PM.yellow)
+	for i,st in {ap.stand,ap.stand2} do
+		local px=st.X
+		paint("StopBar",px-50.4,px-49.6,sz-4,sz+4,PM.yellow) -- nose wheel stop
+		local num=paint("StandNumber",px-66,px-57,sz-4.5,sz+4.5,Color3.fromRGB(58,60,62))
+		label(num,tostring(i),Enum.NormalId.Top,PM.yellow)
+		-- equipment restraint box (red) round the aircraft
+		local x1,x2,z1,z2=px-63,px+68,sz-58,sz+57
+		paint("SafetyLine",x1,x2,z1,z1+.5,PM.red);paint("SafetyLine",x1,x2,z2-.5,z2,PM.red)
+		paint("SafetyLine",x1,x1+.5,z1,z2,PM.red);paint("SafetyLine",x2-.5,x2,z1,z2,PM.red)
+	end
+	-- passenger walkway from the ApronDoor to the forward left door of stand 1 (white edges)
+	local d=ap.door
+	local w0=Vector3.new(d.x+2,0,(d.z1+d.z2)/2);local w1=Vector3.new(ap.stand.X-41.3,0,sz+24)
+	stripe("Walkway",w0,w1,6,Color3.fromRGB(150,152,150))
+	local side=(w1-w0).Unit:Cross(Vector3.yAxis)
+	for _,k in {-3.2,3.2} do stripe("WalkwayEdge",w0+side*k,w1+side*k,.4,PM.line,.01) end
+	-- stand 1 marker (the flight package parks the shuttle on it)
+	local st=mk(field,"ShuttleStand",Vector3.new(6,.2,6),ap.stand,PM.yellow,nil,true)
+	st.Transparency=1
+	st:SetAttribute("Stand","PM1");st:SetAttribute("Purpose","Shuttle")
+	st:SetAttribute("Door",Vector3.new(d.x,G+.5,(d.z1+d.z2)/2)) -- ApronDoor (hall floor level)
+	-- stand 2: the parked aircraft, an airstair at its forward left door, tug + baggage carts, power unit
+	local plane=Aircraft.build(field,ap.stand2,{scale=1.8,livery=PM.teal,collide=true,name="ParkedAircraft"})
+	plane:SetAttribute("Stand","PM2")
+	local s2=ap.stand2
+	local dx=s2.X-41.3
+	mk(field,"Airstair",Vector3.new(4.4,13,18),CFrame.new(dx,Y+6.5,sz+16.6)*CFrame.Angles(0,math.pi,0),PM.ivory,Enum.Material.Metal,true,"WedgePart")
+	bx(field,"AirstairTruck",dx-2.6,dx+2.6,Y,Y+3,sz+25.6,sz+33,PM.yellow,Enum.Material.SmoothPlastic,true)
+	bx(field,"AirstairRail",dx+2.2,dx+2.5,Y+3,Y+16.4,sz+7.4,sz+8,C.metal,Enum.Material.Metal,true)
+	bx(field,"GroundPower",s2.X-54,s2.X-48,Y,Y+3.2,sz+9,sz+12.5,PM.yellow,Enum.Material.SmoothPlastic,true)
+	local tugX,tugZ=s2.X+14,sz+40
+	bx(field,"BaggageTug",tugX-3.6,tugX+3.6,Y+.6,Y+3.4,tugZ-2.2,tugZ+2.2,Color3.fromRGB(236,236,232),Enum.Material.SmoothPlastic,true)
+	bx(field,"BaggageTugCab",tugX-3.6,tugX-.8,Y+3.4,Y+5.6,tugZ-2,tugZ+2,Color3.fromRGB(40,46,52),Enum.Material.Glass,true)
+	for i=1,2 do
+		local cx=tugX+4.4+i*8
+		bx(field,"BaggageCart",cx-3.4,cx+3.4,Y+.8,Y+1.4,tugZ-2.2,tugZ+2.2,C.metalSoft,Enum.Material.Metal,true)
+		for k,bxz in {{-1.8,-.9},{.6,.8}} do
+			bx(field,"Suitcase",cx+bxz[1]-1.2,cx+bxz[1]+1.2,Y+1.4,Y+3.2,tugZ+bxz[2]-1,tugZ+bxz[2]+1,AWNINGS[(i+k)%#AWNINGS+1],Enum.Material.SmoothPlastic,true)
+		end
+	end
+	for _,p in {{s2.X-62,sz},{s2.X+2,sz-58},{s2.X+2,sz+57}} do cyl(field,"Cone",p[1],p[2],Y,Y+1.6,.9,Color3.fromRGB(236,110,30),Enum.Material.SmoothPlastic,true) end
+	-- stand 2 sign on a post beside its nose
+	cyl(field,"StandSignPost",s2.X-70,sz+22,Y,Y+11,.5,C.metal,Enum.Material.Metal)
+	local ss=bx(field,"StandSign",s2.X-73.5,s2.X-66.5,Y+8,Y+11,sz+21.7,sz+22.3,PM.navy,Enum.Material.Metal,true)
+	both(ss,"STAND 2","z",PM.gold,true)
+	-- fence towards the city (collidable: granite kerb, clear glass panels, metal top rail, posts); the runway side
+	-- stays open
+	local r1,r2=ap.rects[1],ap.rects[2]
+	local fence={{r2.x1,r2.x2,r2.z2,r2.z2+.3},{r2.x1,r2.x1+.3,r2.z1,r2.z2},{r1.x1,r2.x1,r1.z2,r1.z2+.3},{r1.x2,r1.x2+.3,7632,r2.z2}}
+	for _,f in fence do
+		bx(field,"ApronFenceKerb",f[1],f[2],G+.1,G+.8,f[3],f[4],PM.granite,Enum.Material.Granite)
+		glassy(bx(field,"ApronFence",f[1],f[2],G+.8,G+5,f[3],f[4],Color3.fromRGB(196,214,222)),.72)
+		bx(field,"ApronFenceRail",f[1],f[2],G+5,G+5.3,f[3]-.05,f[4]+.05,C.metal,Enum.Material.Metal,true)
+	end
+	for x=r2.x1,r2.x2,48 do cyl(field,"FencePost",x,r2.z2+.15,G+.1,G+5.4,.45,C.metal,Enum.Material.Metal,true) end
+	for z=7652,r2.z2-20,40 do cyl(field,"FencePost",r1.x2+.15,z,G+.1,G+5.4,.45,C.metal,Enum.Material.Metal,true) end
+end
 local function airport(m: Model)
 	local rw=A.runway
 	local cz=(rw.z1+rw.z2)/2
@@ -168,16 +249,33 @@ local function airport(m: Model)
 	for _,x in {rw.x1+14,rw.x2-54} do
 		for i=-3,2 do bx(field,"Threshold",x,x+40,ROAD,ROAD+.03,cz+i*10+2,cz+i*10+7,PM.line,nil,true) end
 	end
-	bx(field,"Apron",-420,650,G+.02,G+.25,rw.z2,A.terminal.z1,C.concrete,Enum.Material.Concrete)
 	for x=rw.x1+10,rw.x2-10,130 do
 		for _,z in {rw.z1-1.5,rw.z2+1.5} do bx(field,"EdgeLight",x-.6,x+.6,G+.1,G+.9,z-.6,z+.6,Color3.fromRGB(255,236,180),Enum.Material.Neon,true) end
 	end
-	Aircraft.build(field,CFrame.lookAt(Vector3.new(420,ROAD,cz),Vector3.new(0,ROAD,cz)),{scale=1.8,livery=PM.teal,collide=true,name="ParkedAircraft"})
+	apron(field)
 	-- terminal: the hall faces the city (south); roof wave fins and an entrance canopy give it a silhouette
 	local t=A.terminal
 	local term=folder(m,"ArrivalTerminal")
-	K.hall(term,t,A.height,1,A.entrances,12)
+	local hallM: Model=K.hall(term,t,A.height,1,A.entrances,12)
 	local h=G+A.height
+	-- apron door: the hall's east wall gets a 12-wide opening with a lintel (flight request #7)
+	local d=Plan.APRON.door
+	for _,w in hallM:GetChildren() do
+		if w:IsA("BasePart") and w.Name=="SideWall" and w.Position.X>0 then w:Destroy() end
+	end
+	bx(hallM,"SideWall",t.x2-1.5,t.x2,G+.5,h,t.z1+.8,d.z1,C.stone,Enum.Material.Limestone)
+	bx(hallM,"SideWall",t.x2-1.5,t.x2,G+.5,h,d.z2,t.z2-.8,C.stone,Enum.Material.Limestone)
+	bx(hallM,"EntranceLintel",t.x2-1.5,t.x2,G+12,h,d.z1,d.z2,C.stoneDeep,Enum.Material.Limestone)
+	local dm=(d.z1+d.z2)/2
+	local door=mk(hallM,"ApronDoor",Vector3.new(d.z2-d.z1,11.5,1.5),CFrame.lookAt(Vector3.new(t.x2-.75,G+6.25,dm),Vector3.new(t.x2+10,G+6.25,dm)),PM.gold,nil,true)
+	door.Transparency=1
+	door:SetAttribute("Purpose","Apron");door:SetAttribute("Stand","PM1")
+	-- stand ident over the door (both faces) and the pilots' docking board above it (apron side, glowing)
+	local ident=bx(hallM,"StandIdent",t.x2,t.x2+.4,G+13,G+16,d.z1-3,d.z2+3,PM.navy,Enum.Material.Metal,true)
+	label(ident,"STAND 1 · SHUTTLE",Enum.NormalId.Right,PM.gold,true)
+	label(ident,"APRON · STAND 1",Enum.NormalId.Left,PM.gold,true)
+	local dock=bx(hallM,"DockingBoard",t.x2,t.x2+.6,G+17,G+21,Plan.APRON.stand.Z-3,Plan.APRON.stand.Z+3,Color3.fromRGB(20,22,26),Enum.Material.SmoothPlastic,true)
+	label(dock,"STOP",Enum.NormalId.Right,Color3.fromRGB(255,190,70),true,Enum.Font.RobotoMono)
 	for i=0,6 do
 		local x=t.x1+20+i*(t.x2-t.x1-40)/6
 		local y=h+3+math.sin(i/6*math.pi)*5
@@ -342,15 +440,24 @@ local function vipAirport(m: Model)
 	local x,z=def.cf.X,def.cf.Z
 	helipad(v,def,G)
 	local fx1,fx2,fz1,fz2=x-36,x+36,z-36,z+36
-	for _,s in {{fx1,fx2,fz1,fz1+.4},{fx2-.4,fx2,fz1,fz2},{fx1+16,fx2,fz2-.4,fz2},{fx1,fx1+.4,fz1,fz2}} do
+	-- fence with two gates: south-west (waiting area on the district walk) and east (canopy to the VIP terminal)
+	for _,s in {{fx1,fx2,fz1,fz1+.4},{fx2-.4,fx2,fz1,z+6},{fx2-.4,fx2,z+22,fz2},{fx1+16,fx2,fz2-.4,fz2},{fx1,fx1+.4,fz1,fz2}} do
 		bx(v,"HelipadFence",s[1],s[2],G+.1,G+3.6,s[3],s[4],C.metalSoft,Enum.Material.Metal)
 	end
 	for _,gx in {fx1+.4,fx1+16} do cyl(v,"GatePost",gx,fz2-.2,G+.1,G+5,.8,PM.gold,Enum.Material.Metal) end
-	local kiosk=glassy(bx(v,"VipTerminal",250,268,G+.1,G+9,7676,7690,PM.tealGlass),.3)
-	local _=kiosk
-	bx(v,"VipTerminalRoof",248,270,G+9,G+10,7674,7692,PM.ivory,Enum.Material.Metal)
-	local s=bx(v,"VipTerminalSign",250,268,G+10,G+12.5,7691.6,7692,PM.navy,Enum.Material.Metal,true)
+	for _,gz in {z+6,z+22} do cyl(v,"GatePost",fx2-.2,gz,G+.1,G+5,.8,PM.gold,Enum.Material.Metal) end
+	-- VIP helicopter terminal east of the pad: glass pavilion under an ivory roof slab, canopy to the east gate,
+	-- name over the south front (towards the district walk)
+	local tx1,tx2,tz1,tz2=fx2+12,fx2+48,z-2,fz2
+	glowTag(glassy(bx(v,"VipTerminal",tx1,tx2,G+.1,G+10,tz1,tz2,PM.tealGlass),.3),SHOP_GLOW)
+	bx(v,"VipTerminalBase",tx1-.4,tx2+.4,G+.1,G+1.2,tz1-.4,tz2+.4,PM.granite,Enum.Material.Granite)
+	bx(v,"VipTerminalRoof",tx1-3,tx2+2,G+10,G+11,tz1-2,tz2+3,PM.ivory,Enum.Material.Metal)
+	bx(v,"VipTerminalFascia",tx1-3,tx2+2,G+10.2,G+10.8,tz2+3,tz2+3.3,PM.gold,Enum.Material.Metal,true)
+	local s=bx(v,"VipTerminalSign",tx1+4,tx2-4,G+11,G+13.5,tz2+2.6,tz2+3,PM.navy,Enum.Material.Metal,true)
 	label(s,"VIP HELICOPTER TERMINAL",Enum.NormalId.Back,PM.gold,true)
+	bx(v,"VipCanopy",fx2,tx1,G+9,G+9.6,z+5,z+23,PM.navy,Enum.Material.Metal,true)
+	for _,cz in {z+6.5,z+21.5} do cyl(v,"VipCanopyPost",tx1-6,cz,G+.1,G+9,.6,PM.gold,Enum.Material.Metal) end
+	bx(v,"VipCarpet",fx2,tx1,G+.1,G+.15,z+11,z+17,PM.red,Enum.Material.Fabric,true)
 end
 
 ------------------------------------------------------------------------------------------------ arrival plaza
@@ -960,6 +1067,18 @@ local function harbour(m: Model)
 	local cuts: {{number}}={}
 	for _,x in {R.x1+10,-560,-300,-110,0,110,300,580,R.x2-10} do table.insert(cuts,{x-4,x+4}) end
 	for _,sp in spans(R.x1+2,R.x2-2,cuts) do bx(h,"PromenadeLawn",sp[1],sp[2],PLAZA,PLAZA+.04,8609,8619,PM.lawn,Enum.Material.Grass,true) end
+	-- flower edge on the promenade side of the lawn strip (~40-stud beds of alternating colours, clear of the
+	-- sculpture plinth)
+	local fcuts: {{number}}={{Plan.SCULPTURE.X-9,Plan.SCULPTURE.X+9}}
+	for _,c in cuts do table.insert(fcuts,c) end
+	local fi=0
+	for _,sp in spans(R.x1+2,R.x2-2,fcuts) do
+		local n=math.max(1,math.floor((sp[2]-sp[1])/40+.5));local w=(sp[2]-sp[1])/n
+		for i=0,n-1 do
+			fi+=1
+			bx(h,"PromenadeFlowers",sp[1]+i*w,sp[1]+(i+1)*w,PLAZA,PLAZA+.5,8619,8620.6,FLOWERS[fi%#FLOWERS+1],Enum.Material.Grass,true)
+		end
+	end
 	for _,p in Plan.PROM_TREES do
 		bx(h,"TreePlanter",p.x-2.6,p.x+2.6,PLAZA,PLAZA+.8,p.z-2.6,p.z+2.6,PM.granite,Enum.Material.Granite)
 		tree(h,p.x,p.z,p.k,PLAZA+.8)
@@ -989,6 +1108,12 @@ local function harbour(m: Model)
 		local _=can
 		local sg=bx(h,"CartSign",cx-3,cx+3,PLAZA+4.4,PLAZA+5.6,cz-1.75,cz-1.6,PM.navy,Enum.Material.Metal,true)
 		label(sg,CART_NAMES[(i-1)%#CART_NAMES+1],Enum.NormalId.Front,PM.gold,true)
+	end
+	for i,p in Plan.CART_TABLES do
+		cyl(h,"BistroTable",p.X,p.Z,PLAZA,PLAZA+2.6,2.6,PM.ivory,Enum.Material.Metal)
+		for _,dx in {-1.9,1.9} do bx(h,"BistroChair",p.X+dx-.6,p.X+dx+.6,PLAZA,PLAZA+1.6,p.Z-.6,p.Z+.6,C.metal,Enum.Material.Metal,true) end
+		cyl(h,"Umbrella",p.X,p.Z,PLAZA+2.6,PLAZA+7.6,.25,C.metal,Enum.Material.Metal,true)
+		cyl(h,"UmbrellaTop",p.X,p.Z,PLAZA+7.2,PLAZA+7.8,6.4,AWNINGS[(i%#AWNINGS)+1]:Lerp(PM.ivory,.3),Enum.Material.Fabric,true)
 	end
 	local sc=Plan.SCULPTURE
 	cyl(h,"SculpturePlinth",sc.X,sc.Z,PLAZA,PLAZA+1.2,8,PM.granite,Enum.Material.Granite)

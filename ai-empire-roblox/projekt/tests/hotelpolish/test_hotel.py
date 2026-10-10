@@ -31,13 +31,17 @@ built with the pre-package RoomKitsHotel/ExteriorDesign):
   * receptionist hops (stand <-> greet <-> printer): probes standable + connected (agent radius 1.0) and
     a radius-1.0 body touches no collidable part on the straight line (like tests/buildings)
   * NEGATIVE: a hop straight through the counter must be reported by both hop checks
-  * review round 3: room drapes 3.2 wide in one warm colour and a white sheer across each window,
+  * review round 4: the west facade is a stone wall with one 6-wide French window per room (centre mullion,
+    clay-render wall panels on the glass line, no curtain-wall grid left), two on the stair; two-bar French
+    balcony railings on the first-floor room windows with the flower box behind them, flower boxes on the base
+    course under all 7 ground-floor windows; north room ends closed (render panels, no north window boxes); west-room
+    drapes frame the French window (1.5 inside each side of the opening, the middle open), the sheer spans
+    the opening; east rooms keep 3.2-wide drapes at the window ends and a sheer across the window
+  * review round 3: room drapes in one warm colour and a white sheer at each window,
     clear of desk / desk legs / nightstands / headboard / side walls / facade glass; window-side nightstand clear of headboard and curtain; matching
     lounge armchairs; sheer curtain behind the lounge; text boards 100 px per stud (out/gui_tier2.json);
     the canopy's south end without text (the blade sign names the house there); the entrance camera under the
-    soffit against the facade; the art screen on the entrance axis (plant clear of it); window boxes with
-    flowers under the west rooms on both floors and under rooms 205 / 208 on the north cornice (inside the site
-    box, clear of the glass, the flowers in front)
+    soffit against the facade; the art screen on the entrance axis (plant clear of it)
 Usage: python3 tests/hotelpolish/test_hotel.py --out DIR [--tiers 2,3,4]
 """
 import argparse, json, math, os, re, subprocess, sys, tempfile
@@ -86,7 +90,8 @@ DECOR = {"SignLetter", "SignRule", "WallWash", "WallWashCove", "ReceptionFlute",
          "TrolleyCarpet", "TrolleyWheel", "TrolleyPost", "TrolleyRail", "Suitcase", "GarmentBag", "EntranceMat", "Rug", "RugBorder",
          "SignBacking", "BladeSign", "BladeSignGlow", "TableLampStem", "DeskBell",
          "LobbyHouseWord", "KeyRackFrame", "SheerCurtain", "CurtainTrack", "ArtScreen", "ArtScreenFrame",
-         "WindowBox", "WindowBoxGreen", "WindowBoxBloom", "WindowSheer"}
+         "WindowBox", "WindowBoxGreen", "WindowBoxBloom", "WindowSheer", "JulietBar", "JulietRail"}
+WEST_WINDOW = 6.0  # RoomKitsHotel Hotel.WEST_WINDOW
 
 
 def load(path):
@@ -456,8 +461,18 @@ for tier in tiers:
         frame = named("ArtFrame", R)
         check(f"{T}: {rid} print frame is decor", frame and not frame[0]["canCollide"] and not frame[0]["canQuery"])
         cur = named("Curtain", R)
-        check(f"{T}: {rid} two curtains 3.2 wide, 0.15 thick, one warm colour", len(cur) == 2 and all(sorted(round(v, 3) for v in c["size"]) == [0.15, 3.2, 11.6] for c in cur)
+        acc = named(f"Access_{rid}")
+        (rx0, rx1), _, (rz0, rz1) = lo_hi(acc[0]) if acc else ((0, 0), (0, 0), (0, 0))
+        west_room = rx0 < -140.5  # window on the west facade (French window centred on the room)
+        drape_w = round((rz1 - rz0) / 2 - WEST_WINDOW / 2 + 0.9, 3) if west_room else 3.2
+        check(f"{T}: {rid} two curtains {drape_w} wide, 0.15 thick, one warm colour", len(cur) == 2 and all(sorted(round(v, 3) for v in c["size"]) == sorted([0.15, drape_w, 11.6]) for c in cur)
               and all(max(abs(u - v) for u, v in zip(c["color"], CURTAIN_RGB)) < 0.6 for c in cur), [(c["size"], c["color"]) for c in cur])
+        if west_room and len(cur) == 2:
+            zc = (rz0 + rz1) / 2
+            o1, o2 = zc - WEST_WINDOW / 2, zc + WEST_WINDOW / 2
+            spans = sorted(lo_hi(c)[2] for c in cur)
+            check(f"{T}: {rid} drapes frame the French window (1.5 inside each side, the middle 3 open)",
+                  abs(spans[0][1] - (o1 + 1.5)) < 0.02 and abs(spans[1][0] - (o2 - 1.5)) < 0.02 and spans[0][0] >= rz0 + 0.5 and spans[1][1] <= rz1 - 0.5, spans)
         lvl = rid[1]
         obst = [p for p in parts if (R in p["path"] and p["name"] in ("WritingDesk", "DeskLeg", "Nightstand", "Headboard", "LampShade", "DeskLamp", "BedBase"))
                 or (f"/Walls/Level_{lvl}/" in p["path"] and p["name"] in ("Wall", "Skirting")) or ("/Facade/" in p["path"] and p["name"] == "Glass")]
@@ -465,8 +480,14 @@ for tier in tiers:
         check(f"{T}: {rid} curtains clear of desk, legs, nightstands, headboard, walls and the facade glass", not clip, clip[:3])
         sh_ = named("WindowSheer", R)
         sclip = [o["name"] for c in sh_ for o in obst + cur if overlap(c, o, 0.0)]
-        check(f"{T}: {rid} white sheer across the window, translucent, between the glass and the drapes", len(sh_) == 1 and 0.3 <= sh_[0].get("transparency", 0) <= 0.6
-              and not sh_[0]["canCollide"] and not sclip and max(sh_[0]["size"]) >= 12.0, (len(sh_), sclip[:3]))
+        if west_room and sh_:
+            zc = (rz0 + rz1) / 2
+            sz = lo_hi(sh_[0])[2]
+            spans_ok = sz[0] <= zc - WEST_WINDOW / 2 + 1e-3 and sz[1] >= zc + WEST_WINDOW / 2 - 1e-3
+        else:
+            spans_ok = bool(sh_) and max(sh_[0]["size"]) >= 12.0
+        check(f"{T}: {rid} white sheer across the window opening, translucent, between the glass and the drapes", len(sh_) == 1 and 0.3 <= sh_[0].get("transparency", 0) <= 0.6
+              and not sh_[0]["canCollide"] and not sclip and spans_ok, (len(sh_), sclip[:3], spans_ok))
         ns, hb = named("Nightstand", R), named("Headboard", R)
         nclip = [(n["name"], o["name"]) for n in ns for o in hb + cur if overlap(n, o, 0.0)]
         check(f"{T}: {rid} nightstands clear of the headboard and the curtains", len(ns) == 2 and not nclip, nclip[:3])
@@ -527,30 +548,63 @@ for tier in tiers:
         check(f"{T}: entrance camera mounted on the canopy soffit's underside (y 11.0, z 82.3..97.7)", mtop is not None and abs(mtop - 11.0) < 0.02 and cz0 >= 82.3 and cz1 <= 98.0, (mtop, cz0, cz1))
     else:
         check(f"{T}: entrance camera EXT_HOTEL", False)
-    # west window boxes (review round 3): ground floor on the base course, first floor on the cornice
+    # west facade (review round 4): a stone wall with French windows, Juliet balconies and flower boxes
     W_ = "/Facade_HotelWest/"
+    room_c = [109.0, 123.0, 137.0, 151.0, 165.0]  # front office / rooms 101-104 and 201-205 (pier to pier)
+    win_c = [84.5, 95.5] + room_c
+    wp, mul = named("WallPanel", W_), named("Mullion", W_)
+    check(f"{T}: west face: 7 window mullions at the window centres, no curtain-wall grid", len(mul) == 7 and
+          sorted(round(p["cframe"][2], 2) for p in mul) == win_c and all(lo_hi(p)[1][0] <= 0.9 + 1e-3 and lo_hi(p)[1][1] >= 30 - 1e-3 for p in mul),
+          sorted(round(p["cframe"][2], 2) for p in mul))
+    # the panels close the glass line (z 79..169) except the 7 openings c -+ 3, over both storeys
+    gaps, cur_z = [], 79.0
+    for a0, a1 in sorted(lo_hi(p)[2] for p in wp):
+        if a0 > cur_z + 1e-3:
+            gaps.append((round(cur_z, 2), round(a0, 2)))
+        cur_z = max(cur_z, a1)
+    if cur_z < 169 - 1e-3:
+        gaps.append((round(cur_z, 2), 169.0))
+    check(f"{T}: west stone wall panels leave exactly the 7 French windows ({WEST_WINDOW:g} wide)", len(wp) == 8 and
+          gaps == [(c - WEST_WINDOW / 2, c + WEST_WINDOW / 2) for c in win_c], gaps)
+    check(f"{T}: west wall panels on the glass line over both storeys (x -141.5..-141.2, y 0.9..30), warm render (not the stone of the piers)",
+          wp and all(abs(lo_hi(p)[0][0] + 141.5) < 1e-3 and abs(lo_hi(p)[0][1] + 141.2) < 1e-3 and abs(lo_hi(p)[1][0] - 0.9) < 1e-3
+                     and abs(lo_hi(p)[1][1] - 30) < 1e-3 and p["material"] == "Plaster" and p["color"][0] - p["color"][2] >= 30 for p in wp),
+          [(p["material"], p["color"]) for p in wp][:2])
+    jg, jr = named("JulietBar", W_), named("JulietRail", W_)
     wb, fb = named("WindowBox", W_), named("FlowerBox", W_)
-    wg, wbl = named("WindowBoxGreen", W_), named("WindowBoxBloom", W_)
-    check(f"{T}: west window boxes: 5 on the cornice (first-floor rooms), 5 on the base course", len(wb) == 5 and len(fb) == 5 and len(wg) == 5 and len(wbl) == 5
-          and all(abs(lo_hi(p)[1][0] - 16.6) < 1e-3 for p in wb) and all(abs(lo_hi(p)[1][0] - 0.9) < 1e-3 for p in fb), (len(wb), len(fb), len(wg), len(wbl)))
-    allw = wb + fb + wg + wbl + named("FlowerHedge", W_)
-    check(f"{T}: west window boxes inside the site box (x >= -142) and clear of the glass (x <= -141.2)", allw and all(lo_hi(p)[0][0] >= -142.0 - 1e-6 and lo_hi(p)[0][1] <= -141.2 + 1e-6 for p in allw),
-          [(p["name"], lo_hi(p)[0]) for p in allw if not (lo_hi(p)[0][0] >= -142.0 - 1e-6 and lo_hi(p)[0][1] <= -141.2 + 1e-6)][:3])
-    vis = all(any(abs(g["cframe"][2] - b["cframe"][2]) < 0.5 and lo_hi(b)[0][0] < lo_hi(g)[0][0] - 0.05 and b["cframe"][1] < g["cframe"][1] for g in wg) for b in wbl)
-    check(f"{T}: window-box flowers in front of and below the foliage (seen from the path)", wbl and vis)
-    above = all(any(abs(w["cframe"][2] - b["cframe"][2]) < 0.5 and lo_hi(b)[1][0] >= lo_hi(w)[1][1] - 0.01 and lo_hi(b)[0][0] < lo_hi(w)[0][0] for w in wb) for b in wbl)
-    check(f"{T}: window-box flowers stand on the box's front edge (above its top, in front of its face)", wbl and above)
-    rooms_up = [r for r in ("H1_R05", "H1_R06", "H1_R07", "H1_R08", "H1_R09")]
-    under = all(any(lo_hi(b)[2][0] >= lo_hi(acc)[2][0] and lo_hi(b)[2][1] <= lo_hi(acc)[2][1] for b in wb)
-                for rid in rooms_up for acc in named(f"Access_{rid}"))
-    check(f"{T}: a window box under each first-floor west room (201-205)", under)
+    wbl, fh = named("WindowBoxBloom", W_), named("FlowerHedge", W_)
+    near = lambda lst, c: [p for p in lst if abs(p["cframe"][2] - c) < 0.05]
+    ok_j, ok_b = True, True
+    for c in room_c:
+        g, r_, b, bl = near(jg, c), near(jr, c), near(wb, c), near(wbl, c)
+        f_, h_ = near(fb, c), near(fh, c)
+        if not (len(g) == 1 and len(r_) == 1 and len(b) == 1 and len(bl) == 1 and len(f_) == 1 and len(h_) == 1):
+            ok_j = ok_b = False
+            break
+        G, Rr, Bx, Bl = lo_hi(g[0]), lo_hi(r_[0]), lo_hi(b[0]), lo_hi(bl[0])
+        # railing: middle bar and top rail across the opening, ends against the wall panels (x -141.5), the
+        # top 3+ above the floor (y 16), the bar above the flowers
+        ok_j = ok_j and G[2][0] <= c - WEST_WINDOW / 2 and G[2][1] >= c + WEST_WINDOW / 2 and Rr[2][0] <= c - WEST_WINDOW / 2 and Rr[2][1] >= c + WEST_WINDOW / 2 \
+            and abs(G[0][1] + 141.5) < 1e-3 and abs(Rr[0][1] + 141.5) < 1e-3 and Rr[1][1] - 16.0 >= 3.0 and G[1][1] < Rr[1][0] and G[1][0] > Bl[1][1]
+        # flower box on the cornice behind the railing's front, flowers on it; ground box on the base course
+        ok_b = ok_b and abs(Bx[1][0] - 16.6) < 1e-3 and Bx[0][0] >= Rr[0][0] and Bl[0][0] >= Rr[0][0] and Bl[1][0] < Bx[1][1] < Bl[1][1] \
+            and abs(lo_hi(f_[0])[1][0] - 0.9) < 1e-3 and lo_hi(h_[0])[1][1] > lo_hi(f_[0])[1][1]
+    check(f"{T}: French balcony railing on each first-floor room window (bar over the flowers, rail top >= 3 above the floor)", ok_j and len(jg) == 5 and len(jr) == 5, (len(jg), len(jr)))
+    stair_ok = all(len(near(fb, c)) == 1 and len(near(fh, c)) == 1 and abs(lo_hi(near(fb, c)[0])[1][0] - 0.9) < 1e-3 for c in win_c[:2])
+    check(f"{T}: flower box behind each railing (flowers on it) and on the base course under every ground-floor window (stair too)",
+          ok_b and stair_ok and len(wb) == 5 and len(fb) == 7 and len(fh) == 7, (len(wb), len(fb), len(wbl), len(fh)))
+    allw = jg + jr + wb + fb + wbl + fh + wp + mul
+    check(f"{T}: west facade elements inside the site box (x >= -142) and clear of the glass (x <= -141.2) or mullions",
+          allw and all(lo_hi(p)[0][0] >= -142.0 - 1e-6 and (lo_hi(p)[0][1] <= -141.2 + 1e-6 or p["name"] == "Mullion") for p in allw),
+          [(p["name"], lo_hi(p)[0]) for p in allw if not (lo_hi(p)[0][0] >= -142.0 - 1e-6 and (lo_hi(p)[0][1] <= -141.2 + 1e-6 or p["name"] == "Mullion"))][:3])
+    jclip = [(a["name"], b_["name"]) for a in jg + jr for b_ in wb + wbl + wp if overlap(a, b_, 0.0)]
+    check(f"{T}: railing clear of the flower boxes and the wall panels", not jclip, jclip[:3])
     N_ = "/Facade_HotelNorth/"
-    nb, ng, nbl = named("WindowBox", N_), named("WindowBoxGreen", N_), named("WindowBoxBloom", N_)
-    check(f"{T}: north window boxes under rooms 205 and 208 on the cornice, clear of the glass (z >= 172.2)", len(nb) == 2 and len(ng) == 2 and len(nbl) == 2
-          and all(abs(lo_hi(p)[1][0] - 16.6) < 1e-3 for p in nb) and all(lo_hi(p)[2][0] >= 172.2 - 1e-6 for p in nb + ng + nbl), (len(nb), len(ng), len(nbl)))
-    check(f"{T}: north window-box flowers in front of the foliage, on the box's front edge",
-          all(any(abs(g["cframe"][0] - b["cframe"][0]) < 0.5 and lo_hi(b)[2][1] > lo_hi(g)[2][1] + 0.05 for g in ng) and
-              any(abs(w["cframe"][0] - b["cframe"][0]) < 0.5 and lo_hi(b)[1][0] >= lo_hi(w)[1][1] - 0.01 for w in nb) for b in nbl) and len(nbl) == 2)
+    nw = sorted((lo_hi(p)[0], lo_hi(p)[1]) for p in named("WallPanel", N_))
+    check(f"{T}: north room ends closed: render panels over rooms 104/205 (x -139..-124.5, both storeys) and suite 208 (x -116.1..-99.4, first floor)",
+          len(nw) == 2 and abs(nw[0][0][0] + 139) < 1e-3 and abs(nw[0][0][1] + 124.5) < 1e-3 and abs(nw[0][1][0] - 0.9) < 1e-3
+          and abs(nw[1][0][0] + 116.1) < 1e-3 and abs(nw[1][0][1] + 99.4) < 1e-3 and abs(nw[1][1][0] - 16.6) < 1e-3 and abs(nw[1][1][1] - 30) < 1e-3, nw)
+    check(f"{T}: no window boxes left on the north cornice (the room ends there are closed)", not named("WindowBox", N_) and not named("WindowBoxBloom", N_))
     spots = [i for i in inst if i["class"] == "SpotLight" and "/HotelCanopyLight/" in i["path"]]
     check(f"{T}: canopy one SpotLight", len(spots) == 1, len(spots))
     canopy = named("HotelCanopy")

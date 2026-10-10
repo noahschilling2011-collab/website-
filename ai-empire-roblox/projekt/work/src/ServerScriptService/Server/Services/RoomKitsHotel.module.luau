@@ -14,8 +14,8 @@
 --          ground-floor guest rooms), front office;
 --   workshop room: 10 Meeting seats (MeetingRoom "HotelWorkshop"), whiteboard, screen;
 --   12 guest rooms (bed, bedside tables, framed print, desk + chair, wardrobe, TV with a welcome page,
---          curtains, en-suite with toilet, basin and
---          shower behind a cubicle door; FixtureKey contract), suite 208 with a lounge corner.
+--          drapes and a sheer at the window (west rooms: framing the French window), en-suite with toilet,
+--          basin and shower behind a cubicle door; FixtureKey contract), suite 208 with a lounge corner.
 -- Seats for guests are "Waiting" (lobby) / "Dining" / "Meeting" activities in guest-class rooms: staff
 -- never take them (clearance), the later guest NPCs can. Everything sits INSIDE ctx.rooms[id].
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +32,11 @@ local WATER: Kit.Opts = { detail = true, transparency = 1 }
 local FIN = Kit.FINISH
 
 local Hotel = {}
+
+-- The west-strip rooms (door on the corridor's west side: offices and guest rooms on both floors) look
+-- out through one French window this wide, centred on the room; ExteriorDesign closes the rest of the
+-- west facade's glass line with render wall panels and the guest rooms frame the window with their drapes.
+Hotel.WEST_WINDOW = 6
 
 type Ctx = { office: Model, cf: CFrame, tier: number, owner: number, accent: Color3, company: string, folders: { [string]: Instance }, rooms: { [string]: Model } }
 type Room = Plan.Room
@@ -356,9 +361,11 @@ local function ensuite(ctx: Ctx, m: Model, r: Room, F: CFrame, W: number)
 end
 
 -- Drapes either side of every room window over a white sheer: one warm rust-sand fabric for the whole house,
--- so from the street each window reads as a curtained guest room through the facade glass (a light drape
--- vanishes against the sheer). Centre plane CURTAIN_U inside the window wall (u = D), 0.15 thick; the desk
--- and the window-side nightstand keep clear of it.
+-- so each window reads as a curtained guest room (a light drape vanishes against the sheer). Centre plane
+-- CURTAIN_U inside the window wall (u = D), 0.15 thick; the desk and the window-side nightstand keep clear
+-- of it. West rooms (Hotel.WEST_WINDOW wide French window centred on the room, wall panels outside the
+-- rest of the glass): the drapes cover the wall from the side walls to 1.5 inside the window opening and
+-- the sheer spans the opening. East rooms (full-height glazing): drapes at both window ends, sheer across.
 local CURTAIN_U = 0.2
 local CURTAIN_COLOR = C.terracotta:Lerp(C.fabricSand, 0.35)
 
@@ -434,14 +441,17 @@ local function guestRoom(ctx: Ctx, r: Room)
 	end
 	Kit.meetingChair(m, cf, F * CF(du - 2.2, 0, 3.2) * FACE_U, seed + 4)
 	Kit.part(m, cf, "DeskLamp", V3(0.4, 1.2, 0.4), F * CF(du + 0.3, 3.7, 1.8), C.brass, M.metal, DETAIL)
-	-- curtains drawn to both window ends (3.2 wide, 0.04 off the skirting of the side walls, whose faces
-	-- are at v 0.5 and W - 0.5: about 2.4 of each shows in front of the glass)
-	for _, cv in { 2.2, W - 2.2 } do
-		Kit.part(m, cf, "Curtain", V3(0.15, 11.6, 3.2), F * CF(D - CURTAIN_U, 6.0, cv), CURTAIN_COLOR, M.fabric, DETAIL)
+	-- drapes 0.04 off the skirting of the side walls (faces at v 0.5 and W - 0.5) and a translucent white
+	-- sheer between the glass (u = D) and the drapes. West rooms (French window v W/2 -+ WEST_WINDOW/2):
+	-- each drape from the side wall to 1.5 inside the opening, the sheer across the opening; full glazing:
+	-- 3.2-wide drapes drawn to both window ends (about 2.4 of each in front of the glass), sheer across
+	local westWindow = r.doors[1] ~= nil and r.doors[1].face == "E"
+	local drapeW = if westWindow then W / 2 - Hotel.WEST_WINDOW / 2 + 1.5 - 0.6 else 3.2
+	local sheerW = if westWindow then Hotel.WEST_WINDOW + 0.4 else W - 1.2
+	for _, cv in { 0.6 + drapeW / 2, W - 0.6 - drapeW / 2 } do
+		Kit.part(m, cf, "Curtain", V3(0.15, 11.6, drapeW), F * CF(D - CURTAIN_U, 6.0, cv), CURTAIN_COLOR, M.fabric, DETAIL)
 	end
-	-- a white sheer drawn across the whole window between the glass (u = D) and the drapes: translucent, so
-	-- the view stays, and from outside every room window reads as a curtained guest-room window
-	local windowSheer = Kit.part(m, cf, "WindowSheer", V3(0.05, 11.6, W - 1.2), F * CF(D - 0.06, 6.0, W / 2), C.white, M.fabric, { detail = true, transparency = 0.45 })
+	local windowSheer = Kit.part(m, cf, "WindowSheer", V3(0.05, 11.6, sheerW), F * CF(D - 0.06, 6.0, W / 2), C.white, M.fabric, { detail = true, transparency = 0.45 })
 	sheerPleats(windowSheer, Enum.NormalId.Left, 0.8, 40) -- folds on the room side (-u)
 	if W > 16 then
 		-- bigger rooms: armchair corner at the window between desk and bed; the suite: sofa and two chairs

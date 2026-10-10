@@ -51,6 +51,7 @@ STATUS: done by staffops (StaffService/StaffJobs: hour, Lighting.ClockTime, Comp
 `HUD.nextStep`: once `snapshot.data.company` exists, show `EmpireMath.nextGoal(snapshot.data, snapshot.live)`:
 `{id, text, have, need, etaMinutes?}` -> title = text, progress = have/need, "~N min" from etaMinutes (nil = no
 ETA, 0 = "ready"). Today a new player sees "Next step 1/7 Get training data" instead of "Train your first AI".
+STATUS: done by apps (HUD.describe words EmpireMath.nextGoal: title = text, bar = have/need, ETA from etaMinutes ("ready" at 0, none when nil), Save-mode tag, tap opens the app; tests/apps/test_ui garage/client/save/mid/rich/phone)
 
 ## 3. AssistantService.briefing (owner of the assistant) (CORE_SPEC 8.2) [part of a major finding]
 Add the sections Today / Customers / Money / Models from real state only: `CompanyOps.presence` per role (at
@@ -58,6 +59,7 @@ work / vacation / sick / trip counts), `data.empire.deals.accounts` (+ `CompanyO
 `live.ops.trips`, `live.capacity/load/waitlist`, `model.market.vage` ("Your Coding line is 41 min old (-5 fit)":
 `ModelMath.ageFit`), `CompanyOps.hrNeed` ("Growth team at full effect"). At an office move say "New HQ: profit dips
 for ~15 minutes while new people start" (CORE_SPEC 9.5).
+STATUS: done by apps (sections Today / Customers / Money / Models first from CompanyOps.presence, deals.accounts, live.ops.trips, the ledger, live.capacity/load/waitlist, ModelMath.ageFit, reachCap; the Next goal is recommendation 1; New HQ note after an office move; tests/apps/test_server)
 
 ## 4. EmpireApp (later UI package) - the player decisions of CORE_SPEC 8.1 / 3.2 / 6 [major finding]
 No client sends hrBudget / hrAuto / saveMode / buyJet / nightShift / DealAction / apprentice hires yet:
@@ -73,6 +75,7 @@ No client sends hrBudget / hrAuto / saveMode / buyJet / nightShift / DealAction 
 - remove the "Monthly business customers" / "Business MRR" card (:371-380): the lease auction is gone,
   `empire.customers` is always empty and `businessRevenue` 0 (corefix empties them in old saves).
 The error texts exist in ActionController (FIRST_CLIENT, OFFICE, OWNED, MAX_LEVEL, ...).
+STATUS: done by apps (Clients tab with pipeline cards + Pin/Skip/Join -> DealAction, Money tab = ledger P&L today + 4 days + running rates, Settings tab = hrAuto / hrBudget / saveMode / nightShift per role / apprentice hires / buyJet / Lab link; Contracts tab and the Business MRR card removed)
 
 ## 5. BuildingStateService (owner of the screens) - lease readers
 `empire.customers` / `businessRevenue` are empty compatibility fields now (CORE_SPEC 2.4; corefix clears stale
@@ -81,6 +84,7 @@ values on load). Replace the readers with the B2B accounts:
 - :409-419 `P.customers` ("API customers N · $X/min from leases") -> accounts with retainer/day
   (`client.retainer`) and `live.ops.b2b` ($/min);
 - :552-553 "API leases %d" -> accounts count; the training-share line should read "projects" only.
+STATUS: done by apps (customers / growth / platform screens read deals.accounts + live.ops.b2b + live.compute.reserved; no lease text left; reception shows today's trips; data hall shows load, faults, reserved compute; new fleet-office screen B1_FLEET)
 
 ## 6. CityPlan (world / airport package) - player ticket $700 (CORE_SPEC 11.4) [major finding]
 `ReplicatedStorage/Shared/Config/CityPlan.module.luau:31`: `ticket=1500` -> `ticket=700` (= `CompanyOps.TRIPS.abroad.flight`).
@@ -90,6 +94,7 @@ tests/world/test_travel.luau reads the value from the config, so it needs no cha
 `Client/Controllers/SecurityController.module.luau:29-32` `tier()` returns the office index; since
 `Plan.OFFICE_TIER_OFFSET = 1` the titles are one building off (garage level 0 shows "G · Reception, atrium ...").
 Change to `return Plan.tierForOffice(if snapshot then snapshot.data.empire.office else 1)` (CORE_SPEC 2.4).
+STATUS: done by apps (SecurityController.tier() = Plan.tierForOffice(office); buttons in English)
 
 ## 8. Ledger categories in other packages' files (P&L lines; they already land in "other")
 - FacilityService:588 `Economy.grant(s,net)` -> `Economy.grant(s,net,"retail")` (CORE_SPEC 3.6 retail line);
@@ -100,6 +105,7 @@ Change to `return Plan.tierForOffice(if snapshot then snapshot.data.empire.offic
 - AssistantService:435 coffee run -> `"campus"`, :322 / :407 refunds -> `Economy.grant(rec.session,rec.paid,"campus")`;
 - ShopService:379 Robux cash pack -> `EconomyService.grant(session, amount, "shop")`.
 STATUS: FacilityService (retail / campus) and RecruitingService (interview hire -> "hire") done by staffops; VehicleService, AssistantService and ShopService are not staffops files
+STATUS: AssistantService part done by apps (coffee run spend and both refunds book "campus"); VehicleService and ShopService still open
 
 ## 9. EmployeeConfig (owner: life / talk) - operations pay constant (CORE_SPEC 5.5, 11.5)
 Add `Config.OPS_WAGE_PER_DAY = 720`. `CompanyOps.OPS_WAGE` reads it (fallback 720); TalkService can then state
@@ -109,6 +115,7 @@ STATUS: done by staffops (EmployeeConfig.OPS_WAGE_PER_DAY = 720)
 ## 10. ComputeApp (owner of the Compute app) - GPU split hint
 `Client/UI/Apps/ComputeApp.module.luau:85`: "More training compute leaves less capacity for projects and business
 customers." -> "... for studio projects." (`trainingShare` affects projects only; B2B reserves compute itself).
+STATUS: done by apps (ComputeApp: "... for studio projects. Business clients reserve their own compute.")
 
 ## 11. Lead - run_all.sh and the sandbox
 - Add the suites (each prints "<name>: N passed, M failed"):

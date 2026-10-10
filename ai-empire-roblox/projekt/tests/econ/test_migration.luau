@@ -234,6 +234,29 @@ local function body()
 		for _, m in raw.models do if m.status == "live" then n0 += 1 end end
 		check("negative: the same models without the migration break the rule (3 lines > 2 slots)", (function() local x = oldSave(1, true); x.version = 6; x.empire.office = 2; x.models = { a = mk("a", "general", 50, 1), b = mk("b", "general", 60, 1), c = mk("c", "developers", 40, 1), d = mk("d", "students", 45, 1) }; x.modelOrder = { "a", "b", "c", "d" }; local y = Template.migrate(x); local _, n = R.ModelMath.liveLines(y); return n == 3 end)())
 	end
+	-- empire.prefs (phone request 1, added by integrate without a DATA_VERSION bump): old saves get the default,
+	-- autoTrips stays a boolean, every other key is dropped, a saved true survives
+	do
+		check("new save: empire.prefs = {autoTrips = false}", Template.new().empire.prefs ~= nil and Template.new().empire.prefs.autoTrips == false and C.count(Template.new().empire.prefs) == 1)
+		local v5 = oldSave(2, true)
+		v5.empire.prefs = nil
+		local d5 = Template.migrate(v5)
+		check("v5 save without prefs: loads, prefs default {autoTrips = false}", d5 ~= nil and d5.version == 6 and typeof(d5.empire.prefs) == "table" and d5.empire.prefs.autoTrips == false and d5.empire.office == 3)
+		local v6 = Template.new()
+		v6.empire.prefs = nil
+		local d6 = Template.migrate(v6)
+		check("v6 save written before prefs existed: loads with the default", d6 ~= nil and d6.empire.prefs.autoTrips == false)
+		local junk = Template.new()
+		junk.empire.prefs = { autoTrips = "yes", popups = true, money = 1e9 }
+		local dj = Template.migrate(junk)
+		check("prefs cleaner: non-boolean autoTrips -> false, other keys dropped", dj.empire.prefs.autoTrips == false and C.count(dj.empire.prefs) == 1)
+		local on = Template.new()
+		on.empire.prefs = { autoTrips = true }
+		check("prefs cleaner: a saved autoTrips = true survives", Template.migrate(on).empire.prefs.autoTrips == true)
+		local bad = Template.new()
+		bad.empire.prefs = 42
+		check("prefs cleaner: a non-table prefs -> default", Template.migrate(bad).empire.prefs.autoTrips == false)
+	end
 	-- NEGATIVE: the old clamp (1..4) would have broken migrated stage-5 saves; prove the check detects it
 	do
 		local v6 = Template.new()

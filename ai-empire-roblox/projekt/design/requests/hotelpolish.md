@@ -77,3 +77,24 @@ please confirm explicitly so the two packages do not duplicate work.
   between the headboard and the curtain. The guest point (F * (10.6, 4.4)) and the housekeeping points (F * (12, 4.2)) did not move.
 - Requests 4 (garden bench on the WestPath, lead/garden) and 5 (`HouseNameBand` in `Plot.refresh`, econ/corefix) are
   still open.
+
+## 9. Info (no change needed) — review round 4 (hotelpolish)
+- West facade (district side) is no longer a curtain wall: clay-render `WallPanel`s (Plaster, x -141.5..-141.2,
+  y 0.9..30, collidable like the piers) close the glass line except seven 6-stud French windows per floor
+  (`RoomKitsHotel.WEST_WINDOW`; centres z 84.5, 95.5 on the stair, 109/123/137/151/165 on the office and the
+  rooms 101-104 / 201-205), each with one centre `Mullion`; the west face has no grid mullions any more.
+  First-floor room windows: two-bar French balcony railing (`JulietBar`, `JulietRail`) with a `WindowBox` +
+  `WindowBoxBloom` behind it; ground floor `FlowerBox` + `FlowerHedge` per window (all decor, depth <= 1.0).
+- North facade: render `WallPanel`s close the room ends 104/205 (x -139..-124.5, both storeys) and suite 208
+  (x -116.1..-99.4, first floor); the corridor end keeps its window over the terrace door. No north window boxes.
+- West-strip guest rooms: the drapes run from the side walls to 1.5 inside the French window (4.9 wide), the
+  sheer spans the opening (6.4). East rooms unchanged. Guest / housekeeping points did not move.
+- Requests 4 (garden bench on the WestPath, lead/garden) and 5 (`HouseNameBand` in `Plot.refresh`,
+  econ/corefix) are still open; request 7 (drop the entrance move) still stands.
+
+## 10. Info (no change needed) — round 4 resumed (Oct 10, 16:xx)
+- Source of RoomKitsHotel / ExteriorDesign unchanged since the round-4 verification (10:00); re-verified on the current
+  tree. Request 7 is settled by the lead (notes_integration.md: "Gästehaus-Eingang NICHT verlegen").
+- Still open, both outside hotelpolish's files: request 4 (garden bench on the WestPath centre line, ExteriorDesign
+  `garden()`, line `Kit.bench(m, B, Kit.place(-92, 0.14, 150, "E"), 6, seed + 5)`) and request 5 (`HouseNameBand` in
+  `Plot.refresh`, PlotService).

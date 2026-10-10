@@ -7,8 +7,12 @@
 --   * night crew: the overflow heads beyond the day seats of a role with a night shift work 22:00-06:00
 --     (the same heads CompanyOps.wage pays x1.3: the newest paid profiles of that role)
 --   * apprentices: CompanyOps.apprentice (skill 1 -> 3, graduation after 9 company days)
---   * operations posts: one day shift that covers the opening hours, security + IT night rota at stage 5
+--   * operations posts: one day shift that covers the opening hours; at stage 5 two night rota people
+--     (EmployeeConfig.NIGHT_ROTA) take over the security and IT posts at night; below stage 5 the day guard
+--     stays on while a department runs a night crew
 -- Keys are "<role>:<i>" with i = the profile index inside the role (= rig StaffIndex - earlier roles).
+-- compute() is memoised per save table on a signature of everything it reads (like CompanyOps.output): the
+-- inputs change a few times per company day, StaffService asks every 2 s per office.
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Config=require(ReplicatedStorage.Shared.Config.EmployeeConfig)
 local EmpireConfig=require(ReplicatedStorage.Shared.Config.EmpireConfig)
@@ -28,9 +32,7 @@ end
 -- (when the server day index - and with it empire.calendar.day - moves on) already the coming day, so the
 -- people arriving at 07:45 are the ones who work today.
 function Rota.workday(e: any,hour: number): number
- local day=Ops.day(e)
- if hour>=6 and hour<8 then day+=1 end
- return day
+ return Ops.day(e)+Config.workdayOffset(hour)
 end
 -- Profile index i of a hired rig from its StaffIndex (StaffAssignment numbers the roles in ROLES order).
 function Rota.before(e: any): {[string]:number}
@@ -64,8 +66,44 @@ end
 function Rota.nightCrewOnDuty(hour: number): boolean
  return hour>=Config.NIGHT_CREW.start or hour<Config.NIGHT_CREW.finish
 end
--- Everything StaffService needs for one office, recomputed every few seconds.
+-- Seeded night shift of a stage-5 night rota person (EmployeeConfig.NIGHT_ROTA_SHIFT): on before the day
+-- person of the post leaves, off after the day person is back.
+function Rota.nightRotaShift(seed: number): (number,number)
+ local s=math.floor(math.abs(seed))
+ local a=Config.NIGHT_ROTA_SHIFT.start;local b=Config.NIGHT_ROTA_SHIFT.finish
+ return a[1]+(s%16)/15*(a[2]-a[1]),b[1]+(s%31)/30*(b[2]-b[1])
+end
+function Rota.nightRotaOnDuty(hour: number,start: number,finish: number): boolean
+ return hour>=start or hour<finish
+end
+-- Everything compute() reads, as one string (the memo key). Cheap: a few fields per role.
+function Rota.signature(e: any,hour: number): string
+ local parts={tostring(Rota.workday(e,hour)),tostring(Ops.day(e)),tostring(e.office),tostring(e.unpaidLeave)}
+ local profiles=if typeof(e.staffProfiles)=="table" then e.staffProfiles else {}
+ for _,role in EmpireConfig.ROLES do
+  local list=profiles[role.id]
+  local n=if typeof(list)=="table" then #list else -1
+  local first=if typeof(list)=="table" then list[1] else nil
+  local last=if typeof(list)=="table" then list[n] else nil
+  table.insert(parts,tostring(count(e,role.id))..":"..n..":"..tostring(if typeof(first)=="table" then first.s else nil)..":"..tostring(if typeof(last)=="table" then last.s else nil)..":"..(if Ops.nightOn(e,role.id) then "n" else "d"))
+ end
+ table.insert(parts,tostring((Ops.travellers(e) :: any).engineer))
+ local appr=0
+ if typeof(e.apprentices)=="table" then for k in e.apprentices do appr+=1;if appr<=8 then table.insert(parts,tostring(k)) end end end
+ table.insert(parts,tostring(appr))
+ return table.concat(parts,"|")
+end
+local memo: {[any]:{sig: string,snap: Snapshot}}=setmetatable({},{__mode="k"}) :: any
+-- Everything StaffService needs for one office (memoised: the same snapshot table while nothing changed).
 function Rota.compute(e: any,hour: number): Snapshot
+ local sig=Rota.signature(e,hour)
+ local m=memo[e]
+ if m and m.sig==sig then return m.snap end
+ local snap=Rota.build(e,hour)
+ memo[e]={sig=sig,snap=snap}
+ return snap
+end
+function Rota.build(e: any,hour: number): Snapshot
  local day=Rota.workday(e,hour)
  local stage=Ops.stageIndex(e)
  local snap: Snapshot={day=day,stage=stage,away={},night={},apprentices={},apprenticeCount=0,nightCrew=0,securityNight=false,itNight=false,before=Rota.before(e)}
@@ -96,9 +134,10 @@ function Rota.compute(e: any,hour: number): Snapshot
    if i>=1 then snap.night[Rota.key(id,i)]=true;snap.nightCrew+=1 end
   end
  end
- -- the night crew needs a security post on duty; from stage 5 security and IT keep a night rota
- snap.securityNight=stage>=5 or snap.nightCrew>0
- snap.itNight=stage>=5
+ -- the night crew needs a security post on duty: below stage 5 the day guard of post 3 stays on (at stage 5
+ -- the night rota people of EmployeeConfig.NIGHT_ROTA cover security and IT, the day people go home)
+ snap.securityNight=stage<5 and snap.nightCrew>0
+ snap.itNight=false
  return snap
 end
 -- Hired staff on duty at `hour`: absent people never; the night crew 22-06; everyone else their seeded
@@ -108,7 +147,7 @@ function Rota.hiredOnDuty(hour: number,start: number,finish: number,away: string
  if night then return Rota.nightCrewOnDuty(hour) end
  return hour>=start and hour<finish
 end
--- Operations posts: the day shift, or around the clock for a night-rota post (security / IT).
+-- Operations posts: the day shift, or around the clock for the guard who stays with a night crew.
 function Rota.opsOnDuty(hour: number,start: number,finish: number,nightRota: boolean?): boolean
  if nightRota then return true end
  return hour>=start and hour<finish

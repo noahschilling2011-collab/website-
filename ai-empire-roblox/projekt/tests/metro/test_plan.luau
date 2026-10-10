@@ -3,7 +3,8 @@
 --   lots inside the city, off roads / sidewalks / reserved areas, no overlaps, skyline below the landmark;
 --   walk graphs connected, never inside a building and never on the asphalt except at crossings, node heights =
 --   surface heights; crossings carry a junction; lanes inside the carriageway; signal phases never conflict;
---   benches / spots / VIP markers / helipads where they belong; far skyline outside the walls and off the sea;
+--   benches / spots / VIP markers / helipads where they belong; apron (stands, aircraft footprints, door) clear;
+--   far skyline outside the walls and off the sea;
 --   districts cover the city.
 -- Run: python3 harness/make_manifest.py --src work/src --gen harness/.gen_metro && tools/luau tests/metro/test_plan.luau [-a .gen_dir]
 local M = require("../../harness/mock")
@@ -45,8 +46,9 @@ local function body()
 		{ x1 = A.terminal.x1, x2 = A.terminal.x2, z1 = A.terminal.z1, z2 = A.terminal.z2, id = "terminal" },
 		{ x1 = A.runway.x1, x2 = A.runway.x2, z1 = A.runway.z1, z2 = A.runway.z2 + 20, id = "runway+apron" },
 		{ x1 = R.x1, x2 = R.x2, z1 = 8504, z2 = R.z2, id = "spire plaza / harbour walk / promenade" },
-		{ x1 = Plan.HELIPADS.airport.cf.X - 40, x2 = Plan.HELIPADS.airport.cf.X + 40, z1 = Plan.HELIPADS.airport.cf.Z - 40, z2 = 7694, id = "airport helipad + VIP terminal" },
+		{ x1 = Plan.HELIPADS.airport.cf.X - 40, x2 = Plan.HELIPADS.airport.cf.X + 90, z1 = Plan.HELIPADS.airport.cf.Z - 40, z2 = Plan.HELIPADS.airport.cf.Z + 40, id = "airport helipad + VIP terminal" },
 	}
+	for _, r in Plan.APRON.rects do table.insert(reserved, { x1 = r.x1, x2 = r.x2, z1 = r.z1, z2 = r.z2, id = "apron" }) end
 	for _, b in City.BUILDINGS do if b.zone == "abroad" then table.insert(reserved, bRect(b, 4, true)) end end
 	local badRoad, badRes, badOv, badRect = {}, {}, 0, {}
 	for i, l in Plan.LOTS do
@@ -213,7 +215,33 @@ local function body()
 	local hr = bRect(hotel, 0, false)
 	check("hotel helipad on the hotel roof (Purpose VIP)", hp.purpose == "VIP" and inside(hr, hp.cf.X, hp.cf.Z, hp.size / 2) and math.abs(hp.cf.Y - Plan.HOTEL_ROOF - 1) < 1e-6, hp.cf)
 	local ap = Plan.HELIPADS.airport
-	check("airport helipad beside the arrival terminal (Purpose VIPAirport)", ap.purpose == "VIPAirport" and ap.cf.X - ap.size / 2 > A.terminal.x2 + 50 and math.abs(ap.cf.Y - City.GROUND - 1) < 1e-6)
+	check("airport helipad on the heliport east of the apron (Purpose VIPAirport)", ap.purpose == "VIPAirport" and ap.cf.X - 36 > Plan.APRON.rects[1].x2 + 10 and ap.cf.X + 90 <= R.x2 and math.abs(ap.cf.Y - City.GROUND - 1) < 1e-6)
+	------------------------------------------------------------------ apron (flight request #7)
+	local AP = Plan.APRON
+	local function onApron(x, z) for _, r in AP.rects do if x >= r.x1 and x <= r.x2 and z >= r.z1 and z <= r.z2 then return true end end return false end
+	local badApron = {}
+	for _, r in AP.rects do
+		if not (r.x1 >= A.terminal.x2 and r.x2 <= R.x2 - 6 and r.z1 >= A.runway.z2) then table.insert(badApron, "outside") end
+		if ov(r, { x1 = A.plaza.x1, x2 = A.plaza.x2, z1 = A.plaza.z1, z2 = A.plaza.z2 }) then table.insert(badApron, "plaza") end
+		for _, rd in Plan.ROADS do if ov(r, Plan.roadRect(rd, true)) then table.insert(badApron, rd.id) end end
+		local hp = Plan.HELIPADS.airport.cf
+		if ov(r, { x1 = hp.X - 36, x2 = hp.X + 36, z1 = hp.Z - 36, z2 = hp.Z + 36 }) then table.insert(badApron, "heliport") end
+	end
+	-- both aircraft footprints on the apron (AircraftModel "320" at scale 1.8, measured: fuselage + tailplane band
+	-- |side| <= 20 from 60 ahead of the pivot to 66 behind it, inner wings |side| <= 35 from 25 ahead to 57 behind,
+	-- outer wings to the tips (57) from 18 ahead to 17 behind; c = {behind, side})
+	for i, st in { AP.stand, AP.stand2 } do
+		local fwd = st.LookVector; local right = st.RightVector
+		for _, c in { { -60, -20 }, { -60, 20 }, { 66, -20 }, { 66, 20 }, { -25, -35 }, { -25, 35 }, { 57, -35 }, { 57, 35 }, { -18, -57 }, { -18, 57 }, { 17, -57 }, { 17, 57 } } do
+			local p = st.Position - fwd * c[1] + right * c[2]
+			if not onApron(p.X, p.Z) then table.insert(badApron, string.format("stand%d@%.0f,%.0f", i, p.X, p.Z)) end
+		end
+	end
+	local gap = (AP.stand2.Position - AP.stand.Position).Magnitude
+	check("apron inside the city, off the plaza / roads / heliport; both aircraft footprints on it", #badApron == 0 and gap >= 126 + 90, table.concat(badApron, " ") .. " gap " .. gap)
+	check("stands face the hall (west), stand 1 nose >= 15 studs from the hall roof", AP.stand.LookVector.X < -0.99 and AP.stand2.LookVector.X < -0.99 and AP.stand.X - 60 >= A.terminal.x2 + 6 + 15 and AP.door.z1 >= A.terminal.z1 + 4 and AP.door.z2 <= A.terminal.z2 - 4 and AP.door.z2 - AP.door.z1 >= 12)
+	local door1 = AP.stand.Position + AP.stand.LookVector * 41.3 - AP.stand.RightVector * 6.24
+	check("stand 1 forward left door over the apron, airstair foot on the apron", onApron(door1.X, door1.Z) and onApron(door1.X, door1.Z + 20), door1)
 	local badFar = 0
 	for _, f in Plan.FAR do
 		local r = { x1 = f.x - f.w / 2, x2 = f.x + f.w / 2, z1 = f.z - f.d / 2, z2 = f.z + f.d / 2 }
@@ -248,8 +276,31 @@ local function body()
 	local holes = 0
 	for x = R.x1 + 1, R.x2 - 1, 20 do for z = R.z1 + 1, R.z2 - 1, 20 do if not Plan.districtAt(x, z) then holes += 1 end end end
 	check("named districts cover the whole city", holes == 0 and #Plan.DISTRICTS >= 4, holes)
-	check("regions: Port Meridian and downtown, nothing on the campus / airport (terminal check-in z 2461, car park z 2421)", Plan.regionAt(Vector3.new(0, 0, 8000)) == "metro" and Plan.regionAt(Vector3.new(0, 0, 1500)) == "downtown" and Plan.regionAt(Vector3.new(0, 0, 0)) == nil and Plan.regionAt(Vector3.new(0, 0, 2800)) == nil
-		and Plan.regionAt(Vector3.new(0, 0, 2461)) == nil and Plan.regionAt(Vector3.new(0, 0, 2421)) == nil)
+	check("regions: Port Meridian, downtown (to z 2416), the City Airport terminal (check-in z 2461); nothing on the campus / car park lot / above the terminal", Plan.regionAt(Vector3.new(0, 0, 8000)) == "metro" and Plan.regionAt(Vector3.new(0, 0, 1500)) == "downtown" and Plan.regionAt(Vector3.new(0, 0, 0)) == nil and Plan.regionAt(Vector3.new(0, 0, 2800)) == nil
+		and Plan.regionAt(Vector3.new(0, 0, 2461)) == "airport" and Plan.regionAt(Vector3.new(-400, 0, 2421)) == nil and Plan.regionAt(Vector3.new(0, City.GROUND + 60, 2461)) == nil
+		and Plan.regionAt(Vector3.new(0, 0, 2410)) == "downtown")
+	-- City Airport terminal net (airport request #5): connected, links are edge ids, everything inside the hall, seat spurs
+	local ap = Plan.airportNet()
+	local seen, stack = { [1] = true }, { 1 }
+	while #stack > 0 do
+		local n = table.remove(stack)
+		for _, eid in ap.nodes[n].links do
+			local e = ap.edges[eid]
+			local o = if e.a == n then e.b else e.a
+			if not seen[o] then seen[o] = true; table.insert(stack, o) end
+		end
+	end
+	local reached, badLink, outside, seatsN, portals = 0, 0, 0, 0, 0
+	for _ in seen do reached += 1 end
+	local t = City.AIRPORT.terminal
+	for _, n in ap.nodes do
+		for _, eid in n.links do local e = ap.edges[eid]; if not e or (e.a ~= n.id and e.b ~= n.id) then badLink += 1 end end
+		if n.p.X < t.x1 or n.p.X > t.x2 or n.p.Z < t.z1 or n.p.Z > t.z2 then outside += 1 end
+		if n.seat then seatsN += 1 end
+		if n.portal then portals += 1 end
+	end
+	check("airport terminal net: connected, consistent links, inside the hall, >= 10 seat spurs, doors + A1 bridge as portals", reached == #ap.nodes and badLink == 0 and outside == 0 and seatsN >= 10 and portals >= 5 and #ap.lanes == 0,
+		reached .. "/" .. #ap.nodes .. " links " .. badLink .. " out " .. outside .. " seats " .. seatsN .. " portals " .. portals)
 	------------------------------------------------------------------ furniture vs fountains / pool; skyline height
 	local wet = {}
 	local function seatBox(sp) local seat = Vector3.new(sp.x, 0, sp.z) - sp.face * 1.6; return seat end

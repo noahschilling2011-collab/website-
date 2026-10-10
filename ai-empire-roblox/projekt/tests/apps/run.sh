@@ -16,4 +16,5 @@ run() {
 }
 for st in garage client save mid rich phone; do run "apps_ui_$st" test_ui.luau -a "$GEN" "$st"; done
 for st in garage mid rich; do run "apps_server_$st" test_server.luau -a "$GEN" "$st"; done
+for sc in garage_edge stage5 rackfull oldsave many spam midnight broke hr; do run "apps_adv_$sc" test_adv.luau -a "$GEN" "$sc"; done
 exit $rc

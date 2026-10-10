@@ -137,6 +137,9 @@ local function body()
 	check("abroad points", #City.ABROAD.checkin >= 1 and City.ABROAD.arrival ~= nil and City.INTL_HOTEL ~= nil and City.INTL_HOTEL.zone == "abroad")
 	check("city hotel lobby + reception", City.CITY_HOTEL ~= nil and City.CITY_HOTEL.lobby ~= nil and City.CITY_HOTEL.reception ~= nil and City.CITY_HOTEL.zone == "downtown")
 	check("ticket price in a config table", type(City.TRAVEL.ticket) == "number" and City.TRAVEL.ticket > 0)
+	-- CORE_SPEC 11.4 (corefix request 6, applied by integrate): the player's own return ticket costs what the economy
+	-- books for an abroad trip flight (CompanyOps.TRIPS.abroad.flight = 700)
+	check("CORE_SPEC 11.4: ticket = CompanyOps.TRIPS.abroad.flight = $700", okOps and type(Ops) == "table" and Ops.TRIPS and Ops.TRIPS.abroad and City.TRAVEL.ticket == Ops.TRIPS.abroad.flight and City.TRAVEL.ticket == 700, City.TRAVEL.ticket)
 
 	------------------------------------------------------------------ routes
 	local function segmentOk(a, b)

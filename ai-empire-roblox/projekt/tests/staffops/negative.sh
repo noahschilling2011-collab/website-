@@ -5,7 +5,7 @@
 cd "$(dirname "$0")/../.." || exit 1
 python3 tests/staffops/mkharness.py --neg >/dev/null || exit 1
 n=0; m=0
-for t in clock absence night ops apprentice rack garage arrival talk client; do
+for t in clock absence night ops apprentice academy rack nightfault garage beacon arrival talk client perf; do
   m=$((m+1))
   out=$(timeout 900 tools/luau tests/staffops/test_staffops.luau -a "$t" neg 2>&1); r=$?
   line=$(echo "$out" | grep -E "passed|ERROR" | tail -n 1)

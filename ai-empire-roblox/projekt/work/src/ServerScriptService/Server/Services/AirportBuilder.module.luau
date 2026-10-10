@@ -621,6 +621,17 @@ local function floorPlan(inside: Instance)
 	for _,x in {-150,150} do box(m,"DoorAxis",x-3,x+3,F,F+.03,2437,2472,rgb(96,102,112),M.Marble,true) end
 	box(m,"DoorAxis",-3,3,F,F+.03,2437,2451.7,rgb(96,102,112),M.Marble,true)
 	for _,cx in {-185,-115,115,185} do box(m,"KioskRug",cx-6.2,cx+6.2,F,F+.06,2456.4,2463.4,rgb(36,86,98),M.Carpet,true) end
+	-- entrance mats (metal frame, dark grille mat) inside every door, and a terrazzo medallion (brass ring, dark
+	-- field, teal centre) on each departures door axis between the doors and the queues
+	for _,x in DOORS do
+		box(m,"EntranceMatFrame",x-6.3,x+6.3,F,F+.05,FRONT+.9,FRONT+6.6,C.metalSoft,M.Metal,true)
+		box(m,"EntranceMat",x-6,x+6,F,F+.07,FRONT+1.2,FRONT+6.3,rgb(46,48,52),M.Carpet,true)
+	end
+	for _,x in {-150,0,150} do
+		post(m,"FloorMedallion",x,2445,F,F+.04,13,C.brass,M.Metal,true)
+		post(m,"FloorMedallion",x,2445,F,F+.05,12.2,rgb(84,88,96),M.Marble,true)
+		post(m,"FloorMedallion",x,2445,F,F+.065,5,BRAND,M.Marble,true)
+	end
 end
 
 local function landside(inside: Instance,ticketText: string)
