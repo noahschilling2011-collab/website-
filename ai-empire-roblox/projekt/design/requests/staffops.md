@@ -53,6 +53,7 @@ label "IT Support · remote fix", talk line "I'm fixing a rack fault remotely fr
 compute rooms."). An engineer walks to the rack only when no IT post is free (garage, IT busy / off duty). With
 the line applied, the tests in tests/staffops (rack suite: "remote fix exactly when IT may not enter the rack room")
 switch to expecting IT at the rack automatically.
+STATUS: done by integrate (BuildingPlan ROLE_CLEARANCE.support.compute = true; the rack suite switches to IT at the rack by itself: staffops_rack 27/0)
 
 ## 2. EmployeeRigDesign (world package) - Training Lead uniform + apprentice look at build time
 - `UNIFORMS["Training Lead"] = {shirt=rgb(46,126,112), trousers=rgb(44,50,66), shoes=rgb(40,34,30)}` and
@@ -61,12 +62,14 @@ switch to expecting IT at the rack automatically.
 - Optional: a `young = true` build option (no beard, no grey hair, build scale x0.94 inside `at()`) instead of the
   post-build `Model:ScaleTo(0.94)` StaffAssignment uses now (Studio check: R6 feet may float ~0.2 studs while
   anchored, the same order as today's 0.92..1.06 build spread).
+STATUS: done by integrate (EmployeeRigDesign.UNIFORMS["Training Lead"] with the same tones; the green lanyard stays StaffAssignment.dressTrainer's; the optional `young` build option is not added - ScaleTo stays)
 
 ## 3. TalkService (talk) - exact hour + relief/shadow facts (optional)
 - `context().hour`: `EmployeeConfig.hour(Staff.now())` already matches the sky now (the timer is phase-locked to the
   server clock); `Staff.hour()` is the exact value if you prefer it.
 - `subject()`: pass the rig attribute `ShadowOf` (string) as `sub.shadowOf`; Dialogue would then say "I'm sitting
   with Mia Weber today ..." (today it says "a senior colleague").
+STATUS: done by integrate (TalkService passes rig ShadowOf as sub.shadowOf, Dialogue's Shadowing line names the senior; context.hour uses Staff.hour() when present; new check in the staffops talk suite)
 
 ## 3b. TalkPanel (talk, client) - the panel slides under the top bar on phones (found in the staffops previews)  [STILL OPEN - confirmed by the round-1 review with the HUD + phone button mounted; out/staffops/phone_talk_*.png still show it]
 `TalkPanel.fitScale` fits the 640x540 panel to `workspace.CurrentCamera.ViewportSize - 24`, but the ScreenGui has
@@ -76,6 +79,7 @@ than the area it is centred in and its header (name, Close button) sits under th
 `local size = screen.AbsoluteSize; scale.Scale = math.clamp(math.min((size.Y - 16) / TalkPanel.H, (size.X - 16) / TalkPanel.W), .3, 1)`
 (re-run on `screen:GetPropertyChangedSignal("AbsoluteSize")`), or subtract `GuiService:GetGuiInset()` from the
 viewport. Desktop is unaffected.
+STATUS: done by integrate (TalkPanel.fitScale fits into the ScreenGui's AbsoluteSize (below the top bar) and re-runs on its change; viewport fallback before layout)
 
 ## 4. tests/lead/run_all.sh (lead) - add the staffops suites  [STILL OPEN - the regression run covers no staffops suite]
 ```
@@ -85,6 +89,7 @@ for t in clock absence night ops apprentice academy rack nightfault garage beaco
 (`tests/staffops/run.sh` does the same, about 12 min; negative checks: `tests/staffops/negative.sh` (files before the
 package) and `tests/staffops/negative_round2.sh` (files of review round 1); GUI previews: `tests/staffops/render.sh`
 -> out/staffops/.)
+STATUS: done by integrate (run_all: staffops_{clock,absence,night,ops,apprentice,academy,rack,nightfault,garage,beacon,arrival,talk,client,perf} after tests/staffops/mkharness.py)
 
 ## 5. CORE_SPEC (lead) - decisions to record
 - 5.3 / 11.1: operations staff have no visible absences: the HR relief covers vacation and sick days of a post
@@ -106,6 +111,7 @@ package) and `tests/staffops/negative_round2.sh` (files of review round 1); GUI 
   pays no extra guard there).
 - 5.3 (round 2): "Who's away today?" lists the people of the shift day (06:00-08:00 already the coming day), read
   from live.workforce.hour.
+STATUS: done by integrate (CORE_SPEC "Decisions (integrate)")
 
 ## 6. CompanyOps (econ / lead) - drop apprentices entries without a profile  [new, round 2]
 `Ops.apprenticeCount` counts every key of `empire.apprentices`, so an entry whose seed no current profile has (a list
@@ -123,6 +129,7 @@ end
 for key in map do if not live[key] then map[key] = nil end end
 ```
 (or the same in the Template cleaner). Test: tests/staffops academy suite "stale apprentice entry" (staffops side).
+STATUS: done by integrate (Ops.graduate drops empire.apprentices entries without a current profile; tests/corefix: stale entry dropped, current kept, Training Lead not paid)
 
 ## 7. CompanyOps (econ) - no absence on the hire day  [new, round 2, optional but players will notice]
 `CompanyOps.presence` can put a person on vacation (1/12) or sick (1.7 %) on the day they are hired, so a hire the
@@ -131,6 +138,7 @@ person is away, the first-day arrival happens on the next working day). Suggeste
 `empire.hiredOn[tostring(seed)] = day` written by EmpireService.hire / auto-HR (one entry per hire, dropped after the
 day like the apprentice map) and in `Ops.presence`: `if hiredToday(seed) then out[i] = "present"` before the
 vacation / sick rules (the vacation day of that cycle then simply falls on another day: skip it, no collision shift).
+STATUS: dropped (integrate: needs a new saved map (hiredOn) and a presence-rule change in the economy calendar; a hire who draws an absence walks in on the next working day - recorded in CORE_SPEC "Decisions (integrate)")
 
 ## 8. BuildingStateService (apps) - data-hall screen: who repairs the fault  [new, round 2]
 Line ~373 says "IT on the way" whenever `compute.it` is true, but the worker can be an ML Engineer, IT doing a remote
@@ -154,6 +162,7 @@ The EmployeeBadge is 150 px; "Apprentice · Growth Manager" needs ~180 px at 12 
 apprentice's badge to 190 px (TextScaled with a UITextSizeConstraint max 12 for very long names) and restores 150 px at
 graduation. Optional: build every badge with `TextScaled = true` + `UITextSizeConstraint.MaxTextSize = 12` so long
 regular names never overflow either.
+STATUS: dropped (integrate: cosmetic; regular names fit the 150 px badge, the long apprentice line is handled by staffops (190 px + TextScaled); a build-time TextScaled would also need the graduation path changed)
 
 
 ## 10. Lead decision - operations posts built vs posts CompanyOps pays (found in round 2, not changed)
@@ -164,3 +173,4 @@ new night rota 318 / 319) vs 16 + 2. Either (a) staffops places only the posts o
 `EmployeeConfig.POST_FROM_STAGE = {[2]=3,[4]=4,[10]=3,[11]=4,[15]=3,[16]=3}`, others from stage 2; a small
 StaffAssignment change plus test updates in staff_harness / tests/buildings), or (b) econ pays every built post.
 Tell staffops which one; nothing was changed because it alters the visible life of every HQ stage.
+STATUS: done by integrate (lead decision (a): EmployeeConfig.POST_FROM_STAGE = {[2]=3,[4]=4,[10]=3,[11]=4,[15]=3,[16]=3}, StaffAssignment skips posts the economy does not pay at the built stage -> 8 / 12+2 / 14+2 / 16+2 like CompanyOps.STAGES[].ops (CORE_SPEC 5.5). Tests updated for the intended change: staff_harness/test_staff ops count + missing-post warning, tests/life/test_life asserts that unpaid jobs (garage guard, cleaner, mail clerk, café host) do NOT appear below their stage)

@@ -77,12 +77,14 @@ STATUS: done by econ (Plan.clampTier)
 ## 5. FacilityService (package "life") — guest refusal text: already present
 `DENY.guest` exists. Guest-class rooms (guest rooms, corridors, breakfast, workshop) refuse card holders through
 `Plan.playerAllows`; the founder may enter; the guest house lobby is public. No request.
+STATUS: already done (integrate: FacilityService DENY.guest + Plan.playerAllows; no request)
 
 ## 6. Talk package — room purposes / hotel attributes
 New room kinds for Dialogue room purposes: garage_lab, garage_founder, garage_assist, garage_wc, garage_porch
 (plan tier 0) and hotel_lobby, hotel_breakfast, hotel_pantry, hotel_service, hotel_office, hotel_corridor,
 hotel_workshop, hotel_stair, guestroom (guest house). Office attributes set at build: `GarageStage = true`
 (tier 0), `HotelRooms = 12` (tiers with the guest house). `HotelGuests` is left to the hotel-guest package.
+STATUS: done by integrate (GarageStage / HotelRooms are set at build, HotelGuests by EmpireService; Dialogue ROOM_TEXT now has purposes for garage_lab/founder/assist/wc/porch, hotel_lobby/breakfast/pantry/service/office/workshop and guestroom - corridors and stairs stay without a purpose by the talk rule)
 
 ## 7. For the later hotel-guest NPC package (no change needed now; what exists)
 - Role `guest` = {public, guest} (BuildingPlan ROLE_CLEARANCE); support staff have guest clearance.
@@ -98,3 +100,5 @@ hotel_workshop, hotel_stair, guestroom (guest house). Office attributes set at b
   for routes that start or end there (stairs = one walked path, fallback via `Plan.stairEntryFor(annex, level)`).
 - Entrance: automatic door H0_LOBBY_D1 on the east facade (x -98, z 90) facing the WestPath; apron + canopy;
   wayfinding post where the colonnade ends (x -93, z 70); terrace exit H0_CORRIDOR_D1 to the garden.
+STATUS: deferred to guests_jet (info for the hotel-guest NPCs: GuestBed activities, lobby / breakfast seats, posts 13 / 14, annex navigation)
+STATUS: done by guests_jet (GuestPlan/GuestController use the guest-house rooms + doors of Plan.rooms, the lobby Wait1..4 / breakfast Dining seats and the room doors of H0_R01..H1_R12 on their own waypoint graph incl. the switchback stair; posts 13/14 untouched - guests stand on the guest side of the counter; tests/guests_jet: walls / furniture / floors on tiers 2-4)

@@ -9,7 +9,7 @@ if [ -n "${RUNALL_TAG:-}" ]; then
   cd "$SB"
 fi
 L=tools/luau
-run() { local name="$1"; shift; local out; out=$("$@" 2>&1); local rc=$?; printf "%-22s rc=%s  %s\n" "$name" "$rc" "$(echo "$out" | grep -E "passed|failed|SUMMARY|orphanDoors" | tail -n 1)"; }
+run() { local name="$1"; shift; local out; out=$("$@" 2>&1); local rc=$?; printf "%-22s rc=%s  %s\n" "$name" "$rc" "$(echo "$out" | grep -E "passed|failed|SUMMARY|orphanDoors|WORLD CHECK|ENTRANCES|reachable" | tail -n 1)"; }
 python3 harness/make_manifest.py --src work/src --gen harness/.gen_lift >/dev/null
 python3 harness/make_manifest.py --src work/src --gen harness/.gen_leadtest >/dev/null
 python3 tests/gen_layout_test.py >/dev/null 2>&1
@@ -57,3 +57,33 @@ for t in ops b2b service migration net; do run "econ_$t" bash -c "cd tests/econ 
 run corefix           bash -c "cd tests/corefix && ../../tools/luau test_corefix.luau -a .gen_corefix"
 run corefix_ui        bash -c "cd tests/corefix && ../../tools/luau test_ui.luau -a .gen_corefix"
 run models            bash tests/models/run.sh
+# ---- phase-2 world + round-2a package suites (added by integrate, 2026-10-10; commands from the packages' requests)
+# airport (airport.md / flight.md #1): City Airport build, budgets, markers, walk graph
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_airport >/dev/null
+run airport           $L tests/airport/test_airport.luau -a .gen_airport
+# metro (metro.md #1): Port Meridian plan/build, client city life, walkers vs scenery, traffic stress (~3 min)
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_metro >/dev/null
+for t in plan build life paths; do run "metro_$t" $L tests/metro/test_$t.luau -a .gen_metro; done
+run metro_stress      $L tests/metro/stress_traffic.luau -a .gen_metro 3
+# flight (flight.md #8): FlightPlan, ShuttleService, client controllers, aircraft; hull clearance sweep vs the built world
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_flight >/dev/null
+for t in plan shuttle client aircraft; do run "flight_$t" $L tests/flight/test_$t.luau -a .gen_flight; done
+run flight_clearance  bash tests/flight/run.sh --clearance-only
+# shared world dump (airport.md #1/#8, metro.md #2): per-zone budgets, holes, map edge, entrances, metro walkability
+run world_check       bash agents/airport/world_dump.sh --out out/runall_world
+run world_entrances   python3 agents/world/entrances.py out/runall_world/world_dump.json
+run metro_reach       python3 tests/metro/reach.py out/runall_world/world_dump.json
+# hotelpolish (guest house: tiers 2-4 + baseline harness builds, geometry, GUI pixel density)
+run hotelpolish       bash tests/hotelpolish/run.sh
+# staffops (staffops.md #4; ~12 min)
+python3 tests/staffops/mkharness.py >/dev/null
+for t in clock absence night ops apprentice academy rack nightfault garage beacon arrival talk client perf; do run "staffops_$t" $L tests/staffops/test_staffops.luau -a "$t"; done
+# phone (phone.md #2)
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_phone >/dev/null
+run phone             bash -c "cd tests/phone && ../../tools/luau test_phone.luau -a .gen_phone"
+for st in garage rich fixes touch; do run "phone_ui_$st" bash -c "cd tests/phone && ../../tools/luau test_ui.luau -a .gen_phone $st"; done
+# apps (apps.md #3): HUD Next goal, Company/Hardware apps, briefing, screens; 6 UI + 3 server + 9 adversarial states
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_apps >/dev/null
+for st in garage client save mid rich phone; do run "apps_ui_$st" bash -c "cd tests/apps && ../../tools/luau test_ui.luau -a .gen_apps $st"; done
+for st in garage mid rich; do run "apps_server_$st" bash -c "cd tests/apps && ../../tools/luau test_server.luau -a .gen_apps $st"; done
+for sc in garage_edge stage5 rackfull oldsave many spam midnight broke hr; do run "apps_adv_$sc" bash -c "cd tests/apps && ../../tools/luau test_adv.luau -a .gen_apps $sc"; done

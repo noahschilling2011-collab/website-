@@ -394,6 +394,36 @@ function ModelMath.ageFit(vage: number): number
 	return A.maxFit * math.clamp(vage / A.full, 0, 1)
 end
 
+-- Version number the next model called `name` gets: "Nova" -> 1, a second "Nova" -> 2 (shown "Nova v2").
+-- Refinements raise model.version, so the next "Nova" never reuses a number a refined Nova already shows.
+-- AIModelService.startTraining and the Lab's Model Studio both use this rule.
+function ModelMath.nextVersion(data: PlayerData, name: string): number
+	local lower = string.lower(name)
+	local count, highest = 0, 0
+	for _, model in data.models do
+		if string.lower(model.name) == lower then
+			count += 1
+			highest = math.max(highest, tonumber(model.version) or 0)
+		end
+	end
+	return math.max(count, highest) + 1
+end
+
+-- Model look (LAB_SPEC 6.3, cosmetic only): "<colorId>:<emblemIndex>" with a CompanyConfig.COLORS id and an
+-- index into CompanyConfig.LOGOS. Returns (colorId, emblemIndex) for a valid value, otherwise nil. Server
+-- (StartTraining validation) and client (model cards) read looks only through this function.
+function ModelMath.parseLook(look: any): (string?, number?)
+	if typeof(look) ~= "string" or #look > 24 then
+		return nil, nil
+	end
+	local colorId, index = string.match(look, "^([%a]+):(%d+)$")
+	local n = tonumber(index)
+	if not colorId or not n or not CompanyConfig.getColor(colorId) or n < 1 or n > #CompanyConfig.LOGOS or n % 1 ~= 0 then
+		return nil, nil
+	end
+	return colorId, n
+end
+
 -- roll() liefert [0, 1). Gibt nil zurück, wenn kein Event eintritt.
 function ModelMath.rollEvent(roll: () -> number, specId: string): ModelConfig.EventDef?
 	if roll() > ModelConfig.TRAINING.eventChance then

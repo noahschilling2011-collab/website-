@@ -1236,3 +1236,64 @@ There are no new `staffProfiles` fields (absences are hashes, apprentices are a 
 **Injected or approximated:** availability as its expectation 0.90 (not per person); morale as the full-staffing table; guest-house occupancy fixed at 60 %; the travelling engineer is not removed from engineering output.
 
 **Not simulated:** visuals, parallel training, night shift, Q, rack faults, unpaid leave, founder meetings, phones/drivers/apprentices costs, Investor pass, branch office.
+
+---
+
+## Decisions (integrate, 2026-10-10)
+
+Recorded by the integration lead before round 2b (requests corefix #12, staffops #5 and #10, apps #7 / #9). Where a
+decision deviates from the text above, this section wins.
+
+**From the econ/models build (corefix #12)**
+- 2.4: `MIGRATIONS[5]` also empties `customers` / `businessRevenue` and normalises product lines: one live model per
+  line (the best overall is kept, the others retire into it with `replacedBy`, users × MIGRATE plus organic growth
+  move over); lines beyond `PRODUCT_SLOTS[stage]` with the fewest users go back to "trained" with their release data.
+- 11.8 budgets at the caps: a news line is ≤ 80 bytes incl. the stamp (`CompanyOps.NEWS_CHARS`); the replicated
+  ledger holds 4 of the 7 saved company days with ≤ 16 categories per side and day.
+- 7.7 auto-price: the first cycle runs 150 s after the company starts ticking (the design bot's phase), then every 300 s.
+- 5.5 / 10 rack faults: one fault takes 1 compute unit off line (`FAULT.units`), as written (the econ build first took
+  whole GPUs).
+- 11.1: the Training Lead ($900/day) is paid only while the company has apprentices; `Ops.graduate` drops
+  `empire.apprentices` entries whose seed no current profile has (staffops #6), so stale entries never pay him.
+
+**Staff calendar and operations (staffops #5)**
+- 5.3 / 11.1: operations staff have no visible absences: HR relief covers vacation and sick days of a post, the post is
+  never empty in opening hours. The covering day shift is 07:15–07:30 to 18:00–18:30 (seeded).
+- 5.3: the company day a shift belongs to switches at 06:00 for the staff animation (people arriving at 07:45 work the
+  day that starts at 08:00); the economy's calendar still advances at 08:00. "Who's away today?" lists the people of
+  that shift day (06:00–08:00 already the coming day).
+- 5.3: at the end of a shift an employee finishes the current step but leaves within 3–11 real seconds (night hours
+  pass at 21 s per hour).
+- 11.1: the Training Lead sits at a free desk of the People & Company (HR) room (else another free operations desk,
+  else the reception); tour 08:20–16:00 on the first day in groups of at most 4; the daily training session
+  (10:00–11:30) is held in the meeting room nearest to the Training Lead's desk with enough free seats (the HR room
+  has no class seating).
+- 5.5: stage 5 night rota = two separate people (OPERATIONS_JOBS 18 / 19) who take over posts 3 and 6 at the day
+  person's shift end and leave at their shift start; below stage 5 the day guard of post 3 stays on while a
+  department runs a night crew (no extra pay).
+- 5.5 (staffops #10): visible operations staff follow the table of 5.5 exactly: a post is staffed only from the stage
+  at which `CompanyOps.STAGES[].ops` pays it (`EmployeeConfig.POST_FROM_STAGE`: posts 2, 10, 15, 16 from stage 3;
+  4, 11 from stage 4; the others from stage 2; guest-house posts 13 / 14 where the guest house stands). Stage 2 shows
+  8 post holders, stage 3 12 + 2, stage 4 14 + 2, stage 5 16 + 2 — the same principle as drivers and pilots: a person
+  is visible iff the economy pays them.
+- 11.1 / user request 23: IT Support has compute clearance (BuildingPlan `ROLE_CLEARANCE.support.compute`), so the IT
+  post walks to the faulty rack itself; the remote fix from the corridor remains only as a fallback.
+- Not adopted (staffops #7): a hire-day exemption from vacation / sick draws would need a new saved map
+  (`hiredOn`) and changes `CompanyOps.presence`; a hire who draws an absence on day 1 walks in on the next working day.
+
+**Player settings and actions**
+- Appendix A: `empire.prefs = { autoTrips = false }` (phone #1; a pure addition, no DATA_VERSION bump; the Template
+  cleaner keeps only the boolean `autoTrips`). The itinerary package reads it through `PhoneService.setting`.
+- `EmpireAction {action = "nightShift", role, on}` sets every department of a role atomically; `DealAction pin / skip`
+  accept an explicit boolean `on` (idempotent; without it they toggle as before). `live.compute.faults[i].eta` = the
+  remaining repair seconds at the current rate in whole 5 s steps. `HardwareConfig.SERVE_POWER = 0.025`.
+- 11.4: `CityPlan.TRAVEL.ticket = 700` is now in the code (was 1500).
+- Ledger lines: car purchases book "cars", Robux cash packs "shop".
+
+**Open (not decided in this round)**
+- 8.1 "per-department HR target" (apps #7): no field or action yet; HR auto + the wage budget remain the player's HR
+  levers. Needs an econ design (`e.hr.targets`, `Ops.hrNeed`) before a UI.
+- LOGIC_BRIEF 15 "work items" (apps #9): no work-item system; screens, briefing and talk show the training run, the
+  research job and studio projects (real state). A later econ/staff design.
+- Computer window touch scale (apps #8): deferred to the lab package, which designs its Studio against the current
+  0.432 window scale and plans a coordinated Computer chrome request (LAB_SPEC 3.2).

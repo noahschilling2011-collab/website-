@@ -67,6 +67,7 @@ function HardwareConfig.thermal(empire: any,throughput: number): number
 	return math.min(1,budget/math.max(1,throughput))
 end
 HardwareConfig.SELL_REFUND = 0.5
+HardwareConfig.SERVE_POWER = 0.025 -- $ per compute unit per second while any model is live (MarketService.tick; ComputeApp shows it)
 HardwareConfig.TFLOPS_PER_UNIT = 35 -- nur für die Anzeige
 
 function HardwareConfig.getGPU(id: string): GPUDef?

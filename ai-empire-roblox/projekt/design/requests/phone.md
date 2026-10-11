@@ -39,6 +39,7 @@ Add `empire.prefs = { autoTrips = false }`:
 PhoneService already reads and writes `empire.prefs.autoTrips` when the table exists (and marks the session dirty);
 the Settings screen then says "Saved with your company" instead of "Kept for this session". Covered by
 tests/phone/test_phone.luau ("with empire.prefs the setting is saved there"). Replication cost: ~20 bytes once.
+STATUS: done by integrate (EmpireMath.new: prefs = {autoTrips = false}; Template.cleanCompany keeps only the boolean autoTrips; no DATA_VERSION bump; tests/econ test_migration: v5 / v6 saves without prefs load with the default, junk cleaned, true kept; tests/phone test_phone updated: new saves save the setting, the session fallback is tested with prefs removed)
 
 ## 2. lead - tests/lead/run_all.sh (still open: the project-wide run does not cover the phone yet)
 ```
@@ -53,6 +54,7 @@ Expected (review round 1): 226/0, 36/0, 50/0, 43/0, 19/0 (phone_ui_fixes runs ab
 seconds real). Same as `tests/phone/run.sh`. Mutation proof: `tests/phone/negative.sh` (59 mutations). Previews:
 `tests/phone/render.sh` -> `out/phone/*.png` (desktop 1280x720 + iPhone landscape 844x390 + touch).
 test_ui requires `tools/guiprev/guidump` (sandbox.py already copies guiprev).
+STATUS: done by integrate (run_all: phone + phone_ui_{garage,rich,fixes,touch} on .gen_phone)
 
 ## 3. models / apps (MarketApp or LabApp) - "Chat" on a released model (user request 16: "Lab/Market app")
 On each live (or retired) model card a small button "Chat" that opens the phone on that model's thread:
@@ -64,6 +66,11 @@ Kit.onClick(chatButton, function()
 end)
 ```
 Only models with `model.release` (status "live" or "retired") can chat; the server answers NO_MODEL otherwise.
+STATUS: done by lab (2026-10-10): a "CHAT" button on every live model card in the Market app (MarketApp, touch-sized on
+touch screens) and on every released (live or retired) model in the Lab home's Hall of fame (LabApp); both call
+`PhoneController.openChat(model.id)` through a lazy `pcall(require, ...)` and close the Computer. Checked in
+tests/lab/test_studio.luau (section 11).
+STATUS: deferred to lab
 
 ## 4. staffops (EmployeeController, client) - a phone in the hand during calls (brief 17b)
 When an employee shows the life package's phone pose (`Holding == "Phone"` / activity "PHONE"), weld a small
@@ -80,6 +87,7 @@ Without the attribute it falls back to `Phone.HUD_WIDTH = 316`. On a small phone
 (580 -> 520 design px) and only then shrinks (667x375 touch: scale 0.84 next to the 466 px compact lane; 844x390:
 0.96). Please keep publishing `LaneWidth` when the column changes. The phone button sits in the bottom-right corner
 (touch devices: left of Roblox's jump button); please keep that corner free of HUD elements.
+STATUS: already done (integrate: info; HUD keeps publishing LaneWidth)
 
 ## 6. info for later packages (no change needed)
 - The open phone raises its ScreenGui to DisplayOrder 28 (above ShuttlePass 25, below toasts / TravelGPS 30 and every
@@ -89,3 +97,4 @@ Without the attribute it falls back to `Phone.HUD_WIDTH = 316`. On a small phone
   saved once request #1 lands) and the auto-trip countdown with a cancel button (brief 24) are yours to wire through
   `PhoneService.onAction("itinerary", ...)`; the phone keeps saying "The travel desk that uses it is coming soon" until
   the hook is registered.
+STATUS: deferred to itinerary (autoTrips wiring through PhoneService.onAction("itinerary") + the auto-trip countdown)

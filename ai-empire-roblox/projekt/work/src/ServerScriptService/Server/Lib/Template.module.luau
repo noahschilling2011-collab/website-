@@ -339,6 +339,9 @@ function Template.cleanCompany(raw: any)
 	end
 	e.apprentices = apprentices
 	e.unpaidLeave = if finite(e.unpaidLeave) then math.clamp(math.floor(e.unpaidLeave), 0, EmpireMath.staff(e)) else 0
+	-- player preferences (phone request 1): only the boolean autoTrips survives, every other key is dropped
+	local prefs = if typeof(e.prefs) == "table" then e.prefs else {}
+	e.prefs = { autoTrips = prefs.autoTrips == true }
 	-- the lease auction is gone (CORE_SPEC 2.4): empty compatibility fields, also for saves migrated earlier
 	e.customers = {}
 	e.businessRevenue = 0

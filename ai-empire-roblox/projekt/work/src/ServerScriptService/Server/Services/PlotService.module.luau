@@ -113,7 +113,8 @@ function Plot.refresh(session: any)
 		local company: string=session.data.company.name
 		-- guest-house name signs (hotel annex, plan tier >= 2) follow a rename like the HQ boards (hotelpolish request 2)
 		local boards: {[string]:string}={ReceptionSign="WELCOME TO\n"..company,KitchenBrand=company.."\nSNACK CLUB",CompanyStele=company,
-			LobbyHouseSign=string.upper(company),ParapetNameBand=string.upper(company)}
+			LobbyHouseSign=string.upper(company),ParapetNameBand=string.upper(company),
+			HouseNameBand=string.upper(company).."  ·  GUEST HOUSE"} -- east-facade band (hotelpolish request 5)
 		for boardName,text in boards do
 			local board=office:FindFirstChild(boardName,true);local gui=if board then board:FindFirstChildWhichIsA("SurfaceGui",true) else nil
 			setText(gui,text)

@@ -1221,7 +1221,7 @@ local function garden(ctx: any)
 	Kit.bench(m, B, Kit.place(-28, 0.14, 210.6, "S"), 15, seed + 2)
 	Kit.bench(m, B, Kit.place(-40, 0.14, 181.8, "S"), 6, seed + 3)
 	Kit.bench(m, B, Kit.place(0, 0.14, 181.8, "S"), 6, seed + 4)
-	Kit.bench(m, B, Kit.place(-92, 0.14, 150, "E"), 6, seed + 5)
+	Kit.bench(m, B, Kit.place(-86.6, 0.15, 150, "W"), 6, seed + 5) -- on the planting bed beside the WestPath, facing it (hotelpolish request 4)
 	local i = 0
 	local h = Plan.HOTEL
 	local hotel = Plan.hasHotel(ctx.tier)

@@ -89,6 +89,7 @@ STATUS: done by apps (customers / growth / platform screens read deals.accounts 
 ## 6. CityPlan (world / airport package) - player ticket $700 (CORE_SPEC 11.4) [major finding]
 `ReplicatedStorage/Shared/Config/CityPlan.module.luau:31`: `ticket=1500` -> `ticket=700` (= `CompanyOps.TRIPS.abroad.flight`).
 tests/world/test_travel.luau reads the value from the config, so it needs no change.
+STATUS: done by integrate (CityPlan.TRAVEL.ticket = 700 = CompanyOps.TRIPS.abroad.flight; new check in tests/world/test_cityplan "CORE_SPEC 11.4: ticket = CompanyOps.TRIPS.abroad.flight = $700"; test_travel / test_shuttle read the config)
 
 ## 7. SecurityController (client, owner of the camera UI) - floor titles by plan tier
 `Client/Controllers/SecurityController.module.luau:29-32` `tier()` returns the office index; since
@@ -106,6 +107,7 @@ STATUS: done by apps (SecurityController.tier() = Plan.tierForOffice(office); bu
 - ShopService:379 Robux cash pack -> `EconomyService.grant(session, amount, "shop")`.
 STATUS: FacilityService (retail / campus) and RecruitingService (interview hire -> "hire") done by staffops; VehicleService, AssistantService and ShopService are not staffops files
 STATUS: AssistantService part done by apps (coffee run spend and both refunds book "campus"); VehicleService and ShopService still open
+STATUS: done by integrate (the rest: VehicleService car purchase books "cars", ShopService Robux cash pack books "shop"; both labels exist in EmpireApp)
 
 ## 9. EmployeeConfig (owner: life / talk) - operations pay constant (CORE_SPEC 5.5, 11.5)
 Add `Config.OPS_WAGE_PER_DAY = 720`. `CompanyOps.OPS_WAGE` reads it (fallback 720); TalkService can then state
@@ -129,6 +131,7 @@ STATUS: done by apps (ComputeApp: "... for studio projects. Business clients res
 - `tests/lead/sandbox.py` symlinks `tools`; Luau `require` does not follow the symlink, so
   `tests/models/ui_setup.luau` (`require("../../tools/guiprev/guidump")`, also used by tests/corefix/test_ui.luau)
   fails inside a RUNALL sandbox. Copy `tools/guiprev` into the sandbox instead of linking the whole `tools` dir.
+STATUS: already done (integrate: run_all has econ_* / corefix / corefix_ui / models (on .gen_corefix); tests/lead/sandbox.py copies tools/guiprev)
 
 ## 12. CORE_SPEC (lead) - decisions to record
 - 2.4 MIGRATIONS[5] also empties `customers`/`businessRevenue` and normalises product lines (one live model per
@@ -138,3 +141,4 @@ STATUS: done by apps (ComputeApp: "... for studio projects. Business clients res
 - 7.7 auto-price: first cycle 150 s after the company starts ticking (the design bot's phase), then every 300 s.
 - 5.5/10 rack faults: 1 compute unit per fault (`FAULT.units`), as written; the econ build took whole GPUs.
 - 11.1 Training Lead: paid only while there are apprentices.
+STATUS: done by integrate (CORE_SPEC "Decisions (integrate)": MIGRATIONS[5] line normalisation, 11.8 caps, auto-price phase, 1 unit per rack fault, Training Lead only with apprentices)

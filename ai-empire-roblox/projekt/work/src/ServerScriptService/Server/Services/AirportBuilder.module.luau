@@ -804,8 +804,9 @@ local function arrivals(inside: Instance)
 		box(m,"RentalDesk",292,297,F,F+3.6,z-3,z+3,C.white,M.Marble)
 		panel(m,"RentalSign",Vector3.new(297.6,G+8,z),Vector3.new(-1,0,0),6,1.6,BRAND,"CAR RENTAL "..i,{ink=INK})
 	end
-	post(m,"MeetingPointPost",262,2446,F,F+9,.4,C.metal,M.Metal,true)
-	panel(m,"MeetingPointSign",Vector3.new(262,F+9.8,2446),Vector3.new(0,0,-1),6,2,rgb(64,140,90),"MEETING POINT",{ink=INK},"MEETING POINT")
+	-- meeting point 4 studs off the walk-graph edge L270 -> arrival (it stood on that line at (262, 2446); metro request 7)
+	post(m,"MeetingPointPost",264,2449.5,F,F+9,.4,C.metal,M.Metal,true)
+	panel(m,"MeetingPointSign",Vector3.new(264,F+9.8,2449.5),Vector3.new(0,0,-1),6,2,rgb(64,140,90),"MEETING POINT",{ink=INK},"MEETING POINT")
 	trolleys(m,262,2481,5)
 	planter(m,250,2480,4,4,true,1)
 	local over=post(m,"PendantLight",276,2466,G+20,G+20.6,4,C.lightNeutral,M.Neon,true)
@@ -1011,8 +1012,9 @@ local function lounge(inside: Instance)
 		post(m,"FloorLampStem",p[1],p[2],F,F+6.4,.2,C.brass,M.Metal,true)
 		post(m,"FloorLampShade",p[1],p[2],F+6.4,F+7.6,1.6,C.lightWarm,M.Neon,true)
 	end
-	box(m,"MagazineRack",-249.5,-248.5,F,F+4.2,2496.5,2500.5,C.oakDark,M.Wood,true)
-	for j=0,2 do box(m,"Magazine",-248.5,-248.4,F+1+j*1.1,F+1.9+j*1.1,2496.9,2500.1,pick(BOOKS,j+2),SM,true) end
+	-- 2 studs long: its north end stays 1.6 studs off the walk-graph edge loungeIn -> buffet (metro request 7)
+	box(m,"MagazineRack",-249.5,-248.5,F,F+4.2,2496.5,2498.5,C.oakDark,M.Wood,true)
+	for j=0,2 do box(m,"Magazine",-248.5,-248.4,F+1+j*1.1,F+1.9+j*1.1,2496.8,2498.2,pick(BOOKS,j+2),SM,true) end
 	for _,p in {{-282,2500},{-284,2517},{-270,2517},{-256,2517}} do
 		post(m,"LoungePendant",p[1],p[2],G+12.4,G+13,3,C.lightWarm,M.Neon,true)
 		box(m,"PendantRod",p[1]-.05,p[1]+.05,G+13,G+14,p[2]-.05,p[2]+.05,C.metal,M.Metal,true)
@@ -1619,11 +1621,13 @@ local function apron(m: Instance)
 		box(apronF,"HoldingLine",s[1],s[2],y0,y0+.05,s[3],s[4],YELLOW,SM,true)
 	end
 	for _,c in {{-662,2560},{-628,2560},{-662,2586},{-628,2586}} do cone(hold,c[1],c[2]) end
-	-- apron flood masts (four real lights)
-	for _,x in {-650,-260,260,650} do
-		box(apronF,"FloodMast",x-.6,x+.6,A.apronTop,G+32,2836,2837.2,C.metal,M.Metal)
-		box(apronF,"FloodFrame",x-5,x+5,G+32,G+33,2835.6,2837.6,C.metal,M.Metal,true)
-		local head=box(apronF,"FloodHead",x-4.6,x+4.6,G+33,G+35,2834.2,2836,GLOW,M.Neon,true)
+	-- apron flood masts (four real lights) between the stands, 74 studs north of the taxilane (z 2790): out of the
+	-- 62-stud wingtip corridor of the taxilane and the taxiway (flight request 6; they stood at z 2836 before)
+	local MZ=2716
+	for _,x in {-330,-100,100,330} do
+		box(apronF,"FloodMast",x-.6,x+.6,A.apronTop,G+32,MZ,MZ+1.2,C.metal,M.Metal)
+		box(apronF,"FloodFrame",x-5,x+5,G+32,G+33,MZ-.4,MZ+1.6,C.metal,M.Metal,true)
+		local head=box(apronF,"FloodHead",x-4.6,x+4.6,G+33,G+35,MZ-1.8,MZ,GLOW,M.Neon,true)
 		head.CFrame=head.CFrame*CFrame.Angles(math.rad(25),0,0)
 		kit.light(head,60,.8)
 	end
@@ -1659,8 +1663,10 @@ local function runway(m: Instance)
 		-- hold-short marking: two solid + two dashed lines, and the red runway sign
 		for k,dz in {-1.5,-.5} do box(apronF,"HoldShortLine",x-19,x+19,top,top+.05,A.holdShortZ+dz*1.6-.2,A.holdShortZ+dz*1.6+.2,YELLOW,SM,true);local _=k end
 		for dx=-18,14,4 do for _,dz in {.6,1.6} do box(apronF,"HoldShortDash",x+dx,x+dx+2.4,top,top+.05,A.holdShortZ+dz*1.6-.2,A.holdShortZ+dz*1.6+.2,YELLOW,SM,true) end end
-		box(apronF,"HoldSignPost",x+23.5,x+24,G,G+4,A.holdShortZ-.25,A.holdShortZ+.25,C.metal,M.Metal,true)
-		panel(apronF,"HoldSign",Vector3.new(x+23.75,G+4.6,A.holdShortZ-.4),Vector3.new(0,0,-1),6,1.6,rgb(190,40,36),"09 – 27",{ink=INK,far=true})
+		-- the red runway sign 32 studs east of the connector centre line: clear of the nacelle while the aircraft
+		-- turns through the connector (flight request 6; it stood at x + 23.75 before)
+		box(apronF,"HoldSignPost",x+31.75,x+32.25,G,G+4,A.holdShortZ-.25,A.holdShortZ+.25,C.metal,M.Metal,true)
+		panel(apronF,"HoldSign",Vector3.new(x+32,G+4.6,A.holdShortZ-.4),Vector3.new(0,0,-1),6,1.6,rgb(190,40,36),"09 – 27",{ink=INK,far=true})
 		for z=tw.z2+10,rw.z1-10,20 do for _,s in {-1,1} do post(apronF,"TaxiEdgeLight",x+s*20.5,z,G,G+.9,.5,rgb(70,120,255),M.Neon,true) end end
 	end
 	-- blue taxiway edge lights (neon) along both edges
@@ -1713,9 +1719,10 @@ local function runway(m: Instance)
 	for x=rw.x1+10,rw.x2-10,100 do
 		for _,z in {rw.z1-1.5,rw.z2+1.5} do post(runwayF,"EdgeLight",x,z,G,G+.9,.6,Color3.fromRGB(255,236,180),M.Neon,true) end
 	end
-	-- wind sock
-	post(runwayF,"WindsockPole",620,rw.z1-40,G,G+12,.4,C.metal,M.Metal,true)
-	local sock=mk(runwayF,"Windsock",Vector3.new(6,1.6,1.6),CFrame.new(623,G+11.4,rw.z1-40)*CFrame.Angles(0,0,math.rad(-8)),rgb(240,110,40),M.Fabric,true)
+	-- wind sock between the taxiway and the runway, 68 studs off the taxiway centre line (out of the wingtip
+	-- corridor; flight request 6 - it stood at rw.z1 - 40 before) and 72 off the runway centre line
+	post(runwayF,"WindsockPole",620,rw.z1-12,G,G+12,.4,C.metal,M.Metal,true)
+	local sock=mk(runwayF,"Windsock",Vector3.new(6,1.6,1.6),CFrame.new(623,G+11.4,rw.z1-12)*CFrame.Angles(0,0,math.rad(-8)),rgb(240,110,40),M.Fabric,true)
 	sock.Shape=Enum.PartType.Cylinder
 end
 

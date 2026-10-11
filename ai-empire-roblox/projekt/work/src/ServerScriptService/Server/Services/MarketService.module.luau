@@ -9,6 +9,7 @@ local ModelMath = require(Shared.ModelMath)
 local MarketMath = require(Shared.MarketMath)
 local EmpireMath = require(Shared.EmpireMath)
 local EmpireConfig = require(Shared.Config.EmpireConfig)
+local HardwareConfig = require(Shared.Config.HardwareConfig)
 local Remote = require(script.Parent.Parent.Lib.Remote)
 local Guard = require(script.Parent.Parent.Lib.Guard)
 local SessionService = require(script.Parent.SessionService)
@@ -155,7 +156,7 @@ function Market.tick(session: any, dt: number)
 	for _, r in live.perModel do r.revenue*=factor; r.cost*=b.serving*cycle.cost end
 	-- Electricity while serving is distinct from the upfront training electricity budget.
 	local fleet=ModelMath.fleet(data.gpus)
-	if #entries>0 then live.cost+=fleet.throughput*0.025 end
+	if #entries>0 then live.cost+=fleet.throughput*HardwareConfig.SERVE_POWER end -- electricity of serving (apps request 1)
 	live.marketplace={offers=Market.offers,customers=Market.customers}
 	-- Merge, never replace: session.live also carries fields other services own (workforce from
 	-- StaffService, admin from AdminService, campus, empire, studio, arena, rankings ...).

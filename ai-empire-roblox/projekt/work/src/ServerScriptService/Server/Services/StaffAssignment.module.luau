@@ -23,6 +23,9 @@
 --    People & Company (HR) room, else another free operations desk, else at the reception.
 --  * The stage-5 night rota (OPERATIONS_JOBS[18] / [19], EmployeeConfig.NIGHT_ROTA): a second guard and a
 --    second IT person at the station of post 3 / post 6, only in the stage-5 building (plan tier 4).
+-- integrate (staffops request 10, lead decision): a post is staffed only from the office stage at which the
+-- economy pays it (CORE_SPEC 5.5, EmployeeConfig.POST_FROM_STAGE): stage 2 has 8 post holders, stage 3 12 + 2,
+-- stage 4 14 + 2, stage 5 16 + 2 (night rota) - the same numbers as CompanyOps.STAGES[].ops.
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local EmpireConfig=require(ReplicatedStorage.Shared.Config.EmpireConfig)
 local EmployeeConfig=require(ReplicatedStorage.Shared.Config.EmployeeConfig)
@@ -325,6 +328,7 @@ function Assignment.assign(office: Model,cf: CFrame,session: any)
   if m:IsA("Model") and typeof(i)=="number" and not keepOps[i] then keepOps[i]=m else m:Destroy() end
  end
  local leadPost=(EmployeeConfig :: any).TRAINING_LEAD_POST or 17
+ local postFrom: {[number]:number}=(EmployeeConfig :: any).POST_FROM_STAGE or {}
  local nightRota: {[number]:number}=(EmployeeConfig :: any).NIGHT_ROTA or {}
  -- names in use: the hired team and every post holder (their generated names)
  local usedNames: {[string]:boolean}={}
@@ -383,6 +387,11 @@ function Assignment.assign(office: Model,cf: CFrame,session: any)
    set(lead,"WorkCFrame",work);set(lead,"CampusCFrame",cf)
    set(lead,"StaffFloor",if desk then Plan.levelY(floor(desk)) else 0)
    local lp=cf:PointToObjectSpace(work.Position);set(lead,"StaffX",lp.X);set(lead,"StaffZ",lp.Z)
+   continue
+  end
+  -- a post the economy does not pay at this stage stays empty (CORE_SPEC 5.5, EmployeeConfig.POST_FROM_STAGE)
+  if Plan.officeForTier(tier)<(postFrom[i] or 2) then
+   if existingRig then existingRig:Destroy() end
    continue
   end
   local post=posts[i];local work=if post then standing(post) else nil

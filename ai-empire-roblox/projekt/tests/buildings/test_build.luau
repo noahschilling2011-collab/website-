@@ -242,7 +242,13 @@ local function body()
 	local EmployeeConfig = M.require(RS.Shared.Config.EmployeeConfig)
 	-- staffops: OPERATIONS_JOBS[17] "Training Lead" has no post (placed only while there are apprentices);
 	-- 18 / 19 = the stage-5 night rota (placed only in plan tier 4)
-	check("t1: every operations job except the two guest-house jobs staffed", #office1.OperationsEmployees:GetChildren() == #EmployeeConfig.OPERATIONS_JOBS - 5, #office1.OperationsEmployees:GetChildren())
+	-- integrate (staffops request 10, CORE_SPEC 5.5): plan tier 1 = stage 2 staffs only the posts the economy pays
+	-- there (EmployeeConfig.POST_FROM_STAGE): 1, 3, 5, 6, 7, 8, 9, 12 = 8 = CompanyOps.STAGES[2].ops
+	local postFrom = EmployeeConfig.POST_FROM_STAGE or {}
+	local paid1 = 0
+	for i = 1, 16 do if i ~= 13 and i ~= 14 and Plan.officeForTier(1) >= (postFrom[i] or 2) then paid1 += 1 end end
+	local Ops1 = M.require(RS.Shared.CompanyOps)
+	check("t1: exactly the operations posts paid at stage 2 are staffed (8 = CompanyOps.STAGES[2].ops)", #office1.OperationsEmployees:GetChildren() == paid1 and paid1 == Ops1.STAGES[2].ops, #office1.OperationsEmployees:GetChildren() .. " / " .. paid1)
 
 	--------------------------------------------------------------------------------------------- tier 2+
 	local tiers = if ALL then { 2, 3, 4 } else { 2 }

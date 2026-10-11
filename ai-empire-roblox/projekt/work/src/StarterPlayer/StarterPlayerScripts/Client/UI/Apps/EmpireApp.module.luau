@@ -441,7 +441,7 @@ local function clientRow(parent: Instance, c: any): ClientRow
 		Kit.setDisabled(pin, true)
 		Kit.setDisabled(skip, true)
 		enqueue("DealAction", function()
-			local ok, res = paced("DealAction", { action = kind, clientId = c.id })
+			local ok, res = paced("DealAction", { action = kind, clientId = c.id, on = not now }) -- explicit state: a repeat never undoes it
 			if not ok then
 				lock = nil
 				Kit.setDisabled(pin, false)
@@ -1273,8 +1273,8 @@ local function settings(parent: Instance)
 	local nightLabels: { [string]: TextLabel } = {}
 	local nightWant: { [string]: boolean } = {} -- a switch tap still on its way to the server (shown meanwhile)
 	-- the night crew works per role (CompanyOps.nightOn: any department of the role); the switch sets every department
-	-- of the role, one paced call each (EmpireAction nightShift is idempotent: it sets, never toggles), so a burst of
-	-- taps on several roles never ends with a role half on
+	-- of the role in ONE call (EmpireAction nightShift with role: atomic and idempotent, it sets, never toggles), so a
+	-- burst of taps on several roles never ends with a role half on
 	local switchW, rowH = Kit.tap(170, 220), Kit.tap(36, TAP)
 	for i, roleDef in Config.ROLES do
 		local row = Kit.row(nightRows, rowH, 12, i)
@@ -1290,10 +1290,8 @@ local function settings(parent: Instance)
 			nightWant[roleDef.id] = want
 			enqueue("EmpireAction", function()
 				local failed: string? = nil
-				for _, dept in Ops.ROLE_DEPTS[roleDef.id] or {} do
-					local ok, res = paced("EmpireAction", { action = "nightShift", dept = dept, on = want })
-					if not ok then failed = tostring(res.err); break end
-				end
+				local ok, res = paced("EmpireAction", { action = "nightShift", role = roleDef.id, on = want })
+				if not ok then failed = tostring(res.err) end
 				if nightWant[roleDef.id] == want then nightWant[roleDef.id] = nil end
 				if failed then
 					Toast.show("error", Action.message(failed))

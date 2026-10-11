@@ -69,18 +69,10 @@ local function specOf(session: Session): string
 	return if company then company.spec else "general"
 end
 
--- "Nova" -> Version 1, zweites "Nova" -> Version 2 (Anzeige "Nova v2")
+-- "Nova" -> Version 1, zweites "Nova" -> Version 2 (Anzeige "Nova v2"); the rule lives in ModelMath.nextVersion,
+-- which the Lab's Model Studio shows before the start ("Becomes Nova v2")
 local function versionFor(data: Types.PlayerData, name: string): number
-	local lower = string.lower(name)
-	local count, highest = 0, 0
-	for _, model in data.models do
-		if string.lower(model.name) == lower then
-			count += 1
-			highest = math.max(highest, tonumber(model.version) or 0)
-		end
-	end
-	-- refinements raise model.version, so the next "Nova" never reuses a number a refined Nova already shows
-	return math.max(count, highest) + 1
+	return ModelMath.nextVersion(data, name)
 end
 
 -- Line label for news and notices ("Consumer Chat").
@@ -301,6 +293,7 @@ local function finish(session: Session, training: TrainingState)
 	data.training = nil
 	local model = data.models[training.modelId]
 	if model then
+		local before = model.overall -- LAB_SPEC S1: a refinement's reveal compares with the model's own old score
 		local stats, overall = ModelMath.computeStats(
 			model.sizeId,
 			model.focusId,
@@ -344,10 +337,17 @@ local function finish(session: Session, training: TrainingState)
 		model.trainCost = if training.refinement then model.trainCost + training.cost else training.cost
 		data.stats.bestOverall = math.max(data.stats.bestOverall, overall)
 		data.stats.modelsTrained += 1
+		local event = training.event
 		Remote.fire(session.player, "Notify", "TRAINING_COMPLETE", {
 			modelId = model.id,
 			overall = overall,
 			previousBest = previousBest,
+			-- LAB_SPEC S1 (display only, < 100 bytes): reveal count-up, lucky roll, refinement gain, event chip
+			expected = training.expected,
+			refinement = training.refinement == true,
+			before = if training.refinement then before else nil,
+			eventId = if event then event.id else nil,
+			outcome = if event then event.outcome else nil,
 		})
 	end
 	SessionService.markDirty(session)
@@ -430,6 +430,21 @@ end
 local function startTraining(session: Session, payload: ServerTypes.Payload): ServerTypes.Result
 	local recipeId=if payload.recipeId==nil then "steady" else Guard.id(payload.recipeId)
 	if not recipeId or not ModelConfig.getRecipe(recipeId) then return {ok=false,err="BAD_INPUT"} end
+	-- LAB_SPEC 6.3 (Model Studio, cosmetic + planning only): optional look "<colorId>:<emblemIndex>" and the
+	-- planned product line. Absent = nil (old clients, the economy bot); present but invalid = BAD_INPUT like
+	-- recipeId, before any other check and before the name filter yields.
+	local look: string? = nil
+	if payload.look ~= nil then
+		local colorId, emblem = ModelMath.parseLook(payload.look)
+		if not colorId or not emblem then return {ok=false,err="BAD_INPUT"} end
+		look = `{colorId}:{emblem}`
+	end
+	local planTarget: string? = nil
+	if payload.target ~= nil then
+		local target = Guard.id(payload.target)
+		if not target or not MarketConfig.isTarget(target) then return {ok=false,err="BAD_INPUT"} end
+		planTarget = target
+	end
 	if session.data.training then
 		return { ok = false, err = "TRAINING_ACTIVE" }
 	end
@@ -504,6 +519,11 @@ local function startTraining(session: Session, payload: ServerTypes.Payload): Se
 		release = nil,
 		market = nil,
 	}
+	-- optional per-model fields (old models have none; every reader validates them)
+	local extra: any = model
+	extra.look = look
+	extra.plan = planTarget
+	extra.recipeId = recipeId
 	data.models[id] = model
 	table.insert(data.modelOrder, id)
 	pruneRetired(data)

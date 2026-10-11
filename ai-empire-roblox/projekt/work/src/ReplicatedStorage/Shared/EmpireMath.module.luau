@@ -19,7 +19,9 @@ function Math.new(): any
 		-- CORE_SPEC Appendix A (DATA_VERSION 6): company calendar, B2B pipeline, Lab levels, jet, auto-HR,
 		-- Save mode, night shifts, apprentices, unpaid leave, P&L ledger (Template.migrate cleans them)
 		calendar = { day = 1 }, deals = Ops.newDeals(), labLevel = 0, jet = false, hr = { auto = true, budget = 0.40 },
-		saveMode = "auto", nightShift = {}, apprentices = {}, unpaidLeave = 0, ledger = {} }
+		saveMode = "auto", nightShift = {}, apprentices = {}, unpaidLeave = 0, ledger = {},
+		-- player preferences (phone request 1; a pure addition, no DATA_VERSION bump): PhoneService "autoTrips"
+		prefs = { autoTrips = false } }
 end
 -- Persistent staff identities: staffProfiles[roleId][i] = {n = name, s = appearance seed,
 -- k = skill 1..5, w = wage multiplier} for the i-th hired person of that role (StaffAssignment builds

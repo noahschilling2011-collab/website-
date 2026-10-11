@@ -238,6 +238,14 @@ local function body()
 	local minutes = TICKS * 0.2 / 60
 	local function seen(k, pose) return seenPose[k] ~= nil and seenPose[k][pose] == true end
 	local function held(k, item) return seenItem[k] ~= nil and seenItem[k][item] == true end
+	-- integrate (staffops request 10, CORE_SPEC 5.5): an operations post is staffed only from the office stage at
+	-- which the economy pays it (EmployeeConfig.POST_FROM_STAGE). Below that stage the job must NOT show up at all.
+	local STAGE = d.empire.office
+	local postFrom = EmployeeConfig.POST_FROM_STAGE or {}
+	local function jobCheck(post, name, ok)
+		if STAGE >= (postFrom[post] or 2) then check(name, ok)
+		else check(name .. ": nobody (post " .. post .. " is paid from stage " .. postFrom[post] .. ", this is stage " .. STAGE .. ")", not ok) end
+	end
 	-- operations jobs: visible steps
 	check("chef stirs at the range", seen("Chef", "stir"))
 	check("chef plates at the pass", seen("Chef", "plate") and held("Chef", "plate"))
@@ -249,20 +257,21 @@ local function body()
 	check("receptionists greet", seen("Reception", "greet"))
 	check("reception prints badges", held("Reception", "badge"))
 	check("security scans on patrol", seen("Security", "scan"))
-	check("garage guard checks the ramp", seen("Security", "inspect"))
+	jobCheck(4, "garage guard checks the ramp", seen("Security", "inspect"))
 	check("IT fixes with a laptop", held("IT Support", "laptop") and seen("IT Support", "typeStand"))
 	check("a desk screen broke and got fixed", faultSeen >= 1 and faultFixed >= 1, faultSeen .. "/" .. faultFixed)
-	check("cleaner pushes the mop cart", seen("Cleaner", "push") and held("Cleaner", "mopcart"))
-	check("cleaner wipes", seen("Cleaner", "wipe"))
-	check("mail clerk sorts parcels", seen("Mailroom", "sort") and held("Mailroom", "parcel"))
-	check("mail clerk fills the lockers", seen("Mailroom", "reach"))
+	jobCheck(15, "cleaner pushes the mop cart", seen("Cleaner", "push") and held("Cleaner", "mopcart"))
+	jobCheck(15, "cleaner wipes", seen("Cleaner", "wipe"))
+	jobCheck(16, "mail clerk sorts parcels", seen("Mailroom", "sort") and held("Mailroom", "parcel"))
+	jobCheck(16, "mail clerk fills the lockers", seen("Mailroom", "reach"))
 	check("fleet plugs in the EVs", seen("Fleet", "plug"))
 	check("facilities inspect", seen("Facilities", "inspect"))
-	check("café host greets and wipes tables", seen("Cafe Host", "greet") and seen("Cafe Host", "wipe"))
+	jobCheck(10, "café host greets and wipes tables", seen("Cafe Host", "greet") and seen("Cafe Host", "wipe"))
 	check("ops short breaks in place", seen("Reception", "relax") or seen("Security", "relax") or seen("Chef", "relax") or seen("Facilities", "relax"))
 	-- props used by the jobs
 	for _, id in { "Range", "Pass", "KitchenCoffeeMachine", "KitchenSink", "DishStation", "Servery", "CardPrinter", "MailLockers", "CarLift", "EVCharger2" } do
-		check("prop used: " .. id, propUsed[id] == true)
+		if id == "MailLockers" then jobCheck(16, "prop used: " .. id, propUsed[id] == true) -- only the mail clerk uses it
+		else check("prop used: " .. id, propUsed[id] == true) end
 	end
 	-- lunch
 	check("employees ate at a table (meal + TablePoint)", eaten >= 5, eaten)

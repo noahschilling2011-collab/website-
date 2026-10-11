@@ -10,6 +10,7 @@ the alley removed (a hanging sign in the colonnade replaces it, bottom at y 9), 
 WestPath with names on its front and south end, stone forecourt across the path, bay trees, three lamp posts in
 the planting bed, built neon "GUEST HOUSE" letters on the south (over the arcade, seen from the plaza/street) and
 west parapets. tests/hotelpolish checks the WestPath lane x -95..-89, z 72..125 is free at body height.
+STATUS: already done (integrate: no change requested; the entrance stays - see #7)
 
 ## 2. PlotService (owner: econ) — optional: keep the guest-house name signs in sync on a company rename
 `Plot.refresh` updates `ReceptionSign` / `KitchenBrand` / `CompanyStele` with `setText`. If a company can be named
@@ -28,6 +29,8 @@ STATUS: done by corefix (PlotService.refresh: LobbyHouseSign and ParapetNameBand
   moved to (-105.6, 90.6) (building-local), the counter now runs z 95.0..103.4 at x -110..-108.5 with a second
   (empty) staff chair at (-113.4, 101.7). Every hop of post 13 is walkable for a radius-1.0 body
   (tests/hotelpolish, tests/life/test_routes.py, tests/buildings/test_geometry.py).
+STATUS: deferred to guests_jet (info for the hotel-guest NPCs: lobby seats, greet point, counter, second staff chair)
+STATUS: done by guests_jet (guests check in / out on the guest side of the counter at (-107.3, 97.6 / 100.6), sit on Wait1..4 (sofa / armchairs) and the window-bar stools; the greet point and staff chairs stay the receptionist's)
 
 ## 4. ExteriorDesign `garden()` (owner: lead / garden) — move the WestPath bench off the path's centre line
 `Kit.bench(m, B, Kit.place(-92, 0.14, 150, "E"), 6, seed + 5)` puts the two seats (Office/Site/Garden/Seat, x -92.8..-91.2,
@@ -39,6 +42,7 @@ Kit.bench(m, B, Kit.place(-86.6, 0.15, 150, "W"), 6, seed + 5) -- PlantingBed x 
 ```
 (any spot with x <= -96.5 or x >= -87.5 works; the bed at z 147..153 is free: nothing between x -88 and the pavilion glazing at -83.9).
 hotelpolish does not edit `garden()` (outside its scope).
+STATUS: done by integrate (ExteriorDesign.garden: the WestPath bench is on the planting bed at (-86.6, 0.15, 150) facing W)
 
 ## 5. PlotService (owner: econ / corefix) — refresh the east-facade name band on a company rename
 The pre-existing east-facade band `HouseNameBand` (ExteriorDesign, Kit.text: one SurfaceGui with one TextLabel) still shows the
@@ -49,6 +53,7 @@ HouseNameBand = string.upper(company) .. "  ·  GUEST HOUSE",
 Not requested (documented instead): the 12 room TVs' `WelcomePage` (3 TextLabels, "WELCOME" / "<company> Guest House" /
 "Room 2xx") keep the build-time name until the building is rebuilt (every plan-tier change rebuilds the office); a
 `FindFirstChild` refresh would only reach the first TV.
+STATUS: done by integrate (Plot.refresh boards: HouseNameBand = UPPER(company) .. "  ·  GUEST HOUSE")
 
 ## 6. Info (no change needed) — approach changes in review round 2 (hotelpolish)
 - Blade sign `BladeSign` (+ neon edge `BladeSignGlow`) on the guest house's south-east corner pier: x -96.4..-92.0, y 7.8..11.0,
@@ -58,6 +63,7 @@ Not requested (documented instead): the 12 room TVs' `WelcomePage` (3 TextLabels
   the soffit) and now reads "GUEST HOUSE  ↑" (larger letters), so it no longer hides the blade sign from the plaza.
 - Dark metal backing plates `SignBacking` behind the neon parapet letters (south z 75.16..75.24, west x -141.79..-141.71;
   the west letters are 0.18 deep now, x -141.98..-141.80).
+STATUS: already done (integrate: info, no change needed)
 
 
 ## 7. Lead (notes_integration.md, round 2b) — entrance move: please DROP "Gästehaus-Eingang verlegen (BuildingPlan)"
@@ -66,6 +72,7 @@ independent review of round 2 accepted the current side entrance (blade sign on 
 WestPath, lanterns, forecourt, three lamp posts, lit approach from the colonnade). Moving it would also move the
 receptionist's greet point and the counter layout that the life route tests check. If the lead still wants the move,
 please confirm explicitly so the two packages do not duplicate work.
+STATUS: done by integrate (the guest-house entrance move is dropped from the round-2b plan; notes_integration.md records it)
 
 ## 8. Info (no change needed) — review round 3 (hotelpolish)
 - Lobby: the 38 built brass letters are gone; "GUEST HOUSE" is a SurfaceGui line on the clear carrier `LobbyHouseWord`
@@ -77,6 +84,7 @@ please confirm explicitly so the two packages do not duplicate work.
   between the headboard and the curtain. The guest point (F * (10.6, 4.4)) and the housekeeping points (F * (12, 4.2)) did not move.
 - Requests 4 (garden bench on the WestPath, lead/garden) and 5 (`HouseNameBand` in `Plot.refresh`, econ/corefix) are
   still open.
+STATUS: already done (integrate: info; requests 4 and 5 are applied now)
 
 ## 9. Info (no change needed) — review round 4 (hotelpolish)
 - West facade (district side) is no longer a curtain wall: clay-render `WallPanel`s (Plaster, x -141.5..-141.2,
@@ -91,6 +99,7 @@ please confirm explicitly so the two packages do not duplicate work.
   sheer spans the opening (6.4). East rooms unchanged. Guest / housekeeping points did not move.
 - Requests 4 (garden bench on the WestPath, lead/garden) and 5 (`HouseNameBand` in `Plot.refresh`,
   econ/corefix) are still open; request 7 (drop the entrance move) still stands.
+STATUS: already done (integrate: info; requests 4 and 5 are applied now, 7 settled)
 
 ## 10. Info (no change needed) — round 4 resumed (Oct 10, 16:xx)
 - Source of RoomKitsHotel / ExteriorDesign unchanged since the round-4 verification (10:00); re-verified on the current
@@ -98,3 +107,4 @@ please confirm explicitly so the two packages do not duplicate work.
 - Still open, both outside hotelpolish's files: request 4 (garden bench on the WestPath centre line, ExteriorDesign
   `garden()`, line `Kit.bench(m, B, Kit.place(-92, 0.14, 150, "E"), 6, seed + 5)`) and request 5 (`HouseNameBand` in
   `Plot.refresh`, PlotService).
+STATUS: already done (integrate: info; requests 4 and 5 are applied now)

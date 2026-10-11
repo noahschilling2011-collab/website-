@@ -376,7 +376,7 @@ local function grant(session: Session, def: ShopConfig.Product): { [string]: any
 	local shop = shopOf(session)
 	if def.kind == "cash" then
 		local amount = ShopConfig.cashFor(def, session.data.empire.office)
-		EconomyService.grant(session, amount)
+		EconomyService.grant(session, amount, "shop") -- P&L line "shop" (corefix request 8)
 		return { key = def.key, kind = "cash", amount = amount }
 	elseif def.kind == "voucher" and def.voucher then
 		local count = (tonumber(shop.vouchers[def.voucher]) or 0) + 1

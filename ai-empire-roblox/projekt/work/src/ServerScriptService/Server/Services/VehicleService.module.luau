@@ -190,7 +190,7 @@ function Vehicles.init()
 			c.cars[def.id]=true;c.selectedCar=def.id;Session.markDirty(s);return {ok=true}
 		end
 		if c.cars[def.id] then return {ok=false,err="ALREADY_DONE"} end
-		if not Economy.spend(s,def.price) then return {ok=false,err="NO_MONEY"} end
+		if not Economy.spend(s,def.price,"cars") then return {ok=false,err="NO_MONEY"} end -- P&L line "cars" (corefix request 8)
 		c.cars[def.id]=true;c.selectedCar=def.id;Session.markDirty(s);return {ok=true}
 	end)
 	Remote.bind("SpawnCar",{burst=2,perSecond=.25,company=true},Vehicles.spawn)

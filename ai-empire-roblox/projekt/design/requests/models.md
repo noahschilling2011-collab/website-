@@ -85,8 +85,10 @@ run models            bash tests/models/run.sh
 ```
 `tests/models/run.sh` exits non-zero unless `test_models` and `test_ui` (empty/rich/full) all report 0 failed.
 Why: the models package ships 4 suites (276 checks) that run_all does not call yet.
+STATUS: already done (integrate: run_all runs `models` = tests/models/run.sh)
 
 ## 9. Note for every package: auto-price runs in a Heartbeat worker
 `PricingService.init()` (called from `AIModelService.init()`) connects one `RunService.Heartbeat` handler that
 advances the auto-price forecasts of the whole server within `ModelConfig.PRICING.frameBudget` (1.5 ms) of CPU per
 frame and does nothing when no job waits. No change needed elsewhere; mentioned so nobody is surprised by it.
+STATUS: already done (integrate: info)

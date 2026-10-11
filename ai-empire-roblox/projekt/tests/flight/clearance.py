@@ -30,11 +30,9 @@ HULL_PARTS = {"Wing", "Winglet", "FlapFairing", "Nacelle", "NacelleAft", "Engine
               "Fuselage", "Nose", "TailCone", "BellyFairing", "CockpitSkin", "Windshield", "CockpitSideWindow", "ExhaustPlug", "EngineCore"}
 HELI_SKIP = {"HeliSkid", "HeliSkidTip", "HeliStrut", "HeliBlade", "HeliTailBlade", "HeliHub", "HeliTailHub", "HeliNavLight"}
 # (path fragment, part names, request) - other packages' geometry, tracked in design/requests/flight.md
-PENDING = [
-    ("/Airport/Apron/", {"FloodMast", "FloodFrame", "FloodHead"}, "airport: flight.md #6 (flood masts in the wingtip corridor)"),
-    ("/Airport/Apron/", {"HoldSign", "HoldSignPost"}, "airport: flight.md #6 (hold-short sign next to the connector)"),
-    ("/Airport/Runway/", {"Windsock", "WindsockPole"}, "airport: flight.md #6 (windsock beside the east taxiway)"),
-]
+# flight.md #6 (flood masts, hold-short signs, windsock in the wingtip corridor) was applied by integrate
+# (AirportBuilder, 2026-10-10): nothing is pending any more, so every hit is a failure again.
+PENDING = []
 
 passed = failed = 0
 def check(name, ok, detail=""):

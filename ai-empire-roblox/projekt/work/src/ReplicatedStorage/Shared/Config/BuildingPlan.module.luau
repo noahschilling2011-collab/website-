@@ -112,7 +112,9 @@ local ROLE_CLEARANCE: { [string]: { [string]: boolean } } = {
 	curator = { public = true, staff = true },
 	marketer = { public = true, staff = true },
 	-- Support staff run the guest house too (reception, housekeeping): they may enter guest rooms.
-	support = { public = true, staff = true, technical = true, guest = true },
+	-- IT Support repairs racks in the data hall / compute rooms (staffops request 1, user request 23); compute rooms
+	-- are dead ends behind secure doors, so no other operations route gains a shortcut through them.
+	support = { public = true, staff = true, technical = true, guest = true, compute = true },
 	-- The founder's personal assistant works in the founder suite (brings coffee, briefings).
 	assistant = { public = true, staff = true, founder = true },
 	-- Job applicants are visitors: front-of-house only.

@@ -356,6 +356,17 @@ local ROOM_TEXT: {[string]:string}={
  machine="This is the {room}. The lift motor lives up here.",roof_tech="This is the {room}: cooling and ventilation.",roof_solar="This is the {room}. It makes some of our power.",
  garden_lobby="This is the {room}. It connects the main building with the wellness pavilion.",
  pavilion_roof="This is the {room}, a green roof on top of the pavilion.",
+ -- garage stage and guest house (buildings request 6, added by integrate; corridors and stairs get no purpose)
+ garage_lab="This is the {room}. The whole team works in here until the company moves into its first real office.",
+ garage_founder="This is the {room}. It's yours.",garage_assist="This is the {room}. Your assistant works here.",
+ garage_wc="This is the {room}.",garage_porch="This is the {room}, the way into the garage.",
+ hotel_lobby="This is the {room}. Guests of the guest house check in at the desk here.",
+ hotel_breakfast="This is the {room}. Guests of the guest house have breakfast here in the morning.",
+ hotel_pantry="This is the {room}. Breakfast for the guest house is prepared here.",
+ hotel_service="This is the {room}. Housekeeping keeps the linen and the cleaning carts here.",
+ hotel_office="This is the {room}. Luggage is stored here and the guest house is run from here.",
+ hotel_workshop="This is the {room}. Visiting client teams hold their workshops here.",
+ guestroom="This is {room}, one of the guest rooms. Visiting clients stay here overnight.",
 }
 -- Desks in a room: "8 desks in here, 5 in use right now."
 local function deskLine(desks: any,busy: any,where: string): string
@@ -620,7 +631,10 @@ local TASK_TEXT: {[string]:(any,any,Vary)->string}={
  ApprenticeTour=function(_s,_f,V) return V("task",{"We're on the apprentice tour of the building.","Apprentice tour! We're seeing every department today."}) end,
  TrainingSession=function(s,_f,_V) return "I'm in today's apprentice training session"..roomPhrase(s).."." end,
  TrainingLead=function(s,f,_V) return "I'm teaching today's training session"..roomPhrase(s).." for our "..plural(count(f,"apprenticeCount"),"apprentice").."." end,
- Shadowing=function(s,_f,V) return V("task",{"I'm sitting with a senior colleague to learn how they work","I'm shadowing one of our seniors today"})..roomPhrase(s).."." end,
+ Shadowing=function(s,_f,V)
+  -- the senior's real name from the rig attribute ShadowOf (TalkService passes it as sub.shadowOf; staffops request 3)
+  if typeof(s.shadowOf)=="string" and s.shadowOf~="" then return "I'm sitting with "..s.shadowOf.." today to learn how they work"..roomPhrase(s).."." end
+  return V("task",{"I'm sitting with a senior colleague to learn how they work","I'm shadowing one of our seniors today"})..roomPhrase(s).."." end,
  Practice=function(s,_f,V) return V("task",{"I'm practising on a small task at my desk","Practice task"})..roomPhrase(s)..". My trainer checks it later." end,
  Coaching=function(_s,_f,_V) return "I'm checking in on one of our apprentices at their desk." end,
 }

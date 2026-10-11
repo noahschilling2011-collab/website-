@@ -36,10 +36,17 @@ function TalkPanel.finish(text: string?)
  local hook=finishHook
  if hook then hook(text) else TalkPanel.close() end
 end
-local function fitScale(scale: UIScale)
- local camera=workspace.CurrentCamera
- local vp=if camera then camera.ViewportSize else Vector2.new(1280,720)
- scale.Scale=math.clamp(math.min((vp.Y-24)/TalkPanel.H,(vp.X-24)/TalkPanel.W),.3,1)
+-- Fit into the ScreenGui (IgnoreGuiInset = false: the area below the Roblox top bar, so the header never slides
+-- under it on phones; staffops request 3b). Before the ScreenGui has a size the camera viewport is the fallback.
+local function fitScale(scale: UIScale,screen: ScreenGui?)
+ local size: Vector2?=if screen then screen.AbsoluteSize else nil
+ if typeof(size)~="Vector2" or size.X<=0 or size.Y<=0 then
+  local camera=workspace.CurrentCamera
+  local vp=if camera then camera.ViewportSize else Vector2.new(1280,720)
+  size=vp-Vector2.new(8,8)
+ end
+ local s=size :: Vector2
+ scale.Scale=math.clamp(math.min((s.Y-16)/TalkPanel.H,(s.X-16)/TalkPanel.W),.3,1)
 end
 -- Typing pause: longer answers take a little longer (minus the time the server already needed).
 function TalkPanel.typingDelay(text: string,elapsed: number): number
@@ -56,10 +63,11 @@ function TalkPanel.open(payload: any,call: Call)
  screen.Parent=player:WaitForChild("PlayerGui");gui=screen
  local box=Kit.frame(screen,UDim2.fromOffset(W,H),UDim2.fromScale(.5,.5));box.AnchorPoint=Vector2.new(.5,.5)
  box.BackgroundColor3=C.panel;box.BackgroundTransparency=0;Kit.corner(box,14);Kit.stroke(box,.85)
- local scale=Instance.new("UIScale");scale.Parent=box;fitScale(scale)
+ local scale=Instance.new("UIScale");scale.Parent=box;fitScale(scale,screen)
  local connections: {RBXScriptConnection}={}
  local camera=workspace.CurrentCamera
- if camera then table.insert(connections,camera:GetPropertyChangedSignal("ViewportSize"):Connect(function() if scale.Parent then fitScale(scale) end end)) end
+ if camera then table.insert(connections,camera:GetPropertyChangedSignal("ViewportSize"):Connect(function() if scale.Parent then fitScale(scale,screen) end end)) end
+ table.insert(connections,screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() if scale.Parent then fitScale(scale,screen) end end))
  screen.Destroying:Connect(function() for _,c in connections do c:Disconnect() end;table.clear(connections) end)
  local inner=Kit.frame(box,UDim2.new(1,-32,1,-32),UDim2.fromOffset(16,16))
  -- Header: who you are talking to

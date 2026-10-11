@@ -287,6 +287,16 @@ local function body()
 		s.live.revenue, s.live.cost = 0, 0
 		EmpireService.tick(s, 1)
 		check("8 graduation: skill 3, entry removed, news line", p.k == Ops.APPRENTICE.endSkill and e.apprentices[tostring(p.s)] == nil and newsWith(e, "graduated") == 1)
+		-- staffops request 6 (applied by integrate): an entry whose seed no current profile has is dropped at the
+		-- next graduation pass (it would pay the Training Lead forever and never graduate)
+		e.apprentices["424242"] = { day = Ops.day(e) }
+		local fresh = nil
+		for _, list in e.staffProfiles do if typeof(list) == "table" and typeof(list[1]) == "table" and e.apprentices[tostring(list[1].s)] == nil then fresh = list[1] end end
+		if fresh then e.apprentices[tostring(fresh.s)] = { day = Ops.day(e) } end
+		Ops.graduate(e)
+		check("8 stale apprentice entry (no profile) dropped by Ops.graduate", e.apprentices["424242"] == nil)
+		check("8 a current apprentice entry is kept", fresh ~= nil and e.apprentices[tostring(fresh.s)] ~= nil)
+		check("8 Training Lead not paid for stale entries", Ops.apprenticeCount(e) == (if fresh then 1 else 0), Ops.apprenticeCount(e))
 	end
 
 	------------------------------------------------------------------ 9. garage site board

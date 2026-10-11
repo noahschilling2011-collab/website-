@@ -1,6 +1,6 @@
 --!nocheck
 -- Airport package: City Airport as built by CityBuilder -> AirportBuilder in the headless mock.
---   * budgets: terminal interior <= 3,500 parts, airport exterior (without the parked aircraft) <= 222 + 1,500,
+--   * budgets: terminal interior <= 3,500 parts, airport exterior (without the parked aircraft) <= 2,000 (was 222 + 1,500),
 --     real lights <= 40 in the airport zone; decor flags (non-colliding parts never touch/query, no shadow)
 --   * the existing contracts: four check-in counters (CityAction checkin, FlightTo abroad, CheckinTo, Public,
 --     ticket text), the GPS kiosk home, arrival point on a floor, gate CFrames free
@@ -100,8 +100,10 @@ local function body()
 	end
 	print(string.format("  airport parts: interior %d, exterior %d, parked aircraft %d", nInterior, nExterior, nAircraft))
 	check("terminal interior (fit-out + hall structure) <= 3,500 parts", nInterior <= 3500 and nInterior > 1200, nInterior)
-	-- brief: exterior + apron additions <= 1,500 over the 222 parts of the old airport exterior
-	check("airport exterior (without aircraft) <= 1,722 parts (old 222 + 1,500)", nExterior <= 1722 and nExterior > 800, nExterior)
+	-- brief: exterior + apron additions <= 1,500 over the 222 parts of the old airport exterior; raised to 2,000 by
+	-- integrate (airport request 8: headroom for the round-2b hangar / company jet dressing; the airport zone total of
+	-- 7,000 in the world check still binds)
+	check("airport exterior (without aircraft) <= 2,000 parts (airport.md #8)", nExterior <= 2000 and nExterior > 800, nExterior)
 	check("every airport part anchored", unanchored == 0, unanchored)
 	check("decor never touches/queries", decoBad == 0, decoBad)
 	check("decor casts no shadow", shadowBad == 0, shadowBad)

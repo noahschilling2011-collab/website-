@@ -43,6 +43,10 @@ local TalkService=require(Services.TalkService)
 local ShopService=require(Services.ShopService)
 local CityService=require(Services.CityService)
 local PhoneService=require(Services.PhoneService)
+-- round 2b (pre-wired stubs: guests_jet, drivers, itinerary packages replace them)
+local JetService=require(Services.JetService)
+local DriverService=require(Services.DriverService)
+local ItineraryService=require(Services.ItineraryService)
 
 local MAX_STEP = 5 -- nach einem Server-Hänger nicht mehr als 5 s auf einmal simulieren
 
@@ -72,6 +76,9 @@ AssistantService.init()
 TalkService.init() -- talk to anyone (employees, ops staff, visitors)
 ShopService.init() -- Robux receipts/game passes (before SessionService: receipts wait for the session)
 PhoneService.init() -- company phone: calls, messages, calendar, AI chat
+JetService.init() -- company jet in the hangar, company pilots, private flights (round 2b)
+DriverService.init() -- company chauffeurs, fleet rides, VIP limo (round 2b)
+ItineraryService.init() -- the founder's business trip itinerary (round 2b)
 SessionService.init()
 
 -- Ein Fehler bei einem Spieler darf den Takt der anderen nicht stoppen
@@ -125,6 +132,9 @@ RunService.Heartbeat:Connect(function(dt: number)
   safely("Company displays",function()BuildingStateService.tick(campusStep)end)
 		safely("Company cars",function()VehicleService.tick(campusStep)end)
 		safely("World travel",function()CityService.tick(campusStep)end)
+		safely("Company jet",function()JetService.tick(campusStep)end)
+		safely("Company drivers",function()DriverService.tick(campusStep)end)
+		safely("Founder trips",function()ItineraryService.tick(campusStep)end)
 	end
 	arenaAccumulator+=dt
 	if arenaAccumulator>=.1 then

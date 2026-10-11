@@ -131,9 +131,9 @@ local function body()
 	-- in design/requests/metro.md); metro's own seat spurs (edges after the airport's) use the full 1.0
 	local ap = Plan.airportNet()
 	local apCore, apArms, apSamples = sweep("City Airport terminal", ap, luggage, 0.75)
-	-- requested from the airport package (design/requests/metro.md #7): its graph edge loungeIn -> buffet crosses the
-	-- lounge's magazine rack, the edge L270 -> arrival passes the meeting-point post; listed as PENDING, anything else fails
-	local PENDING = { { "MagazineRack", -249, 2500.5, 3 }, { "Magazine", -249, 2500.5, 3 }, { "MeetingPointPost", 262, 2446, 2 } }
+	-- design/requests/metro.md #7 (magazine rack on the edge loungeIn -> buffet, meeting-point post on L270 -> arrival)
+	-- was applied by integrate (shorter rack, arrival linked from L262): nothing is PENDING any more, every hit fails
+	local PENDING = {}
 	local left, pending = {}, 0
 	for _, k in apCore do
 		local nm, x, z = string.match(k, "^(.-)@(%-?%d+),(%-?%d+)$")

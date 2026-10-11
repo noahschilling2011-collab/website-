@@ -315,10 +315,22 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 		retire.Position = UDim2.new(1, 0, 0, 2)
 		retire.TextSize = 13
 
-		local refineRow = Kit.row(frame, 34, 10, 7)
-		local refine = Kit.button(refineRow, "REFINE CHECKPOINT", "secondary", UDim2.fromOffset(190, 32))
+		local refineRow = Kit.row(frame, Kit.tap(34, 104), 10, 7)
+		local refine = Kit.button(refineRow, "REFINE CHECKPOINT", "secondary", UDim2.fromOffset(Kit.tap(190, 300), Kit.tap(32, 104)))
 		Kit.onClick(refine, function()
 			ModelsUI.call("ImproveModel", { modelId = model.id })
+		end)
+		-- the phone's model chat (design/requests/phone.md #3): a released model answers in the phone's chat app
+		local chat = Kit.button(refineRow, "CHAT", "secondary", UDim2.fromOffset(Kit.tap(110, 180), Kit.tap(32, 104)))
+		chat.Name = "Chat"
+		chat.LayoutOrder = 2
+		Kit.onClick(chat, function()
+			-- lazy require: PhoneController requires Screens/Computer, which requires the apps (no require cycle)
+			local ok, phone = pcall(require, Client.Controllers.PhoneController)
+			if ok and typeof(phone) == "table" and typeof((phone :: any).openChat) == "function" then
+				(phone :: any).openChat(model.id)
+				navigation.close()
+			end
 		end)
 		Kit.para(frame, `Add 100M new tokens, then refine with your GPUs: the model keeps serving with the current version meanwhile. At most {ModelConfig.REFINE.limit} refinements per model, each costs 50 % more; every stat stays at most {ModelConfig.STAT_CAP}.`, 13, C.dim, 8)
 

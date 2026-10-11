@@ -51,6 +51,7 @@ for t in ops b2b service migration net; do run "econ_$t" bash -c "cd tests/econ 
 Expected: 173/0, 61/0, 83/0, 83/0, 11/0 (about 15 s together). Mutation proof: `tests/econ/negative.sh`
 (11 of 11 mutations detected). Economy check against CORE_SPEC 9: `agents/econ/run_sim.sh <label> [args]`
 (real work/src, no patches).
+STATUS: already done (integrate: run_all runs econ_{ops,b2b,service,migration,net} on harness/.gen_corefix)
 
 ## 6. Later UI package (HUD / phone / Empire app) — what the econ state offers
 - `EmpireMath.nextGoal(snapshot.data, snapshot.live)` -> `{id, text, have, need, etaMinutes?}` (CORE_SPEC 8.2 order).

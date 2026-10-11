@@ -32,6 +32,7 @@ The shuttle (client-animated, same kind "320" and scale `A.standScale`) parks ex
 `A.standCFrames[A.shuttleStand]`; ShuttleController hides the server's ParkedAircraft of that stand locally
 (LocalTransparencyModifier, local CanCollide off), so the jet bridge keeps meeting the door. If the airport
 package ever stops building that aircraft, nothing breaks.
+STATUS: already done (integrate: FYI, no change needed; the airport still builds the stand's parked aircraft)
 
 ## 4. MetroBuilder (FYI, owner: metro package)
 - The shuttle parks at Port Meridian on the runway at (140, ROAD_TOP, 7552) facing west and turns around
@@ -82,6 +83,7 @@ tests/flight/clearance.py (exact hull sweep along every pose vs the built world)
   (650, 2836.6) and the east hold-short sign (x 973.8) are on that route too (same requests as above).
 Until this is done the clearance test lists these obstacles as PENDING (not counted as failures, printed on every
 run: 14 hits today - shuttle 6, visiting airliners 8); any other obstacle fails the test.
+STATUS: done by integrate (AirportBuilder: the four FloodMast/Frame/Head moved to z 2716 between the stands (x -330 / -100 / 100 / 330), HoldSign + post at connector + 32, Windsock / pole to (620, rw.z1 - 12 = 2928); tests/flight/clearance.py PENDING list emptied: flight_clearance 18/0 with 0 pending, tests/airport passes)
 
 ## 7. MetroBuilder / MetroPlan — Port Meridian airfield: obstacle-free strip and a real apron (owner: metro package)
 - The arrival hall's BackGlass (z 7610) and roof (z >= 7604) and the towers Tower_aw_* / Tower_ae_* (faces at
@@ -136,6 +138,7 @@ for t in plan shuttle client aircraft; do run "flight_$t" $L tests/flight/test_$
 ```
 and, for the geometry part (world dump ~35 s + sweep ~20 s), `bash tests/flight/run.sh --clearance-only`.
 `world_client_patched` is gone: flight.md #1 is merged into tests/world/test_client.luau.
+STATUS: done by integrate (run_all: flight_{plan,shuttle,client,aircraft} on .gen_flight + flight_clearance = tests/flight/run.sh --clearance-only)
 
 ## 7b. Update (flight, round 4): the Port Meridian apron is in use
 FlightPlan reads `MetroPlan.APRON` (stand 1 = `stand`, `taxiX`, `door`): arrival roll-out on FlightPlan.PM_LINE to
@@ -146,10 +149,12 @@ studs), taxi north, left onto the runway, take-off roll west on PM_LINE. Boardin
 door (FlightPlan.PM_DOOR) and the client airstairs at the forward left door; a local pushback tug serves stand 1.
 Nothing more is needed from metro for the shuttle; the runway's obstacle-free strip request above still stands for
 the roll-out / take-off on PM_LINE.
+STATUS: already done (integrate: info; metro built the apron. The remaining strip request concerns the arrival hall (airport, z 7610) - dropped: moving it would move check-in / lounge / arrival / plaza, and PM_LINE 7544 keeps 5.2 studs, verified by the clearance sweep)
 
 ## 9. Lead (FYI) — tests/flight/run.sh
 `bash tests/flight/run.sh` today: flight_plan 95/0, flight_shuttle 111/0, flight_client 90/0, flight_aircraft 45/0,
 flight_clearance 18/0 (14 pending, other packages). Request #8 (add it to run_all) still stands.
+STATUS: already done (integrate: covered by #8)
 
 
 ## 10. Status (flight, round 5, 2026-10-10 ~16:00 UTC) - still open: #6 (airport) and #8 (lead)
@@ -165,3 +170,4 @@ flight_clearance 18/0 (14 pending, other packages). Request #8 (add it to run_al
   `bash tests/flight/run.sh` today: flight_plan 95/0, flight_shuttle 111/0, flight_client 90/0, flight_aircraft
   45/0, flight_clearance 18/0 (+14 pending above), `--negative` 1/0.
 - metro #7 note taken: tests/flight/test_plan.luau now uses the real pads (MetroPlan.HELIPADS.airport / hotel).
+STATUS: done by integrate (#6 and #8 applied, see there)

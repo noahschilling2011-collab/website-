@@ -54,6 +54,8 @@ local UNIFORMS: {[string]:any}={
  Housekeeping={shirt=rgb(196,214,220),trousers=rgb(70,74,82),shoes=rgb(60,48,38),apron=rgb(236,236,230)},
  Cleaner={shirt=rgb(52,92,150),trousers=rgb(52,56,62),shoes=rgb(40,34,30),hivis=rgb(204,222,70)},
  Mailroom={shirt=rgb(150,112,70),trousers=rgb(56,62,70),shoes=rgb(60,48,38)},
+ -- Training Lead (staffops request 2): the tones StaffAssignment.dressTrainer already applies after the build
+ ["Training Lead"]={shirt=rgb(46,126,112),trousers=rgb(44,50,66),shoes=rgb(40,34,30)},
  -- shuttle pilots (ShuttleService, role "pilot"): white shirt, navy jacket and tie, uniform cap with a gold band
  Pilot={shirt=rgb(244,244,240),jacket=rgb(26,34,58),trousers=rgb(26,34,58),shoes=rgb(18,18,20),tie=rgb(20,26,44),cap=rgb(26,34,58)},
 }

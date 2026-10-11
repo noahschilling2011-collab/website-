@@ -290,7 +290,9 @@ function Empire.tick(session: any, dt: number)
 	Ops.faultStep(e, data.gpus, session.userId, dt, clock)
 	local fleet = ModelMath.fleet(data.gpus)
 	local faults = {}
-	for _, f in Ops.faults(e) do table.insert(faults, { slot = f.slot, gpu = f.gpu, since = math.floor(f.since) }) end
+	-- eta = remaining repair seconds at the current rate in whole 5 s steps (apps request 2: exact across IT shift changes)
+	local faultRate = if Ops.itOnDuty(e, clock) then 1 / Ops.FAULT.it else 1 / Ops.FAULT.alone
+	for _, f in Ops.faults(e) do table.insert(faults, { slot = f.slot, gpu = f.gpu, since = math.floor(f.since), eta = math.ceil(f.left / faultRate / 5) * 5 }) end
 	session.live.compute = { units = fleet.throughput, lost = Ops.faultLoss(e), reserved = math.floor(((e.deals and e.deals.reserved) or 0) * 100 + 0.5) / 100,
 		slots = fleet.slotsUsed, it = Ops.itOnDuty(e, clock), faults = faults }
 	-- trailing income (5-minute average) and Save mode for the HR coordinator
@@ -363,6 +365,15 @@ local function empireAction(session: any, p: any): any
 		e.saveMode = p.mode
 		return setFlag(session)
 	end
+	-- night shift for every department of a role in one call (apps request 5: atomic, so a role is never half on)
+	if action == "nightShift" and p.role ~= nil then
+		local list = (Ops.ROLE_DEPTS :: { [string]: { string } })[Guard.id(p.role) or ""]
+		if not list or typeof(p.on) ~= "boolean" then return {ok=false, err="BAD_INPUT"} end
+		if Ops.stageIndex(e) < Ops.NIGHT.from then return {ok=false, err="OFFICE"} end
+		if typeof(e.nightShift) ~= "table" then e.nightShift = {} end
+		for _, dept in list do e.nightShift[dept] = if p.on then true else nil end
+		return setFlag(session)
+	end
 	if action == "nightShift" then
 		local dept = Guard.id(p.dept)
 		if not dept or not DepartmentConfig.DEPARTMENTS[dept] or typeof(p.on) ~= "boolean" then return {ok=false, err="BAD_INPUT"} end
@@ -412,14 +423,17 @@ local function dealAction(session: any, p: any): any
 	local client = Ops.client(Guard.id(p.clientId))
 	if not client then return {ok=false, err="BAD_INPUT"} end
 	local d = Ops.ensure(session.data.empire)
+	-- pin / skip: an optional boolean `on` sets the state (idempotent, apps request 6); without it they toggle
 	if p.action == "pin" then
-		d.pinned = if d.pinned == client.id then nil else client.id
-		if d.pinned then d.skip[client.id] = nil end
+		local want = if typeof(p.on) == "boolean" then p.on else d.pinned ~= client.id
+		d.pinned = if want then client.id elseif d.pinned == client.id then nil else d.pinned
+		if d.pinned == client.id then d.skip[client.id] = nil end
 		return success(session)
 	end
 	if p.action == "skip" then
-		d.skip[client.id] = if d.skip[client.id] then nil else true
-		if d.skip[client.id] and d.pinned == client.id then d.pinned = nil end
+		local want = if typeof(p.on) == "boolean" then p.on else not d.skip[client.id]
+		d.skip[client.id] = if want then true else nil
+		if want and d.pinned == client.id then d.pinned = nil end
 		return success(session)
 	end
 	if p.action == "joinMeeting" then

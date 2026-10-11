@@ -253,6 +253,7 @@ local function subject(i: Info,s: any,tier: number,cf: CFrame?,st: Statics): any
  local task=m:GetAttribute("Task");if typeof(task)=="string" then sub.task=task end
  local skill=m:GetAttribute("Skill");if typeof(skill)=="number" then sub.skill=skill end
  local pose=m:GetAttribute("Pose");if typeof(pose)=="string" then sub.pose=pose end
+ local shadow=m:GetAttribute("ShadowOf");if typeof(shadow)=="string" then sub.shadowOf=shadow end -- apprentice shadowing a senior (staffops request 3)
  if cf then
   local lp=cf:PointToObjectSpace(i.root.Position);local r=Plan.roomAt(tier,lp)
   if r then
@@ -286,7 +287,7 @@ end
 local BUSY_KINDS={reception=true,facilities=true,mailroom=true,ops=true} -- tour / building answers cite desks in use
 local function context(viewer: string,player: Player,i: Info,s: any,tier: number,cf: CFrame?,sub: any,st: Statics): any
  local data=s.data
- local c: any={viewer=viewer,viewerName=player.DisplayName,day=campusDay(),hour=EmployeeConfig.hour(Staff.now()),tier=tier,
+ local c: any={viewer=viewer,viewerName=player.DisplayName,day=campusDay(),hour=if typeof((Staff :: any).hour)=="function" then (Staff :: any).hour() else EmployeeConfig.hour(Staff.now()),tier=tier,
   facts=Dialogue.facts(data,s.live),company=if data.company then data.company.name else s.player.DisplayName.."'s company",ownerName=s.player.DisplayName}
  local ids=Dialogue.placeIds(viewer,i.kind)
  if #ids>0 then c.places=Dialogue.places(tier,ids,sub.levelNumber) end

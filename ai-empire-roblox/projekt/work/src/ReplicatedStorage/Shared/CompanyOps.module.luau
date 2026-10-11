@@ -330,6 +330,19 @@ function Ops.graduate(e: any): { string }
 			end
 		end
 	end
+	-- entries without a current profile (list truncated by syncProfiles, admin edit, migration) are stale: they
+	-- would keep paying the Training Lead and never graduate (staffops request 6)
+	local current: { [string]: boolean } = {}
+	for role, list in e.staffProfiles do
+		local n = math.max(0, math.floor(tonumber(e.employees and e.employees[role]) or 0))
+		if typeof(list) == "table" then
+			for i = 1, math.min(n, #list) do
+				local p = list[i]
+				if typeof(p) == "table" and typeof(p.s) == "number" then current[tostring(p.s)] = true end
+			end
+		end
+	end
+	for key in map do if not current[key] then map[key] = nil end end
 	return done
 end
 function Ops.nightOn(e: any, role: string): boolean

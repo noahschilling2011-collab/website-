@@ -26,6 +26,10 @@ Config.ROLES={researcher="AI Researcher",engineer="ML Engineer",curator="Data Cu
 Config.OPERATIONS_JOBS={"Reception","Reception","Security","Security","Facilities","IT Support","Barista","Chef","Kitchen Team","Cafe Host","Facilities","Fleet","Hotel Reception","Housekeeping","Cleaner","Mailroom","Training Lead","Security","IT Support"}
 Config.OPTIONAL_POSTS={[13]=true,[14]=true,[17]=true,[18]=true,[19]=true}
 Config.TRAINING_LEAD_POST=17
+-- First office stage (empire.office) at which a post is staffed (CORE_SPEC 5.5 table; the economy pays exactly these
+-- posts: CompanyOps.STAGES[].ops 8 / 12 + 2 / 14 + 2 / 16 + 2). Posts not listed start at stage 2 (Founder HQ); the
+-- guest-house posts 13 / 14 exist only where the guest house is built (stage 3+). Lead decision (staffops request 10).
+Config.POST_FROM_STAGE={[2]=3,[4]=4,[10]=3,[11]=4,[15]=3,[16]=3}
 -- night rota person (OPERATIONS_JOBS index) -> the post (OpsIndex) whose station they use at night
 Config.NIGHT_ROTA={[18]=3,[19]=6}
 -- their shift: from the end of the day person's shift at that post to its start the next morning

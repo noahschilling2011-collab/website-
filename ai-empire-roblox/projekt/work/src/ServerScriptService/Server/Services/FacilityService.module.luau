@@ -483,6 +483,7 @@ function Facility.handle(player: Player,q: ProximityPrompt)
 		if not Plan.playerAllows(player.UserId==owner,card,class) then notify(player,if card then DENY[class] or CARD_TEXT else CARD_TEXT);return end
 	end
 	fn(ctx)
+	Session.markDirty(s,true) -- prompt-driven: send the change after 0.1 s like a remote call (net request 2)
 end
 
 -- Access guard (security fallback) ---------------------------------------------------------------

@@ -33,6 +33,7 @@ ends (bye, close, idle 60 s, walk-away, NPC removed, player leaves, session clos
 `release` when `hold` returned false or threw. After a successful `hold`, TalkService turns an anchored,
 non-seated NPC to face the player and turns it back afterwards, so StaffService should not rewrite the
 root CFrame while `e.talkHold` is set.
+STATUS: already done (integrate: StaffService.hold / release, life.md #7)
 
 ## 2. EmployeeController (life, client) — look at the person you talk to
 File: `StarterPlayer/StarterPlayerScripts/Client/Controllers/EmployeeController.module.luau`, in `pose` / the
@@ -43,18 +44,21 @@ PreSimulation loop. While the rig has the attribute `TalkingTo` (number userId, 
 - Arms: the existing TALKING gesture (`right=.6+.35*sin(t*1.7)`, `left=.2+.12*sin(t*1.2)`) unless seated
   and typing.
 Only in the NEAR LOD band (as now). No server writes.
+STATUS: already done (integrate: EmployeeController TalkingTo / TalkFace head turn + gesture, life.md #7)
 
 ## 3. StaffJobs / StaffService (life) — lunches served today
 Set the office attribute `LunchesServed` (number) = plates handed out in the current campus day (reset when
 `math.floor(time/1200)` changes). That is one attribute write per served plate, e.g. in `Jobs.officeTick`
 where `table.remove(q, 1)` hands the tray over. TalkService reads it for the chef, kitchen team, barista
 and café host ("17 lunches served today"). Without it they don't claim any count (tested).
+STATUS: already done (integrate: office attribute LunchesServed, life.md #7)
 
 ## 4. Hotel annex (buildings / hotel package) — guests
 When the hotel exists, set office attributes `HotelGuests` (number of guests tonight) and `HotelRooms` (room
 count). TalkService then lets Hotel Reception / Housekeeping talk about them; until then they say honestly
 that the hotel isn't taking guests yet. If the hotel adds BuildingPlan rooms, send the room ids to the talk
 owner. They go into `Dialogue.placeIds` (directions "Where is …?").
+STATUS: already done (integrate: HotelRooms at build, HotelGuests from EmpireService; hotel room ids / purposes: buildings.md #6)
 
 ## 5. Lead — run_all.sh: add the talk suites
 After the `screens_real` line (or anywhere after the generic manifests):
@@ -67,6 +71,7 @@ run talk_real         $L tests/talk/test_real.luau -a .gen_talk 2
 ```
 Expected today: 1687/0, 113/0, 31/0, 150/0 (about 4 s together). Negative checks: `tests/talk/negative.sh`
 (original stubs + 5 mutations of TalkService must fail; all do).
+STATUS: already done (integrate: run_all runs talk_dialogue / talk / talk_client / talk_real)
 
 ## 6. Economy owners (CORE_SPEC) — operations staff pay (optional)
 If operations staff get a wage (core_clarity: "$800 per game day each"), expose it as a config number
@@ -84,6 +89,7 @@ block: every operations rig of a company is "… Rossi" (seen in every tier dump
 operations staff are not saved, so no save impact; hired staff use profile names): pick the last name from an
 independent hash, e.g. `Config.LAST_NAMES[(Employee.hash(o*13+index*7) % #Config.LAST_NAMES) + 1]`, keeping the
 first name rule (presentation) as is. Check people/staff tests that compare generated names first.
+STATUS: already done (integrate: CampusMath.staffName steps operations surnames by #list + 1 past the hired range)
 
 ## 8. Info (no action)
 - TalkService writes no session data and no `session.live` fields, so the net package's urgent
@@ -104,3 +110,4 @@ first name rule (presentation) as is. Check people/staff tests that compare gene
   Hotel Reception). WorldController's existing Public rule shows them to visitors.
 - Studio check: `RequiresLineOfSight=true` (unchanged) on the head prompt. Please verify that the seated
   receptionist and the security desk can be talked to from the visitor side of the counter.
+STATUS: already done (integrate: info)

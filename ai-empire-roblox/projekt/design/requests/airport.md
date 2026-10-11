@@ -8,6 +8,7 @@ Persistent <= 12 models / 800 parts (skyline + control tower + the airport's Per
 landmarks). tests/world/run.sh uses agents/airport/world_dump.sh + agents/airport/world_check.py (copy of
 agents/world/world_check.py with the per-zone budgets). Suggest: adopt the same budgets in agents/world/world_check.py
 (line 45) so every package's world check agrees, or keep pointing at the airport copy.
+STATUS: done by integrate (agents/world/world_check.py now carries the per-zone budgets + map-edge check of agents/airport/world_check.py; run_all runs `world_check` = agents/airport/world_dump.sh in the sandbox)
 
 ## 2. Metro — MeridianBoulevard/MediaScreen has a negative size
 `World/WorldCity/PortMeridian/MeridianBoulevard/MediaScreen` requested size `[24, 13.2, -0.15]` (clamped by Roblox)
@@ -34,6 +35,7 @@ part `LoungeEntrance`)
   catering truck wait in the staging box ahead of the wing (flight.md #5, checked by tests/airport against the hull).
 - TravelController's cutscene plane is now a full-LOD AircraftModel (270 parts, client only); tests/world/test_client
   allows <= 400 parts. Consider `lod = "medium"` there.
+STATUS: already done (integrate: FYI, no change requested; the cutscene plane is only the shuttle-off fallback and stays inside tests/world's 400-part client budget, so lod = "medium" is not needed)
 
 ## 4. Later VIP / staff packages — hooks in the terminal
 - Model `BusinessLounge` (tag "BusinessLounge", attribute Purpose = "BusinessLounge") inside TerminalInterior; its
@@ -42,6 +44,8 @@ part `LoungeEntrance`)
 - Staff posts: invisible parts `AirportPost` (CityPost = checkin | security | gate | lounge | shop | crew | info,
   BuildingId = "airport", Desk = A..D / lane1..3 / A1..A3 / news, cafe, tech, dutyfree, food1..3, restaurant),
   LookVector = facing; every post is reachable (tests/airport walk grid, agent radius 1).
+STATUS: deferred to guests_jet (info: BusinessLounge / LoungeEntrance / AirportPost markers are in place for terminal passengers and staff; nothing to change now)
+STATUS: done by guests_jet (terminal passengers use CityPlan.AIRPORT.walk + seats read-only: check-in serpentines and desks, security lanes, gate A1 seats east of the gate desk, A1lane / A1board, arrival -> reclaim -> doorArr; lounge / posts not used by passengers)
 
 ## 5. Metro (CityLifeController) — a light walker set inside the City Airport terminal
 The terminal reads empty because CityLifeController switches its crowd off in the "City Airport" region
@@ -115,3 +119,4 @@ defaults FAR 120 / VERTICAL 24; tests/staffops client suite: a spin prop with Fx
 - agents/world/world_check.py still has the 10,000-part world total (the world is ~13,500 now) and fails if
   run; please retire it in favour of agents/airport/world_check.py (per-zone budgets, #1), which now also has
   a map-edge check (no slit along |x| = 1150 for z -800..3800 and along z = 3800).
+STATUS: done by integrate (tests/airport exterior budget 2,000 - the airport zone total of 7,000 still binds; agents/world/world_check.py retired its 10,000 total in favour of the per-zone budgets)

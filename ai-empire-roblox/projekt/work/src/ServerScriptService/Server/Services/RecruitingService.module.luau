@@ -794,7 +794,7 @@ local function onPrompt(q: ProximityPrompt,player: Player)
  local character=player.Character;local root=if character then character.PrimaryPart else nil
  if not v or not a or not root or (root.Position-v.e.root.Position).Magnitude>14 then return end
  if v.phase=="leaving" or v.phase=="exit" then return end
- a.st="interviewing";Session.markDirty(s)
+ a.st="interviewing";Session.markDirty(s,true) -- prompt-driven: urgent send (net request 2)
  if v.e.nav then Nav.cancel(v.e) end
  -- also in "retry" (no route active): otherwise campusTick re-enters and walks off mid-interview
  if v.phase=="enter" or v.phase=="retry" then v.phase="waiting";releaseSpot(v) end

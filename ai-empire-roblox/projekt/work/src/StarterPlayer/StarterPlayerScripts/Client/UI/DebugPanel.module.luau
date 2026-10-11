@@ -17,11 +17,15 @@ local Toast = require(UI.Toast)
 
 local C = Theme.colors
 
-local COMMANDS: { { cmd: string, label: string, done: string } } = {
+local COMMANDS: { { cmd: string, label: string, done: string, key: string? } } = {
 	{ cmd = "money", label = "+ $100K", done = "+$100,000" },
 	{ cmd = "data", label = "+ 10B tokens per type", done = "+10B tokens of every data type" },
 	{ cmd = "finish", label = "Finish training now", done = "Training finished" },
 	{ cmd = "rep", label = "+ 25 reputation", done = "+25 reputation" },
+	-- shop items for testing (DebugService: Studio only, session flag / voucher, never sold; shop request 6)
+	{ cmd = "pass", key = "vip", label = "Shop: VIP pass", done = "VIP pass active (this session)" },
+	{ cmd = "pass", key = "limo", label = "Shop: Limo pass", done = "Executive Limousine pass active (this session)" },
+	{ cmd = "voucher", key = "headhunter", label = "Shop: Headhunter voucher", done = "Headhunter voucher added" },
 }
 
 local DebugPanel = {}
@@ -49,7 +53,7 @@ function DebugPanel.mount(parent: Frame)
 		button.LayoutOrder = index
 		button.TextSize = 14
 		Kit.onClick(button, function()
-			local ok = ActionController.call("Debug", { cmd = def.cmd })
+			local ok = ActionController.call("Debug", { cmd = def.cmd, key = def.key })
 			if ok then
 				Toast.show("info", "[Dev] " .. def.done)
 			end

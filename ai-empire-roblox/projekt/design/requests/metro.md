@@ -20,12 +20,14 @@ no car overlaps in a lane, no red-light runs, cars on their lane lines; it caugh
 fixed-seed suite missed, fixed in CityLifeController). The geometry part (world dump with per-zone budgets, holes,
 walkability of the arrival area / lounge / VIP stand / helipad / waterfront) runs with `tests/metro/run.sh`
 (~3 min with the stress run). `agents/metro/world_dump.sh` and `agents/metro/life_dump.sh` use private gen dirs (no races).
+STATUS: done by integrate (run_all: metro_{plan,build,life,paths} on .gen_metro + metro_stress; metro_reach = tests/metro/reach.py on the shared world dump)
 
 ## 2. Lead / world — agents/world/world_check.py still has the old single budget (10,000)
 tests/world/run.sh already uses agents/airport/world_check.py (per-zone budgets, abroad <= 20,000; today the whole
 world is 14,749 parts (2026-10-10 16:xx UTC: abroad zone 5,139 in world_check; tests/metro/test_build counts 5,253 Port Meridian parts =
 +4,472 of the package's +4,500, i.e. the metro budget is used up - further metro additions must free parts first). agents/metro/world_dump.sh uses the airport copy as well. Adopt the
 per-zone budgets in agents/world/world_check.py too (same request as airport.md #1).
+STATUS: done by integrate (agents/world/world_check.py adopted the per-zone budgets of agents/airport/world_check.py; same as airport.md #1)
 
 ## 3. flight — VIP helicopter: the markers (no change needed)
 - Two parts named `Helipad` (landing surface = top face, collidable, anchored, attributes Purpose, PadId, PadName):
@@ -39,6 +41,7 @@ per-zone budgets in agents/world/world_check.py too (same request as airport.md 
   marker `HelipadExit` (see flight.md #4 STATUS).
 - The Meridian Spire (468 studs + 74-stud mast, x 0, z 8520..8576) stands 140 studs south of the hotel pad: approach
   the roof pad from the north (boulevard axis) as planned.
+STATUS: already done (integrate: FYI for flight, no change needed)
 
 ## 4. clients — VIP limousine stand (no change needed)
 - Part `VipLimoStand` (under `PortMeridian/ArrivalPlaza/VipLimoArea`; invisible, no collision; attributes
@@ -49,6 +52,8 @@ per-zone budgets in agents/world/world_check.py too (same request as airport.md 
   Leaving the stand: west along the lay-by into Arrivals Drive (dir -1 lane, `MetroPlan.portMeridian().lanes`).
 - Lounge staff marker: invisible part `LoungeConciergePost` (attribute LoungePost = "concierge", LookVector = facing)
   behind the concierge desk of the Port Meridian `BusinessLounge` — for a hostess NPC (staff / talk packages).
+STATUS: deferred to drivers (VIP limo stand bay 1 / bay 2 / lay-by for the chauffeur car)
+STATUS: done by drivers (DrivePlan place pm_limo = MetroPlan.VIP_LIMO.stand (bay 1); booked limousines wait there and leave west through the lay-by into Arrivals Drive's westbound lane passing bay 2; DriveController shows an idle limousine + chauffeur in bay 1 while no ride stands there; the decorative Limousine in bay 2 stays as built)
 
 ## 5. Everyone — client city life (FYI, no API needed)
 CityLifeController runs only while the camera is inside `MetroPlan.REGIONS` (Port Meridian x +-2600, z 6500..10200;
@@ -61,6 +66,7 @@ impostors for streamed-out towers. Server parts it
 changes locally: lamp plates tagged `MetroSignal` (Color), parts tagged `MetroNightGlow` (Material/Color/Transparency
 at night), the Harbour Wheel (`MetroWheel`, CFrames). A cutscene or the shuttle camera inside a region simply sees
 the crowd; nothing to switch off.
+STATUS: already done (integrate: FYI, no API needed)
 
 ## 6. airport — two small things on your side (owner: airport; optional)
 - `AirportBuilder` line ~1795: the car-park `ParkingSignPost` (x -338..-337, z 2402..2403, 12 studs tall) stands on
@@ -73,6 +79,7 @@ the crowd; nothing to switch off.
   (CityPlan rect + MetroPlan blocks / roads / walls), not a silent edit. For now metro raised the skyline instead
   (median tower 210 studs, 46 of 82 towers 200+, 7 of them 300+; Spire 468 + crown + mast) and made the street
   ends tunnel gates with traffic entering and leaving the city.
+STATUS: dropped (integrate: ParkingSignPost - MetroPlan.downtownObstacles already routes walkers round it, and 3+ studs south would put it into the car-park entry lane; the larger Port Meridian rect needs a coordinated CityPlan + MetroPlan round with new blocks while the metro part budget is used up (5,253 / +4,500) - a later world round)
 
 ## 7. airport — terminal walk graph: three spots too close to scenery (owner: airport; found by tests/metro/test_paths)
 The terminal crowd (airport.md #5, done) walks your `CityPlan.AIRPORT.walk` within 0.25 studs of the centre lines.
@@ -88,4 +95,5 @@ Sweeping it against the built terminal (body band, oriented boxes) finds:
   walkers visibly pass through it; moving it beside the lanes (or listing its boxes in CityPlan so CityLifeController
   can step round them) would fix that.
 test_paths prints these as PENDING (no failure); anything new fails.
+STATUS: done by integrate (AirportBuilder: MagazineRack 2 studs long (1.6 off the edge loungeIn -> buffet), MeetingPointPost + sign moved to (264, 2449.5), 4 studs off L270 -> arrival; tests/metro/test_paths PENDING list emptied: metro_paths 6/0. Posts at 1.0-1.25 studs and the decor luggage only count as arm brushes - not changed)
 

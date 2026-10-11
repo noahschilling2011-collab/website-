@@ -57,6 +57,7 @@ STATUS: done by staffops (Recruiting.headhunt registered in Recruiting.init; app
 * Optional: `ShopService.onPassChanged(function(s,key,owned) ... end)` to show/hide it live.
 * `Template.migrate` drops car ids that are not in `CampusConfig.CARS`; a pass car must never be stored as owned
   in `campus.cars` (ownership comes from the pass), so nothing changes there.
+STATUS: already done (integrate: CampusConfig.CARS has {id="limo", pass="limo"}; VehicleService BuyCar/SpawnCar check the pass (NEEDS_PASS); CampusApp shows "Get the pass")
 
 ## 4. Types.module.luau (lead) — remove two casts (cosmetic)
 Add `shop: any?` to `PlayerData` and `shop: any?` to `LiveInfo`. Template/ShopService/ShopApp currently use
@@ -71,12 +72,14 @@ run shop_client       $L tests/shop/test_client.luau -a .gen_shop
 ```
 (works from the project root like the other suites; `tests/shop/run.sh` does the same.)
 Expected today: 146/0 and 44/0, about 1 s together. Negative checks: `tests/shop/negative.sh` (14/14 detected).
+STATUS: already done (integrate: run_all runs shop / shop_client on .gen_shop)
 
 ## 6. DebugPanel.module.luau (client, owner of DebugPanel) — Studio buttons (optional)
 DebugService now accepts (Studio only, never live): `{cmd="pass", key="vip"|"limo"|"founderSuite"|"investor"}`
 (session flag, not saved) and `{cmd="voucher", key="party"|"headhunter"}`. Add buttons to `COMMANDS`, e.g.
 `{cmd="pass",key="vip",label="Shop: VIP pass",done="VIP pass active (this session)"}` — the panel's
 `ActionController.call("Debug", {cmd=def.cmd})` would need to pass `key` too.
+STATUS: done by integrate (DebugPanel: Shop: VIP pass, Shop: Limo pass, Shop: Headhunter voucher; the call passes `key`; DebugService accepts them in Studio only)
 
 ## 7. Kit.module.luau (client, owner of Kit) — sidebar icon (optional)
 `Kit.icon(parent, "shop")` falls back to the market bars. A small bag icon would fit, e.g.
@@ -89,6 +92,7 @@ STATUS: already present (Kit.icon has the shopping-bag branch for "shop"; checke
   gather on the plaza / cheer; TalkService could add "Great party!" lines.
 * Office attribute `FounderSuite = true` while the founder owns the Founder Suite pass (decor on the private
   founder terrace). Hotel/buildings could also dress the hotel VIP suite (hotel_site.md R12) with it.
+STATUS: dropped (integrate: optional flavour without an owner this round; the attributes TeamPartyUntil / FounderSuite stay available for a later life / talk round)
 
 ## 9. Info for the net package (no action)
 `data.shop` = `{ receipts, order, vouchers, passes, tips }`; receipts/order stay server-only (your strip).
@@ -96,3 +100,4 @@ STATUS: already present (Kit.icon has the shopping-bag branch for "shop"; checke
 `live.shop` = `{ passes, available, redeemable, checked }` (~200 B), rewritten only on change (load, pass
 change, handler registration, first investor multiplier call). Since every Template.new() save has
 `shop.receipts`, `replicatedData` clones `data` on each send (shallow, cheap) — just so you know.
+STATUS: already done (integrate: info)

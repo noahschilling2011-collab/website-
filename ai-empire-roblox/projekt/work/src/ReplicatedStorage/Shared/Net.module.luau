@@ -59,6 +59,7 @@ Net.FUNCTIONS = {
 	"DealAction", -- B2B clients {action=pin|skip|joinMeeting, clientId} (EmpireService, CompanyOps)
 	"EmpireAction", -- company settings {action=labLevel|buyJet|hrBudget|hrAuto|nightShift|saveMode|autoPrice, ...}
 	"PhoneAction", -- company phone {action=inbox|read|calendar|chat|call, ...} (PhoneService)
+	"TripAction", -- founder trip/rides {action=go|cancel|leave|ride|status, ...} (ItineraryService/DriverService)
 } :: { string }
 
 -- Server -> Client

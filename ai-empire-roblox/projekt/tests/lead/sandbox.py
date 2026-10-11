@@ -20,6 +20,13 @@ w = os.path.join(sb, "work")
 if os.path.islink(w): os.remove(w)
 elif os.path.exists(w): shutil.rmtree(w)
 shutil.copytree(src, os.path.join(w, "src"))
+# world dump / check scripts the package suites call (airport + world checks: budgets, holes, map edge, entrances)
+for d, names in (("agents/airport", ("world_dump.sh", "world_check.py")), ("agents/world", ("world_dump.sh", "world_check.py", "entrances.py"))):
+    os.makedirs(os.path.join(sb, d), exist_ok=True)
+    for n in names:
+        f = os.path.join(root, d, n)
+        if os.path.isfile(f):
+            shutil.copy(f, os.path.join(sb, d, n))
 # package-specific baselines some test generators read (e.g. tests/life/mkharness.py negative build)
 for extra in ("agents/life/orig",):
     srcd = os.path.join(root, extra)

@@ -16,6 +16,7 @@ if #entries>0 then live.cost+=fleet.throughput*HardwareConfig.SERVE_POWER end
 `Client/UI/Apps/ComputeApp.module.luau` already reads `(HardwareConfig :: any).SERVE_POWER or 0.025`, so it picks the
 constant up automatically (no client change needed). tests/apps/test_ui.luau (mid) checks the shown value against
 `throughput * 0.025 * 1200`.
+STATUS: done by integrate (HardwareConfig.SERVE_POWER = 0.025; MarketService.tick uses it; ComputeApp already reads it)
 
 ## 2. EmpireService (econ) - exact repair countdown of rack faults (optional)
 `live.compute.faults[i] = {slot, gpu, since}` (EmpireService.tick ~:293). The fault's repair progress `f.left`
@@ -33,6 +34,7 @@ end
 ComputeApp would then prefer `f.eta` when present (a two-line change in an apps file; tell the apps owner or the
 lead applies it: `local left = if typeof(f.eta) == "number" then f.eta else <current formula>`).
 Client half: done by apps (ComputeApp already prefers `f.eta` when the server sends it).
+STATUS: done by integrate (EmpireService publishes live.compute.faults[i].eta = ceil(left / rate / 5) * 5; ComputeApp prefers it)
 
 ## 3. tests/lead/run_all.sh (lead) - add the apps suites
 ```
@@ -44,6 +46,7 @@ manifest to exist, so in run_all use
 `run apps bash tests/apps/run.sh .gen_apps`.) Expected today (fix round): 18 suites (6 UI states, 3 server states, 9 adversarial scenarios incl. the real rate
 limiter with 100 ms round trips), 0 failed, about 20 s together.
 GUI previews: `tests/apps/render.sh` (about 6 min, out/apps/*.png). Negative checks: `tests/apps/negative.sh`.
+STATUS: done by integrate (run_all: apps_ui_{garage,client,save,mid,rich,phone}, apps_server_{garage,mid,rich}, apps_adv_{9 scenarios} on harness/.gen_apps, each its own line)
 
 ## 4. phone (Screens/Phone) - read the HUD's lane width on phones (HUD fix round, user plays on an iPhone)
 On phones the HUD column now has its own UIScale (`HUD.COMPACT_BOOST = 1.5`) so the goal card reads at ~13 pt and
@@ -79,6 +82,7 @@ if action == "nightShift" and p.role ~= nil then
 end
 ```
 EmpireApp then sends `{action="nightShift", role=roleId, on=bool}` once (a one-line change in the apps file).
+STATUS: done by integrate (EmpireService: {action="nightShift", role, on} sets every department of the role atomically; EmpireApp sends that one call; tests/econ test_service + tests/apps test_ui updated - the UI test now expects one role call instead of one call per department)
 
 ## 6. econ (EmpireService.dealAction) - explicit Pin / Skip state (small)
 `pin` and `skip` toggle on the server, so a repeated request undoes the first one. The app now locks a row's buttons
@@ -99,6 +103,7 @@ if p.action == "skip" then
 end
 ```
 EmpireApp then sends `on = not current` (one line).
+STATUS: done by integrate (DealAction pin / skip accept a boolean `on` (idempotent, toggle without it); EmpireApp sends on = not current; tests/econ test_service checks repeats)
 
 ## 7. econ (CompanyOps / EmpireService) - per-department HR target (CORE_SPEC 8.1 player decision, spec gap)
 CORE_SPEC 8.1 lists "per-department target" as a player decision; there is no action and no field, so the Settings
@@ -107,6 +112,7 @@ staff-profile field): `e.hr.targets = { [roleId] = n }` (optional, nil = automat
 `math.min(seats, e.hr.targets[role])` when set, and `EmpireAction {action="hrTarget", role=roleId, target=n|nil}`
 (validated 0..seats, OFFICE below stage 2). The apps package adds a -/+ stepper per role to the HR card as soon as the
 action exists (the status line already explains why HR waits).
+STATUS: dropped (integrate: needs an econ design first - new field e.hr.targets + Ops.hrNeed + action + stepper UI; HR auto and the wage budget stay the HR levers; recorded as open in CORE_SPEC "Decisions (integrate)")
 
 ## 8. Computer.module owner (lead) - a touch scale for the Computer window on phones (review: touch targets)
 UIRoot draws the Computer window at ~0.43 on an iPhone in landscape, so a 36 px control is ~15 pt. The apps now use
@@ -115,8 +121,10 @@ Invite/Reject, Hire), about 41 pt each, but Apple asks for 44 pt and the sidebar
 answer in `Client/UI/Screens/Computer.module.luau`: on `Kit.isTouch()` and a small screen give the window's UIScale
 `math.clamp(0.62 / rootScale, 1, 1.35)` and size the window `UDim2.fromScale(1 / s, 1 / s)` so it still fills the
 screen (content reflows, rows get ~1.3x taller in points). With that the apps could go back to `Kit.tap(x, 72)`.
+STATUS: deferred to lab (LAB_SPEC 3.2 designs the Studio against the current 0.432 window scale and plans a coordinated Computer chrome request; a window-wide scale change now would move every app under the running lab build)
 
 ## 9. lead (info) - LOGIC_BRIEF 15 "work items" have no system yet
 The review notes that LOGIC_BRIEF 15 wants the assistant and the screens to show "the item and its progress". No
 work-item system exists in src (only the training run, the research job and studio projects), so the briefing and
 screens show those. This needs an econ/staff design decision before an apps change.
+STATUS: dropped (integrate: there is no work-item system; it needs an econ/staff design - recorded as open in CORE_SPEC "Decisions (integrate)"; screens / briefing show the real training run, research job and studio projects)

@@ -28,7 +28,7 @@ City.ROAD_TOP=City.GROUND+.22 -- asphalt (part centre GROUND+.12, .2 thick), sam
 City.WALK_TOP=City.GROUND+.475 -- sidewalks (part centre GROUND+.15, .65 thick)
 City.TIME_ZONE_OFFSET=0 -- seconds added to the campus clock abroad: 0 = same time zone (see header)
 City.TRAVEL={
-	ticket=1500, -- tuned by CORE_SPEC: return ticket to Port Meridian, paid at the home check-in (the flight home is included)
+	ticket=700, -- CORE_SPEC 11.4: = CompanyOps.TRIPS.abroad.flight; return ticket to Port Meridian, paid at the home check-in (the flight home is included)
 	flightSeconds=10, -- length of the client cutscene; the server holds the character this long, then releases it
 	streamTimeout=8, -- seconds Player:RequestStreamAroundAsync may wait for the arrival area
 	checkinRadius=16, -- server distance check: character root to a check-in counter

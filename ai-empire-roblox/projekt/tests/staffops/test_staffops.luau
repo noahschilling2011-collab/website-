@@ -1079,6 +1079,9 @@ suites.talk = function()
 	check("night-crew guard line", has(Lg.answers.day.text, "night crew") and not has(Lg.answers.day.text, "around the clock"), Lg.answers.day.text)
 	local L4 = lines({ name = "Lea Roth", roleId = "curator", job = "Data Curator", seed = 8, index = 3, activity = "DATA_REVIEW", task = "Shadowing" })
 	check("shadowing line", has(L4.answers.work.text, "senior"), L4.answers.work.text)
+	-- integrate (staffops request 3): TalkService passes the rig attribute ShadowOf -> the senior's real name
+	local L4s = lines({ name = "Lea Roth", roleId = "curator", job = "Data Curator", seed = 8, index = 3, activity = "DATA_REVIEW", task = "Shadowing", shadowOf = "Mia Weber" })
+	check("shadowing line names the senior (ShadowOf)", has(L4s.answers.work.text, "Mia Weber") and not has(L4s.answers.work.text, "a senior colleague"), L4s.answers.work.text)
 	-- absent teammates in "What does your team do?"
 	local someone
 	for _, a in f.away do if a.role == "researcher" then someone = a end end
