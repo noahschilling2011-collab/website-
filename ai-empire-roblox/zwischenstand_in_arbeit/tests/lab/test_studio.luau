@@ -26,6 +26,9 @@ local function body()
 	local State = M.require(Client.Controllers.StateController)
 	local PricingMath = M.require(RS.Shared.PricingMath)
 	local ModelConfig = M.require(RS.Shared.Config.ModelConfig)
+	local Parts = M.require(Client.UI.Lab.StudioParts)
+	local MarketMath = M.require(RS.Shared.MarketMath)
+	local Theme = M.require(Client.UI.Theme)
 
 	local function settle(t) M.settle(t or 0.5) end
 	local function visible(inst)
@@ -128,6 +131,12 @@ local function body()
 		local primary = named("Primary")
 		check("fresh: primary = BUY DATA PLAN · $7,400", primary and primary.Text == "BUY DATA PLAN · $7,400", primary and primary.Text)
 		check("fresh: CASH AFTER ALL $3,520", has(t, "CASH AFTER ALL") ~= nil and has(t, "$3,520") ~= nil)
+		-- the breakdown explains the number it sits next to (~40.2 after the plan), not today's empty data
+		local sizeLine = nil
+		for _, x in studioRoot():GetDescendants() do
+			if x:IsA("TextLabel") and string.sub(x.Text, 1, 8) == "Size max" then sizeLine = x.Text end
+		end
+		check("fresh: breakdown uses the plan's data (not amount 0.00)", sizeLine ~= nil and string.find(sizeLine, "plan data", 1, true) ~= nil and string.find(sizeLine, "amount 0.00", 1, true) == nil, sizeLine)
 		click(primary)
 		ui.push(); settle()
 		check("after BUY DATA PLAN: 4B tokens, $4,800", d.data.general and d.data.code and d.money == 4800, d.money)
@@ -290,7 +299,11 @@ local function body()
 		PricingMath.profit = origProfit
 		-- Global $250K is above the cash: not selectable
 		local global = named("Campaign_global")
-		check("Global $250K above the cash: 'Need $250K' and disabled", global and disabled(global) and has(studioTexts(), "Need $250K") ~= nil)
+		-- fix round 1 (intended change): the card says how much more is needed, not the full price
+		-- (cash moves with the mock clock between the paint and this check: compare within $5)
+		local needText = has(studioTexts(), "Need $")
+		local needNum = needText and tonumber((string.gsub(string.match(needText, "Need %$([%d,]+) more") or "", ",", "")))
+		check(`Global $250K above the cash: 'Need $X more' (X = 250K - cash) and disabled`, global and disabled(global) and needNum ~= nil and math.abs(needNum - (250000 - State.money())) <= 5, needText)
 		check("a disabled campaign tile keeps its hidden Text invisible (no doubled 'Global')", global and global.TextTransparency == 1, global and global.TextTransparency)
 	end
 
@@ -518,7 +531,9 @@ local function body()
 		check("disabled tiles keep TextTransparency 1 (garage step 2)", #hiddenLeaks() == 0, table.concat(hiddenLeaks(), ","))
 		-- step 4: Deep overfits on 4B tokens at 42 % quality -> short honest hint
 		view().step(2); settle(0.3)
-		check("garage step 4: Deep says 'Too little data' (LabPreview overfit)", labelIn("Recipe_deep", function(x) return x.Text == "Too little data" end) ~= nil
+		-- fix round 1 (intended change): the reason names the condition that fails (4B tokens is enough for 100M,
+		-- 42 % quality is not): 'Needs 60% quality' instead of 'Too little data'
+		check("garage step 4: Deep says 'Needs 60% quality' (LabPreview overfit, quality below 60 %)", labelIn("Recipe_deep", function(x) return x.Text == "Needs 60% quality" end) ~= nil
 			and LP.estimate(d, { sizeId = State.ui.sizeId, focusId = State.ui.focusId, recipeId = "deep" }, d.money).overfit == true)
 		-- Lab home without a live line: short successor texts
 		Studio.close(); settle()
@@ -538,16 +553,19 @@ local function body()
 		click(named("Breakdown"))
 		check("phone Review: tap on the breakdown closes it", named("Breakdown") == nil)
 		view().setClass(Studio.compact); settle(0.2)
-		check("Review rank line fits: 'Quality rank #1 of 5 · Developers'", has(studioTexts(), "Quality rank <b>#1 of 5</b> · Developers") ~= nil, has(studioTexts(), "rank"))
+		-- fix round 1 (intended change): 'Likely rank' (the reveal's stars stay a little surprise)
+		check("Review rank line fits: 'Likely rank #1 of 5 · Developers'", has(studioTexts(), "Likely rank <b>#1 of 5</b> · Developers") ~= nil, has(studioTexts(), "rank"))
 		-- focus step: the BEST FIT tile drops the (+x) suffix next to the tag
 		view().step(-3); settle(0.3)
-		local bestTile
+		-- fix round 1 (intended change): BEST FIT is part of the fit line (rich text), no tag frame over the 22 px rows
+		local bestLine, tagFrames = nil, 0
 		for _, x in (studioRoot() :: any):GetDescendants() do
-			if x.Name == "BEST FIT" or (x:IsA("TextLabel") and x.Text == "BEST FIT" and visible(x)) then bestTile = x.Parent end
+			if x:IsA("TextLabel") and visible(x) then
+				if x.Text == "BEST FIT" then tagFrames += 1 end
+				if string.find(x.Text, "<b>BEST FIT</b>", 1, true) then bestLine = x end
+			end
 		end
-		local suffix = false
-		if bestTile then for _, x in bestTile:GetDescendants() do if x:IsA("TextLabel") and string.find(x.Text, " fit ", 1, true) and string.find(x.Text, "(", 1, true) then suffix = true end end end
-		check("focus step: BEST FIT tile line has no '(+x)' under the tag", bestTile ~= nil and not suffix, bestTile and bestTile.Name)
+		check("focus step: BEST FIT sits in the fit line (rich text, no separate tag), without a '(+x)' suffix", bestLine ~= nil and tagFrames == 0 and bestLine.RichText and not string.find(bestLine.Text, "(", 1, true), bestLine and bestLine.Text)
 		-- stage 5: 1,184 GB VRAM shows as TB so the badge fits
 		s, d = ui.use("hq")
 		State.setSelection("s7b", "coding"); State.setRecipe("deep")
@@ -555,6 +573,379 @@ local function body()
 		Studio.open("design", { step = 2 }); settle()
 		check("hq badge: VRAM 'of 1.2 TB'", has(studioTexts(), "of 1.2 TB") ~= nil, has(studioTexts(), " of "))
 		Studio.close(); settle()
+	end
+
+	------------------------------------------------------------------ 14. fix round 1 regressions (review: function + UX)
+	do
+		local UIS = M.game:GetService("UserInputService")
+		local GS = M.game:GetService("GuiService")
+		local C = Theme.colors
+		local pad, touch = false, false
+		local function patchGet(cls, prop, fn) M.IMPL[cls] = M.IMPL[cls] or { methods = {}, get = {}, set = {}, defaults = {} }; M.IMPL[cls].get[prop] = fn; M.classInfo(cls).get[prop] = fn end
+		local function patchMethod(cls, name, fn) M.IMPL[cls] = M.IMPL[cls] or { methods = {}, get = {}, set = {}, defaults = {} }; M.IMPL[cls].methods[name] = fn; M.classInfo(cls).methods[name] = fn end
+		patchGet("UserInputService", "GamepadEnabled", function() return pad end)
+		patchGet("UserInputService", "TouchEnabled", function() return touch end)
+		local binds14 = 0
+		patchMethod("ContextActionService", "BindActionAtPriority", function() binds14 += 1 end)
+		patchMethod("ContextActionService", "UnbindAction", function() end)
+		local function scaleData(d, k) for _, st in d.data do st.tokens *= k end end
+		local function texts() return studioTexts() end
+
+		-- A. blocking 1: the suggestion's data plan is carried into the Review; START trains what the tile promised
+		local buyCalls, buyCount = 0, 0
+		local origBuy = ui.binds.BuyData
+		ui.binds.BuyData = function(session, payload)
+			buyCalls += 1
+			buyCount += (payload and tonumber(payload.count)) or 0
+			return origBuy(session, payload)
+		end
+		local withPlan, flows = 0, 0
+		local function flow(label, state, k, expect, open)
+			local s, d = ui.use(state)
+			scaleData(d, k)
+			ui.push(); settle()
+			ui.Computer.open("lab"); settle()
+			local sug = expect(d, s)
+			if not sug then check(label .. ": a suggestion exists", false); return end
+			flows += 1
+			open(d); settle()
+			local primary = named("Primary")
+			check(label .. ": opens the Review with the suggestion's size/focus/plan", Studio.mode == "design" and view().state() == 6 and State.ui.sizeId == sug.sizeId and State.ui.focusId == sug.focusId and State.ui.recipeId == sug.recipeId and LabState.lineId == sug.target,
+				`{Studio.mode} {State.ui.sizeId}/{State.ui.focusId}/{State.ui.recipeId} vs {sug.sizeId}/{sug.focusId}/{sug.recipeId}`)
+			check(label .. ": Expected = the tile's promise ~" .. string.format("%.1f", sug.expected), named("ExpectedValue") and named("ExpectedValue").Text == string.format("~%.1f", sug.expected), named("ExpectedValue") and named("ExpectedValue").Text)
+			local plan = if sug.pick and sug.pick.plan.cost > 0 then sug.pick.plan else nil
+			if plan then
+				withPlan += 1
+				check(label .. ": primary = BUY DATA PLAN · " .. Parts.money(plan.cost), primary and primary.Text == "BUY DATA PLAN · " .. Parts.money(plan.cost), primary and primary.Text)
+				check(label .. ": the Review names the data plan", has(texts(), "Data plan: <b>" .. LP.planText(plan)) ~= nil and has(texts(), "after the data plan") ~= nil, has(texts(), "Data plan"))
+				-- the ON/OFF toggle: skip the plan and train on today's data (honest numbers both ways)
+				click(named("PlanToggle"))
+				local today = LP.estimate(d, { sizeId = sug.sizeId, focusId = sug.focusId, recipeId = sug.recipeId }, nil)
+				check(label .. ": plan OFF -> START with today's data (~" .. string.format("%.1f", today.overall) .. ")", named("Primary") and string.find(named("Primary").Text, "START TRAINING", 1, true) == 1 and named("ExpectedValue").Text == string.format("~%.1f", today.overall), named("ExpectedValue") and named("ExpectedValue").Text)
+				click(named("PlanToggle"))
+				primary = named("Primary")
+				check(label .. ": plan ON again -> BUY DATA PLAN", primary and string.find(primary.Text, "BUY DATA PLAN", 1, true) == 1, primary and primary.Text)
+				-- double tap before the State update (reviewer F2): the plan is bought once
+				local packs = 0
+				for _, n in plan.packs do packs += n end
+				buyCalls, buyCount = 0, 0
+				local sent0 = #sent
+				M.fire(primary.Activated)
+				local mid = primary.Text
+				M.fire(primary.Activated)
+				settle(0.6)
+				check(label .. ": the second tap of a double tap does not START either", #sent == sent0, `sent {#sent - sent0}, text after tap 1: {mid}`)
+				check(label .. `: a double tap buys the plan once ({buyCount} packs of {packs})`, buyCount == packs, buyCount)
+				ui.push(); settle()
+				primary = named("Primary")
+			end
+			check(label .. ": then START TRAINING", primary and string.find(primary.Text, "START TRAINING", 1, true) == 1, if primary then primary.Text else `no Primary: mode {Studio.mode} step {view() and view().state and view().state()} training {tostring(d.training ~= nil)}`)
+			click(primary)
+			check(label .. ": START trains exactly the promise (training.expected = tile ~X)", d.training ~= nil and string.format("%.1f", d.training.expected) == string.format("%.1f", sug.expected), `{d.training and d.training.expected} vs {sug.expected}`)
+		end
+		local function suggestNow(d, s) return LP.suggest(d, s.live, State.money(), false) end
+		for _, k in { 0.25, 0.12 } do
+			flow(`SUGGESTED tile (rich, {k * 100}% data)`, "rich", k, suggestNow, function() click(homeButton("SuccessorTile")) end)
+			flow(`SUGGESTED tile (full, {k * 100}% data)`, "full", k, suggestNow, function() click(homeButton("SuccessorTile")) end)
+			flow(`line SUCCESSOR (rich Consumer Chat, {k * 100}% data)`, "rich", k, function(d, s) return LP.lineSuccessor(d, s.live, "general", State.money(), false) end, function()
+				local want = ModelConfig.getLine("general").label
+				for _, x in ui.playerGui:GetDescendants() do
+					if x.Name == "LineSuccessor" and x:IsA("GuiButton") and visible(x) then
+						for _, y in x.Parent:GetChildren() do if y:IsA("TextLabel") and y.Text == want then click(x); return end end
+					end
+				end
+			end)
+		end
+		flow("NOW LIVE 'Design its successor' (rich Nova v2, 25% data)", "rich", 0.25, function(d, s) return LP.lineSuccessor(d, s.live, "general", State.money(), false) end, function(d)
+			Studio.open("live", { modelId = "nova2", target = "general" }); settle(1)
+			click(named("DesignSuccessor"))
+		end)
+		check(`suggestion flows ran ({flows}) and at least one carried a data plan ({withPlan})`, flows >= 7 and withPlan >= 1, `{flows} {withPlan}`)
+		ui.binds.BuyData = origBuy
+
+		-- B. blocking 2: training finished while the Computer was closed -> HUD card / Journey LAUNCH play the reveal
+		do
+			local Toast = M.require(Client.UI.Toast)
+			local toasts = {}
+			local origToast = Toast.show
+			Toast.show = function(kind, text, ...) table.insert(toasts, tostring(text)); return origToast(kind, text, ...) end
+			local s, d = ui.use("rich")
+			ui.Computer.close(); settle(0.5)
+			local function trainClosed(name)
+				local r = ui.binds.StartTraining(s, { name = name, sizeId = "s1b", focusId = "coding", recipeId = "steady", target = "developers" })
+				ui.push(); settle()
+				ui.AIModelService.finishNow(s)
+				ui.push(); settle(1)
+				return r and r.modelId
+			end
+			local id = trainClosed("Rx")
+			check("B: TRAINING_COMPLETE with the Computer closed stores the reveal", id ~= nil and LabState.reveals[id] ~= nil and not LabState.wasRevealed(id))
+			-- HUD card: Computer.open("lab", "release") + LabApp.openRelease(id) in the same frame
+			ui.Computer.open("lab", "release")
+			LabApp.openRelease(id)
+			settle(0.1)
+			check("B: HUD path (Computer.open lab/release + openRelease) shows the reveal, not Launch Day", Studio.mode == "reveal", Studio.mode)
+			LabApp.openRelease(id)
+			settle(3)
+			check("B: the reveal stays until the player leaves it", Studio.mode == "reveal" and named("Launch") ~= nil, Studio.mode)
+			click(named("Later"))
+			LabApp.openRelease(id); settle(1)
+			check("B: after the reveal, openRelease opens Launch Day", Studio.mode == "launch", Studio.mode)
+			-- Journey LAUNCH chip: Computer.open("lab", "release") alone
+			ui.Computer.close(); settle(0.5)
+			local id2 = trainClosed("Ry")
+			ui.Computer.open("lab", "release"); settle(0.1)
+			check("B: Journey LAUNCH path (Computer.open lab/release) shows the reveal of the new model", Studio.mode == "reveal" and LabState.revealing == id2, `{Studio.mode} {tostring(LabState.revealing)}`)
+			settle(3)
+			-- the HUD toast must not spoil the score (request lab #1, HUD is not a lab file)
+			local spoiler = nil
+			for _, t in toasts do if string.find(t, "Training complete", 1, true) and string.find(t, "%d") then spoiler = t end end
+			if spoiler then
+				note("OPEN request lab #1 (HUD owner): the TRAINING_COMPLETE toast still shows the score: '" .. spoiler .. "'")
+			else
+				check("B: the TRAINING_COMPLETE toast has no digits (no score spoiler)", #toasts > 0)
+			end
+			Toast.show = origToast
+			Studio.close()
+		end
+
+		-- C. blocking 3: × while START / LAUNCH / REFINE waits for the server leaves no input bound and the touch controls on
+		do
+			local function slow(name)
+				local orig = ui.binds[name]
+				ui.binds[name] = function(session, payload) task.wait(2); return orig(session, payload) end
+				return function() ui.binds[name] = orig end
+			end
+			local function closedClean(label, before)
+				settle(3)
+				check(label .. ": Computer closed, Studio closed, touch controls back on, nothing re-bound", Studio.mode == "closed" and not ui.Computer.isOpen() and GS.TouchControlsEnabled == true and binds14 == before,
+					`{Studio.mode} touch={tostring(GS.TouchControlsEnabled)} binds {binds14 - before}`)
+			end
+			touch = true
+			-- START
+			local s, d = ui.use("rich")
+			GS.TouchControlsEnabled = true
+			State.setSelection("s1b", "coding"); State.setRecipe("steady")
+			ui.Computer.open("lab"); settle()
+			Studio.open("design", { step = 6 }); settle()
+			check("C: touch controls off while the Studio is open", GS.TouchControlsEnabled == false)
+			local restore = slow("StartTraining")
+			M.fire(named("Primary").Activated); settle(0.5)
+			click(named("CloseComputer"))
+			local before = binds14
+			closedClean("C: × during STARTING…", before)
+			check("C: the training still started on the server", d.training ~= nil)
+			restore()
+			-- LAUNCH
+			s, d = ui.use("rich")
+			GS.TouchControlsEnabled = true
+			ui.Computer.open("lab"); settle()
+			LabApp.openRelease("study"); settle(2); ui.push(); settle()
+			view().setStep(3); settle(0.3)
+			restore = slow("ReleaseModel")
+			M.fire(named("LaunchButton").Activated); settle(0.5)
+			click(named("CloseComputer"))
+			before = binds14
+			closedClean("C: × during LAUNCHING…", before)
+			check("C: the model is live on the server", d.models.study.status == "live", d.models.study.status)
+			restore()
+			-- REFINE on the reveal
+			s, d = ui.use("rich")
+			GS.TouchControlsEnabled = true
+			ui.Computer.open("lab"); settle()
+			LabApp.openReveal("study"); settle(3)
+			restore = slow("ImproveModel")
+			local refineButton = named("Refine")
+			if refineButton and not disabled(refineButton) then
+				M.fire(refineButton.Activated); settle(0.5)
+				ui.Computer.close() -- the reveal has no × (ceremony): the player leaves with Esc / the HUD
+				settle(0.3)
+				before = binds14
+				closedClean("C: × during REFINE", before)
+			else
+				check("C: reveal REFINE is available in rich (study)", false)
+			end
+			restore()
+			-- a late open while the Computer is closed is ignored
+			ui.Computer.close(); settle(0.5)
+			before = binds14
+			Studio.open("design", {}); settle()
+			check("C: Studio.open with the Computer closed does nothing", Studio.mode == "closed" and binds14 == before and GS.TouchControlsEnabled == true)
+			touch = false
+		end
+
+		-- D. blocking 4: the desktop spec sheet shows the real ceiling, never below the expected value
+		do
+			local s, d = ui.use("rich")
+			State.setSelection("s1b", "coding"); State.setRecipe("deep"); LabState.lineId = "developers"
+			ui.Computer.open("lab"); settle()
+			Studio.open("design", { step = 2 }); settle()
+			view().setClass(false); settle(0.2)
+			local sel = { sizeId = "s1b", focusId = "coding", recipeId = "deep" }
+			local ceiling = LP.ceiling(d, sel)
+			local shown = LP.estimate(d, sel, nil).overall
+			local line = labelIn("SpecSheet", function(x) return string.find(x.Text, "Ceiling", 1, true) ~= nil end)
+			check("D: spec sheet 'Ceiling ~X' = LabPreview.ceiling (no 'Max score')", line ~= nil and string.find(line.Text, string.format("Ceiling ~%.1f with ideal data", ceiling), 1, true) == 1 and has(texts(), "Max score") == nil, line and line.Text)
+			check(string.format("D: ceiling %.1f >= the expected value %.1f next to it", ceiling, shown), ceiling + 1e-9 >= shown)
+			view().setClass(Studio.compact); settle(0.2)
+			Studio.close()
+		end
+
+		-- E. blocking 5: the reveal after refining a LIVE model ranks it in its live line, not its old plan
+		do
+			local s, d = ui.use("rich")
+			d.models.nova2.plan = "students"
+			ui.push(); settle()
+			ui.Computer.open("lab"); settle()
+			LabState.storeReveal({ modelId = "nova2", overall = d.models.nova2.overall, previousBest = 80, refinement = true, before = d.models.nova2.overall - 1 })
+			LabApp.openReveal("nova2"); settle(5)
+			local live = LP.segmentOf("general").label
+			local wrong = LP.segmentOf("students").label
+			check(`E: refined live Nova v2 is ranked for its live line ({live}), not its plan ({wrong})`, has(texts(), "for " .. live) ~= nil and has(texts(), "for " .. wrong) == nil, has(texts(), " for "))
+			Studio.close()
+		end
+
+		-- F. non-blocking fixes
+		do
+			-- first-model defaults once per session: the player's own pick survives ‹ LAB
+			local s, d = ui.use("starter")
+			ui.Computer.open("lab"); settle()
+			click(homeButton("DesignNewModel"))
+			check("F: first model opens at the Review with 100M", view().state() == 6 and State.ui.sizeId == "s100m")
+			click(named("Chip_2"))
+			click(named("Size_s500m"))
+			click(named("BackToLab"))
+			click(homeButton("DesignNewModel"))
+			check("F: reopening keeps the player's 500M and step 2 (defaults applied once)", State.ui.sizeId == "s500m" and view().state() == 2, `{State.ui.sizeId} step {view().state()}`)
+			-- Lab home copy for a first model
+			Studio.close(); settle()
+			local home = {}
+			for _, x in ui.playerGui:GetDescendants() do if x:IsA("TextLabel") and visible(x) then table.insert(home, x.Text) end end
+			check("F: Lab home 'First model · ready to start' (opens at the Review, not '6 steps')", has(home, "First model · ready to start") ~= nil)
+			-- locked size tiles read greyed out (title in C.dim), the reason stays
+			Studio.open("design", { step = 2 }); settle()
+			local dimTitle = labelIn("Size_s1b", function(x) return x.Text == Parts.sizeLabel("s1b") and x.TextColor3 == C.dim end)
+			check("F: locked 1B tile title is dimmed", dimTitle ~= nil)
+			-- plan meter: QUICK / STD / DEEP label and bars >= 16 x 24
+			click(named("Chip_4"))
+			local meterLabel = labelIn("PlanMeter", function(x) return x.Text == "STD" or x.Text == "QUICK" or x.Text == "DEEP" end)
+			local smallBar = math.huge
+			local meter = named("PlanMeter")
+			if meter then for _, x in meter:GetChildren() do if x:IsA("Frame") then smallBar = math.min(smallBar, x.Size.X.Offset, x.Size.Y.Offset) end end end
+			check("F: card plan meter has its plan name and bars >= 16 px", meterLabel ~= nil and smallBar >= 16, smallBar)
+			Studio.close()
+
+			-- NO_DATA: every step describes the after-plan data (step-3 fit = Expected's fit)
+			s, d = ui.use("fresh")
+			ui.Computer.open("lab"); settle()
+			click(homeButton("DesignNewModel"))
+			local sel = { sizeId = State.ui.sizeId, focusId = State.ui.focusId, recipeId = State.ui.recipeId }
+			local plan = LP.dataPlan(d, sel, State.money())
+			local shown = LP.estimate(LP.withStock(d, plan.stock), sel, nil)
+			local fit = MarketMath.fit(shown.stats, LP.segmentOf("general"))
+			click(named("Chip_3"))
+			local fitLine = labelIn("Focus_" .. sel.focusId, function(x) return string.find(x.Text, " fit ", 1, true) ~= nil end)
+			check(string.format("F: fresh step 3 fit of the picked focus = after-plan fit %.1f", fit), fitLine ~= nil and string.find(fitLine.Text, string.format(" fit %.1f", fit), 1, true) ~= nil, fitLine and fitLine.Text)
+			Studio.close()
+
+			-- refinement reveal counts up from its old score
+			s, d = ui.use("rich")
+			ui.Computer.open("lab"); settle()
+			local froms = {}
+			local origCount = Parts.countUp
+			Parts.countUp = function(label, from, to, secs) table.insert(froms, from); return origCount(label, from, to, secs) end
+			local m = d.models.study
+			LabState.storeReveal({ modelId = "study", overall = m.overall, previousBest = 50, refinement = true, before = m.overall - 3, expected = m.overall + 5 })
+			LabApp.openReveal("study"); settle(3)
+			Parts.countUp = origCount
+			check("F: refinement count-up starts at the old score (not the server's placeholder)", froms[1] ~= nil and math.abs(froms[1] - (m.overall - 3)) < 1e-9, froms[1])
+
+			-- a finished training while designing: a READY banner, no mode switch; the banner opens the reveal
+			s, d = ui.use("rich")
+			State.setSelection("s1b", "coding"); State.setRecipe("steady")
+			ui.Computer.open("lab"); settle()
+			Studio.open("design", { step = 3 }); settle()
+			local r = ui.binds.StartTraining(s, { name = "Bn", sizeId = "s100m", focusId = "creative", recipeId = "steady", target = "students" })
+			ui.push(); settle()
+			ui.AIModelService.finishNow(s); ui.push(); settle(1)
+			check("F: TRAINING_COMPLETE while designing keeps the step and shows the READY banner", Studio.mode == "design" and view().state() == 3 and Studio.bannerShown() and named("ReadyBanner") ~= nil, `{Studio.mode} {Studio.bannerShown()}`)
+			click(named("ReadyBanner"))
+			check("F: the banner opens the reveal of that model", Studio.mode == "reveal" and LabState.revealing == (r and r.modelId), Studio.mode)
+			Studio.close()
+
+			-- paused training: the close button says what happens
+			s, d = ui.use("rich")
+			ui.binds.StartTraining(s, { name = "Pz", sizeId = "s1b", focusId = "coding", recipeId = "steady", target = "developers" })
+			d.training.eventRolled = true
+			d.training.event = { id = "data_issue", pending = true, expiresAt = G.workspace:GetServerTimeNow() + 18, outcome = nil }
+			ui.push(); settle()
+			ui.Computer.open("lab"); settle()
+			Studio.open("training", {}); settle()
+			local closeText = named("CloseKeepTraining") and named("CloseKeepTraining").Text
+			check("F: paused training: 'CLOSE · auto-picks … in N s'", closeText ~= nil and string.find(closeText, "CLOSE · auto-picks", 1, true) == 1, closeText)
+			Studio.close()
+
+			-- gamepad: selection stays inside the Studio; on close the Lab home's DESIGN NEW MODEL is selected
+			pad = true
+			s, d = ui.use("rich")
+			ui.Computer.open("lab"); settle()
+			Studio.open("design", { step = 1 }); settle()
+			local root = studioRoot()
+			check("F: Studio root is a SelectionGroup that stops at its edges", root.SelectionGroup == true and root.SelectionBehaviorUp == Enum.SelectionBehavior.Stop and root.SelectionBehaviorDown == Enum.SelectionBehavior.Stop and root.SelectionBehaviorLeft == Enum.SelectionBehavior.Stop and root.SelectionBehaviorRight == Enum.SelectionBehavior.Stop)
+			click(named("BackToLab"))
+			check("F: gamepad close selects DESIGN NEW MODEL", GS.SelectedObject ~= nil and GS.SelectedObject.Name == "DesignNewModel", GS.SelectedObject and GS.SelectedObject.Name)
+			pad = false
+
+			-- cash after START below the safety reserve: warn colour + reason; a picked colour is cleared after START
+			s, d = ui.use("rich")
+			State.setSelection("s1b", "coding"); State.setRecipe("steady"); LabState.lineId = "developers"
+			local cost = LP.estimate(d, { sizeId = "s1b", focusId = "coding", recipeId = "steady" }, nil).cost
+			local reserve = LP.reserve(d)
+			d.money = cost + reserve / 2
+			ui.push(); settle()
+			ui.Computer.open("lab"); settle()
+			Studio.open("design", { step = 5 }); settle()
+			local colorTile = nil
+			for _, x in studioRoot():GetDescendants() do if x:IsA("GuiButton") and string.sub(x.Name, 1, 6) == "Color_" and visible(x) then colorTile = x; break end end
+			click(colorTile)
+			check("F: a picked colour is stored", LabState.colorId ~= nil)
+			click(named("Chip_6"))
+			local warnLine = has(texts(), "below your " .. Parts.money(reserve) .. " safety reserve")
+			local cashTile = nil
+			local cap = labelIn("StepPanel", function(x) return x.Text == "CASH AFTER" end)
+			if cap then for _, x in cap.Parent:GetChildren() do if x:IsA("TextLabel") and x ~= cap and string.find(x.Text, "$", 1, true) then cashTile = x end end end
+			check("F: cash after < reserve: warning line + warn colour", warnLine ~= nil and cashTile ~= nil and cashTile.TextColor3 == C.warn, warnLine)
+			click(named("Primary"))
+			check("F: START sent the look, then the colour is cleared for the next design", sent[#sent] and sent[#sent].look ~= nil and LabState.colorId == nil and LabState.emblem == nil, sent[#sent] and sent[#sent].look)
+			Studio.close()
+
+			-- ceremony caption sits left (out of the top-centre toast lane)
+			local ct = studioRoot():FindFirstChild("CenterTitle", true)
+			check("F: ceremony title is left-aligned at x 172 (toast lane free)", ct ~= nil and ct.Position.X.Scale == 0 and ct.Position.X.Offset == 172 and ct.TextXAlignment == Enum.TextXAlignment.Left)
+
+			-- the Lab home does not re-render under the open Studio
+			s, d = ui.use("rich")
+			ui.Computer.open("lab"); settle()
+			local calls = 0
+			local origSuggest = LP.suggest
+			LP.suggest = function(...) calls += 1; return origSuggest(...) end
+			Studio.open("design", { step = 1 }); settle()
+			for _ = 1, 3 do d.money += 5000; ui.push(); settle(0.2) end
+			local whileOpen = calls
+			Studio.close(); settle()
+			LP.suggest = origSuggest
+			check(`F: no Lab home render while the Studio is open ({whileOpen} suggest calls), one after closing ({calls})`, whileOpen == 0 and calls >= 1, `{whileOpen} {calls}`)
+
+			-- breakdown: the spec bonus names its stat, 'quality factor' next to the data's quality
+			s, d = ui.use("rich")
+			State.setSelection("s1b", "coding"); State.setRecipe("steady"); LabState.lineId = "developers"
+			ui.Computer.open("lab"); settle()
+			Studio.open("design", { step = 6 }); settle()
+			view().setClass(false); settle(0.2)
+			check("F: breakdown says '" .. LP.specBonusText("general") .. "' and 'quality factor'", has(texts(), LP.specBonusText("general")) ~= nil and has(texts(), "quality factor") ~= nil, has(texts(), "Bonuses"))
+			view().setClass(Studio.compact); settle(0.2)
+			Studio.close()
+		end
 	end
 
 	------------------------------------------------------------------ 12. performance (soft)

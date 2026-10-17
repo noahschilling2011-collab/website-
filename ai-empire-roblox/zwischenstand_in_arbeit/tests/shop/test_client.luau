@@ -121,27 +121,37 @@ local function body()
 		return table.concat(out, " | ")
 	end
 	local function toastHas(text) return string.find(toasts(), text, 1, true) ~= nil end
-	local function buttonOf(card) return card and card:FindFirstChildWhichIsA("TextButton") end
+	-- shop package (SHOP_SPEC 5.1): a row's buy control is its price chip "Price"; a YOUR ITEMS segment's is "Go"
+	local function buttonOf(card) return card and (named(card, "Price") or named(card, "Go") or card:FindFirstChildWhichIsA("TextButton")) end
 	local function click(button) if button then M.fire(button.Activated) end end
+	local function textIn(root, pred) return find(root, function(x) return x:IsA("TextLabel") and pred(x.Text) end) end
 
 	------------------------------------------------------------------ registration
-	local shopContainer = find(overlay, function(x) return x:IsA("Frame") and x.Name == "shop" end)
+	-- shop package: the Shop is 5 native Menu pages (Page_shop_home ... Page_shop_extras), Home first
+	local shopContainer = find(overlay, function(x) return x:IsA("Frame") and x.Name == "Page_shop_home" end)
 	check("Shop app registered in the computer", shopContainer ~= nil)
+	local menuFrame = find(overlay, function(x) return x.Name == "Content" end)
 	local navTitle = find(overlay, function(x) return x:IsA("TextLabel") and x.Text == "Shop" and x.Parent and x.Parent:IsA("TextButton") end)
 	check("Shop button in the sidebar", navTitle ~= nil)
-	local navStatus = navTitle and find(navTitle.Parent, function(x) return x:IsA("TextLabel") and x ~= navTitle and x.Position.Y.Offset == 32 end)
-	check("sidebar status: Coming soon with every id at 0", navStatus and navStatus.Text == "Coming soon", navStatus and navStatus.Text)
+	-- menu package (ONBOARDING_SPEC B): the sidebar became the Menu rail (icon + label, no status line); the shop's
+	-- status text is still ShopApp.status (the shop package decides where it shows)
+	check("Shop entry in the Menu rail", navTitle ~= nil and navTitle.Parent.Name == "Rail_shop", navTitle and navTitle.Parent.Name)
+	local function shopStatus() local text = ShopApp.status(State.snapshot); return text end
+	check("shop status: Coming soon with every id at 0", shopStatus() == "Coming soon", shopStatus())
 
 	------------------------------------------------------------------ every id 0
 	Computer.open("shop")
 	M.settle(0.5)
-	check("computer opens the shop", Computer.isOpen() and shopContainer.Visible == true)
+	check("computer opens the shop", Computer.isOpen() and shopContainer.Visible == true and Computer.current() == "shop.home")
 	local soon = named(shopContainer, "ComingSoon")
 	check("'Shop coming soon' shown", soon and soon.Visible == true and find(soon, function(x) return x:IsA("TextLabel") and x.Text == "Shop coming soon" end) ~= nil)
 	check("no Roblox price lookups with every id at 0", clientMarket.infoCalls == 0)
-	local anyCard = find(shopContainer, function(x) return (string.match(x.Name, "^Product_") or string.match(x.Name, "^Pass_")) and x.Visible end)
-	check("no item card visible", anyCard == nil)
+	local function anyCardVisible()
+		return find(menuFrame, function(x) return (string.match(x.Name, "^Product_") or string.match(x.Name, "^Pass_")) and visibleChain(x) end)
+	end
+	check("no item card visible", anyCardVisible() == nil)
 	check("no empty-state card", named(shopContainer, "NothingNow").Visible == false)
+	check("live with every id 0: only the Home tab", ShopApp.tabVisible("home") and not ShopApp.tabVisible("speedups") and not ShopApp.tabVisible("extras"))
 
 	------------------------------------------------------------------ ids set
 	local IDS = { seed = 1001, seriesA = 1002, headhunter = 1004, party = 1005, tip = 1006 }
@@ -153,30 +163,34 @@ local function body()
 	Shop.revenueMultiplier(session) -- the market applies the multiplier -> investor sellable
 	push()
 	Computer.close(); M.settle(0.3)
-	Computer.open("shop")
+	Computer.open("shop", "extras")
 	M.settle(1)
+	local extras = find(overlay, function(x) return x:IsA("Frame") and x.Name == "Page_shop_extras" end)
 	check("prices fetched once per listed item", clientMarket.infoCalls == 8, clientMarket.infoCalls)
 	check("coming soon gone once something is listed", soon.Visible == false)
-	local seed = named(shopContainer, "Product_seed")
-	check("seed card visible with the Roblox price", seed and seed.Visible and buttonOf(seed).Text == "Buy · R$ 49", seed and buttonOf(seed).Text)
-	local seedInfo = seed and find(seed, function(x) return x:IsA("TextLabel") and string.find(x.Text, "company cash at your current office", 1, true) end)
-	check("seed card shows the stage-2 amount", seedInfo and string.find(seedInfo.Text, "+$25K", 1, true) ~= nil, seedInfo and seedInfo.Text) -- econ: 0.25 x Startup Campus $100,000 (CORE_SPEC 2.1)
-	check("failed price lookup: card hidden", named(shopContainer, "Product_seriesA").Visible == false)
-	check("no price from Roblox: card hidden", named(shopContainer, "Pass_investor").Visible == false)
-	check("id 0 item hidden", named(shopContainer, "Product_seriesB").Visible == false and named(shopContainer, "Pass_limo").Visible == false)
-	check("headhunter hidden until redeemable on the server", named(shopContainer, "Product_headhunter").Visible == false)
-	check("party + tip + vip + founder suite visible", named(shopContainer, "Product_party").Visible and named(shopContainer, "Product_tip").Visible and named(shopContainer, "Pass_vip").Visible and named(shopContainer, "Pass_founderSuite").Visible)
-	check("section headers follow their cards", find(shopContainer, function(x) return x:IsA("TextLabel") and x.Text == "Company cash" and x.Visible end) ~= nil
-		and find(shopContainer, function(x) return x:IsA("TextLabel") and x.Text == "Your vouchers" and x.Visible end) == nil)
+	local seed = named(extras, "Product_seed")
+	check("seed card visible with the Roblox price", seed and seed.Visible and buttonOf(seed).Text == "R$ 49", seed and buttonOf(seed).Text)
+	local seedInfo = seed and textIn(seed, function(t) return string.find(t, "company cash now", 1, true) ~= nil end)
+	-- shop package (owner decision S1): 10 % of the next office (Startup Campus $100,000), one per office
+	check("seed card shows the stage-2 amount", seedInfo and string.find(seedInfo.Text, "+$10,000", 1, true) ~= nil and string.find(seedInfo.Text, "10 % of the Startup Campus price", 1, true) ~= nil, seedInfo and seedInfo.Text)
+	check("failed price lookup: card hidden", named(extras, "Product_seriesA").Visible == false)
+	check("no price from Roblox: card hidden", named(extras, "Pass_investor").Visible == false)
+	check("id 0 item hidden", named(extras, "Product_seriesB").Visible == false and named(extras, "Pass_limo").Visible == false)
+	check("headhunter hidden until redeemable on the server", named(extras, "Product_headhunter").Visible == false)
+	local style = find(overlay, function(x) return x:IsA("Frame") and x.Name == "Page_shop_style" end)
+	check("party + tip + vip + founder suite visible", named(style, "Product_party").Visible and named(extras, "Product_tip").Visible and named(style, "Pass_vip").Visible and named(style, "Pass_founderSuite").Visible)
+	check("section headers follow their cards", textIn(extras, function(t) return t == "COMPANY CASH" end) ~= nil and visibleChain(textIn(extras, function(t) return t == "COMPANY CASH" end))
+		and named(shopContainer, "YourItems").Visible == false)
+	check("empty tabs hidden (Speed-ups / Boosts have no listed item), Extras / Style shown", not ShopApp.tabVisible("speedups") and not ShopApp.tabVisible("boosts") and ShopApp.tabVisible("extras") and ShopApp.tabVisible("style"))
 	-- retry of a failed lookup only after PRICE_RETRY_SECONDS
-	Computer.close(); M.settle(0.3); Computer.open("shop"); M.settle(0.5)
+	Computer.close(); M.settle(0.3); Computer.open("shop", "extras"); M.settle(0.5)
 	check("failed lookup not retried at once", clientMarket.infoCalls == 8)
 
 	------------------------------------------------------------------ buying opens Roblox, grants nothing
 	local money0 = session.data.money
 	click(buttonOf(seed))
 	check("Buy -> PromptProductPurchase with the product id", #clientMarket.prompts == 1 and clientMarket.prompts[1].kind == "product" and clientMarket.prompts[1].id == 1001 and clientMarket.prompts[1].player == localPlayer)
-	click(buttonOf(named(shopContainer, "Pass_vip")))
+	click(buttonOf(named(style, "Pass_vip")))
 	check("Buy pass -> PromptGamePassPurchase with the pass id", #clientMarket.prompts == 2 and clientMarket.prompts[2].kind == "pass" and clientMarket.prompts[2].id == 2001)
 	local before = #calls
 	M.fire(clientMarket.PromptProductPurchaseFinished, OWNER, 1001, true)
@@ -186,13 +200,15 @@ local function body()
 	-- the real grant: Roblox calls ProcessReceipt on the server
 	local decision = Shop.processReceipt({ PurchaseId = "ui-1", PlayerId = OWNER, ProductId = 1001 })
 	M.settle(0.3)
-	check("server grant", decision == Enum.ProductPurchaseDecision.PurchaseGranted and session.data.money == money0 + 25000) -- econ: CORE_SPEC 2.1 prices
-	check("grant toast from the server's Notify", toastHas("Thank you! +$25K"), toasts())
+	check("server grant", decision == Enum.ProductPurchaseDecision.PurchaseGranted and session.data.money == money0 + 10000) -- S1: 0.10 x $100,000
+	check("grant toast from the server's Notify", toastHas("Thank you! +$10K"), toasts())
+	push()
+	check("S1: one Seed round per office -> its row says so and has no buy chip", textIn(seed, function(t) return t == "Bought for this office ✓" end) ~= nil and buttonOf(seed).Visible == false)
 
 	------------------------------------------------------------------ passes: owned
 	M.fire(serverMarket.PromptGamePassPurchaseFinished, localPlayer, 2001, true)
 	push()
-	local vipButton = buttonOf(named(shopContainer, "Pass_vip"))
+	local vipButton = buttonOf(named(style, "Pass_vip"))
 	check("owned pass says Owned", vipButton.Text == "✓ Owned" and vipButton:GetAttribute("Disabled") == true and vipButton.TextTransparency == 0)
 	click(vipButton)
 	check("owned pass: no second prompt", #clientMarket.prompts == 2)
@@ -200,52 +216,54 @@ local function body()
 	check("VIP badge in the computer header", badge and badge.Visible == true)
 	-- every group header must sit directly above its own first card (LayoutOrder), not stacked at the top
 	do
-		local function orderOf(pred) local x = find(shopContainer, pred); return if x then x.LayoutOrder else nil end
-		local cashHeader = orderOf(function(x) return x:IsA("TextLabel") and x.Text == "Company cash" end)
-		local seed = orderOf(function(x) return x.Name == "Product_seed" end)
-		local tipHeader = orderOf(function(x) return x:IsA("TextLabel") and x.Text == "Support the developer" end)
+		local function orderOf(pred) local x = find(extras, pred); return if x then x.LayoutOrder else nil end
+		local cashHeader = orderOf(function(x) return x.Name == "Section" and textIn(x, function(t) return t == "COMPANY CASH" end) ~= nil end)
+		local seedOrder = orderOf(function(x) return x.Name == "Product_seed" end)
+		local tipHeader = orderOf(function(x) return x.Name == "Section" and textIn(x, function(t) return t == "SUPPORT THE DEVELOPER" end) ~= nil end)
 		local firstTip = nil
-		for _, x in shopContainer:GetDescendants() do
+		for _, x in extras:GetDescendants() do
 			if x.Name:match("^Product_tip") and (firstTip == nil or x.LayoutOrder < firstTip) then firstTip = x.LayoutOrder end
 		end
-		check("cash header directly above the cash cards", cashHeader ~= nil and seed ~= nil and seed == cashHeader + 1, tostring(cashHeader) .. "/" .. tostring(seed))
-		check("support header above the tip cards", tipHeader ~= nil and firstTip ~= nil and tipHeader < firstTip and (seed or 0) < tipHeader)
+		check("cash header directly above the cash cards", cashHeader ~= nil and seedOrder ~= nil and seedOrder == cashHeader + 1, tostring(cashHeader) .. "/" .. tostring(seedOrder))
+		check("support header above the tip cards", tipHeader ~= nil and firstTip ~= nil and tipHeader < firstTip and (seedOrder or 0) < tipHeader)
 	end
 
-	check("pass toast", toastHas("VIP Founder is now active"), toasts())
+	check("pass toast", toastHas("VIP Founder is yours."), toasts())
 	M.fire(clientMarket.PromptGamePassPurchaseFinished, localPlayer, 2003, true)
 	M.settle(1.5)
 	local rechecked = false
 	for _, c in calls do if c.name == "ShopAction" and c.payload.action == "status" and c.payload.recheck == true then rechecked = true end end
 	check("client pass purchase asks the server to recheck", rechecked)
 
-	------------------------------------------------------------------ vouchers
-	check("party voucher card hidden without a voucher", named(shopContainer, "Voucher_party").Visible == false)
+	------------------------------------------------------------------ vouchers (YOUR ITEMS on Shop → Home)
+	Computer.open("shop", "home"); M.settle(0.5)
+	local function segment(key) return named(shopContainer, "Voucher_" .. key) end
+	check("party voucher card hidden without a voucher", segment("party") == nil or not visibleChain(segment("party")))
 	Shop.processReceipt({ PurchaseId = "ui-2", PlayerId = OWNER, ProductId = 1005 })
 	Shop.processReceipt({ PurchaseId = "ui-3", PlayerId = OWNER, ProductId = 1005 })
 	push()
-	local partyCard = named(shopContainer, "Voucher_party")
-	check("voucher card shows the count", partyCard.Visible and find(partyCard, function(x) return x:IsA("TextLabel") and x.Text == "Team party voucher ×2" end) ~= nil)
-	check("vouchers header visible", find(shopContainer, function(x) return x:IsA("TextLabel") and x.Text == "Your vouchers" and x.Visible end) ~= nil)
-	check("sidebar status counts vouchers", navStatus.Text == "2 vouchers to redeem", navStatus.Text)
-	check("redeem button ready", buttonOf(partyCard).Text == "Redeem")
+	local partyCard = segment("party")
+	check("voucher card shows the count", partyCard and partyCard.Visible and textIn(partyCard, function(t) return t == "Team party ×2" end) ~= nil)
+	check("vouchers header visible", named(shopContainer, "YourItems").Visible and textIn(shopContainer, function(t) return t == "YOUR ITEMS" end) ~= nil)
+	check("shop status counts vouchers", shopStatus() == "2 items to use", shopStatus())
+	check("redeem button ready", buttonOf(partyCard).Text == "REDEEM")
 	-- redeem without a plot: server refuses, voucher kept, error toast
 	click(buttonOf(partyCard)); M.settle(0.5)
 	check("redeem refused without a plot: voucher kept", session.data.shop.vouchers.party == 2)
 	local office = Instance.new("Model"); office.Name = "Office"; office:SetAttribute("OfficeTier", 2); office.Parent = G.workspace
 	plots[localPlayer] = { office = office, cframe = G.CFrame.new(), model = office }
-	click(buttonOf(partyCard)); M.settle(0.5)
+	click(buttonOf(segment("party"))); M.settle(0.5)
 	check("redeem through the UI: party built, one voucher used", office:FindFirstChild("TeamParty") ~= nil and session.data.shop.vouchers.party == 1)
 	check("redeem toast", toastHas("Party time"), toasts())
-	check("voucher card updates", find(partyCard, function(x) return x:IsA("TextLabel") and x.Text == "Team party voucher" end) ~= nil)
+	check("voucher card updates", textIn(segment("party"), function(t) return t == "Team party ×1" end) ~= nil)
 	-- a voucher the server can't redeem yet: shown, but disabled
 	session.data.shop.vouchers.headhunter = 1
 	push()
-	local hh = named(shopContainer, "Voucher_headhunter")
-	check("headhunter voucher shown but not redeemable yet", hh.Visible and buttonOf(hh).Text == "Available soon" and buttonOf(hh):GetAttribute("Disabled") == true)
+	local hh = segment("headhunter")
+	check("headhunter voucher shown but not redeemable yet", hh and hh.Visible and buttonOf(hh).Text == "LATER" and buttonOf(hh):GetAttribute("Disabled") == true)
 	Shop.setRedeemHandler("headhunter", function() return true end)
 	push()
-	check("headhunter redeemable once the handler exists", buttonOf(hh).Text == "Redeem" and named(shopContainer, "Product_headhunter").Visible == true)
+	check("headhunter redeemable once the handler exists", buttonOf(segment("headhunter")).Text == "REDEEM" and named(extras, "Product_headhunter").Visible == true)
 
 	------------------------------------------------------------------ tips
 	Shop.processReceipt({ PurchaseId = "ui-4", PlayerId = OWNER, ProductId = 1006 })

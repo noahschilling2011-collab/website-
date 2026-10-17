@@ -46,6 +46,16 @@ for t in 1 2 3 4; do run "life_t$t" $L tests/life/test_life.luau -a "$t"; done
 python3 harness/make_manifest.py --src work/src --gen harness/.gen_shop >/dev/null
 run shop              bash -c 'cd tests/shop && ../../tools/luau test_shop.luau -a .gen_shop'
 run shop_client       bash -c 'cd tests/shop && ../../tools/luau test_client.luau -a .gen_shop'
+# shop package round 3 (requests/onboarding.md #6, added by onbshop_fix1): SHOP_SPEC catalogue texts come from $ROOT/design
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_shop2 >/dev/null
+python3 tests/shop2/spec_texts.py "$ROOT/design/SHOP_SPEC.md" work/src tests/shop2/.spec_texts.luau >/dev/null
+for t in server math client; do run "shop2_$t" bash -c "cd tests/shop2 && ../../tools/luau test_$t.luau -a .gen_shop2"; done
+# menu package ("First steps" guide, Menu shell, Home; ONBOARDING_SPEC A + B, added by onbshop_fix1)
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_menu >/dev/null
+python3 tests/menu/routes.py >/dev/null
+run menu_server       bash -c "cd tests/menu && ../../tools/luau test_server.luau -a .gen_menu"
+run menu_client_guide bash -c "cd tests/menu && ../../tools/luau test_client.luau -a .gen_menu guide"
+run menu_client_menu  bash -c "cd tests/menu && ../../tools/luau test_client.luau -a .gen_menu menu"
 python3 harness/make_manifest.py --src work/src --gen harness/.gen_world >/dev/null
 for t in cityplan build travel vehicle client; do run "world_$t" $L tests/world/test_$t.luau -a .gen_world; done
 python3 tests/buildings/mkharness.py >/dev/null
@@ -87,3 +97,28 @@ python3 harness/make_manifest.py --src work/src --gen harness/.gen_apps >/dev/nu
 for st in garage client save mid rich phone; do run "apps_ui_$st" bash -c "cd tests/apps && ../../tools/luau test_ui.luau -a .gen_apps $st"; done
 for st in garage mid rich; do run "apps_server_$st" bash -c "cd tests/apps && ../../tools/luau test_server.luau -a .gen_apps $st"; done
 for sc in garage_edge stage5 rackfull oldsave many spam midnight broke hr; do run "apps_adv_$sc" bash -c "cd tests/apps && ../../tools/luau test_adv.luau -a .gen_apps $sc"; done
+# ---- round-2b package suites (added by verify2b, 2026-10-17; commands from design/requests/{drivers,guests_jet,itinerary}.md)
+# drivers (drivers.md #2): DrivePlan, DriverService, DriveController, review scenarios R1-R8 / V1-V4, car clearance sweep
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_drivers >/dev/null
+run drivers_plan      bash -c "cd tests/drivers && ../../tools/luau test_plan.luau -a .gen_drivers"
+run drivers_service   bash -c "cd tests/drivers && ../../tools/luau test_service.luau -a .gen_drivers"
+run drivers_client    bash -c "cd tests/drivers && ../../tools/luau test_client.luau -a .gen_drivers"
+run drivers_review    bash -c "cd tests/drivers && ../../tools/luau test_review.luau -a .gen_drivers"
+run drivers_review_cl bash -c "cd tests/drivers && ../../tools/luau test_review_client.luau -a .gen_drivers"
+run drivers_clearance bash tests/drivers/clearance.sh
+# guests_jet (guests_jet.md #1): company jet (JetService + JetController + the separation sweep), hotel guests +
+# terminal passengers (GuestPlan + GuestController), airliners unchanged + bizjet budgets, hotel walks vs tiers 2-4,
+# jet hull + walks vs the world (~4 min)
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_gj >/dev/null
+run guests_jet_jet      bash -c "cd tests/guests_jet && ../../tools/luau test_jet.luau -a .gen_gj"
+run guests_jet_guests   bash -c "cd tests/guests_jet && ../../tools/luau test_guests.luau -a .gen_gj"
+run guests_jet_aircraft bash tests/guests_jet/aircraft.sh
+run guests_jet_geometry bash tests/guests_jet/run.sh --geometry-only
+# itinerary (itinerary.md #6 + fix round 2): ItineraryMath, ItineraryService scenarios, ItineraryController, review regressions
+python3 harness/make_manifest.py --src work/src --gen harness/.gen_itinerary >/dev/null
+run itinerary_math    bash -c "cd tests/itinerary && ../../tools/luau test_math.luau -a .gen_itinerary"
+for sc in abroad jet region offer edge remote; do run "itinerary_$sc" bash -c "cd tests/itinerary && ../../tools/luau test_service.luau -a .gen_itinerary $sc"; done
+run itinerary_client  bash -c "cd tests/itinerary && ../../tools/luau test_client.luau -a .gen_itinerary"
+for sc in race offerwait cabin cabinctl paidticket garage stalecall abroadstart two midnight leave respawn spam endflight overhold stage5 rigcost timed together jettogether perf; do run "itinerary_review_$sc" bash -c "cd tests/itinerary && ../../tools/luau test_review.luau -a .gen_itinerary $sc"; done
+# release e2e (verify2b): two founders on one server, the whole abroad business trip (shuttle / own jet) + one decline
+run trip_e2e          bash -c "cd tests/verify2b && ../../tools/luau test_trip_e2e.luau -a .gen_itinerary"

@@ -19,6 +19,7 @@ local CompanyConfig = require(Shared.Config.CompanyConfig)
 local ModelMath = require(Shared.ModelMath)
 local EmpireMath = require(Shared.EmpireMath)
 local MarketMath = require(Shared.MarketMath)
+local Format = require(Shared.Format)
 local Types = require(Shared.Types)
 
 type PlayerData = Types.PlayerData
@@ -75,8 +76,6 @@ export type LineStatus = {
 }
 
 export type Preset = { sizeId: string, recipeId: string, estimate: Estimate }
-
-export type Successor = { target: string, name: string, focusId: string, sizeId: string, recipeId: string, model: ModelData }
 
 export type RefineCheck = { ok: boolean, err: string?, reason: string?, cost: number?, runs: number }
 
@@ -466,15 +465,17 @@ function LabPreview.sameAsLast(data: PlayerData): { sizeId: string, focusId: str
 	return nil
 end
 
--- The size and plan the successor suggestions use (SUCCESSOR tile, line SUCCESSOR buttons, "Design its
--- successor"). LAB_SPEC 8.1 step 4: with BEST I CAN AFFORD as the default, the --ui-defaults economy run moved the
--- Startup Campus more than 10 % later in 2 of 12 runs (agents/lab/BALANCE.md), so the suggestions use the economy
--- bot's rule (agents/corefix/sim.luau tryTrain), step by step: from the largest size down, the first one without a
--- lock that the servers can carry (fits: the line's users on the new size stay within 110 % of capacity), that the
--- cash above the reserve pays for (Save mode: 30 % of it) and that, after its data plan, beats the line's current
--- model (overall minus age) by 3 points; then Deep when the data after the plan is enough (half of the size's need,
--- 60 % quality) and the cash left above the reserve pays for it. BEST I CAN AFFORD stays a visible preset.
+-- The size and plan the suggestions use (SUGGESTED tile, line SUCCESSOR buttons, "Design its successor").
+-- LAB_SPEC 8.1 step 4: with BEST I CAN AFFORD as the default, the --ui-defaults economy run moved the Startup Campus
+-- more than 10 % later in 2 of 12 runs (agents/lab/BALANCE.md), so the suggestions use the economy bot's rule
+-- (agents/corefix/sim.luau tryTrain), step by step: from the largest size down, the first one without a lock that the
+-- servers can carry (serverFits), that the cash above the reserve pays for (Save mode: 30 % of it) and that, after
+-- its data plan, beats the line's current model (overall minus age) by 3 points; then Deep when the data after the
+-- plan is enough (half of the size's need, 60 % quality) and the cash left above the reserve pays for it. The data
+-- plan is part of the suggestion: the Review offers it as BUY DATA PLAN before START (fix round 1: the 2-tap path
+-- used to train on today's data while the gate assumed the plan). BEST I CAN AFFORD stays a visible preset.
 export type SuccessorPick = { sizeId: string, recipeId: string, plan: DataPlan, current: number }
+
 local function effective(model: ModelData?): number
 	if not model then
 		return 0
@@ -483,17 +484,42 @@ local function effective(model: ModelData?): number
 	local vage = if typeof(market) == "table" then tonumber(market.vage) or 0 else 0
 	return model.overall - ModelMath.ageFit(vage)
 end
-function LabPreview.successorPick(data: PlayerData, live: Types.LiveInfo?, target: string, focusId: string, money: number, saveMode: boolean): SuccessorPick?
+
+-- Server capacity check of the bot (sim.luau fits): a bigger size in a live line needs its extra serving units
+-- for the line's users, a new line its share of today's load; both within 110 % of the capacity.
+function LabPreview.serverFits(data: PlayerData, live: Types.LiveInfo?, target: string): (sizeId: string) -> boolean
 	local units = MarketConfig.SERVE_UNITS
 	local cap = if live and typeof(live.capacity) == "number" then live.capacity else math.huge
 	local load = if live and typeof(live.load) == "number" then live.load else 0
 	local nLive = 0
 	local lineModel: ModelData? = nil
-	local best: ModelData? = nil
 	for _, id in data.modelOrder do
 		local m = data.models[id]
 		if m and m.status == "live" then
 			nLive += 1
+			if not lineModel and m.release and m.release.target == target then
+				lineModel = m
+			end
+		end
+	end
+	local lm = lineModel
+	local lineUsers = if lm and lm.market then MarketMath.totalUsers(lm.market) else 0
+	return function(sizeId: string): boolean
+		local uNew = units[sizeId] or 1
+		if lm then
+			local uOld = units[lm.sizeId] or 1
+			return uNew <= uOld or load + lineUsers * (uNew - uOld) <= cap * 1.1
+		end
+		return load + load / math.max(1, nLive) * uNew <= cap * 1.1
+	end
+end
+
+function LabPreview.successorPick(data: PlayerData, live: Types.LiveInfo?, target: string, focusId: string, money: number, saveMode: boolean): SuccessorPick?
+	local lineModel: ModelData? = nil
+	local best: ModelData? = nil
+	for _, id in data.modelOrder do
+		local m = data.models[id]
+		if m and m.status == "live" then
 			if not lineModel and m.release and m.release.target == target then
 				lineModel = m
 			end
@@ -504,15 +530,7 @@ function LabPreview.successorPick(data: PlayerData, live: Types.LiveInfo?, targe
 	end
 	local lm = lineModel
 	local current = if lm then effective(lm) elseif best then math.max(0, effective(best) - 12) else 0
-	local lineUsers = if lm and lm.market then MarketMath.totalUsers(lm.market) else 0
-	local function fits(sizeId: string): boolean
-		local uNew = units[sizeId] or 1
-		if lm then
-			local uOld = units[lm.sizeId] or 1
-			return uNew <= uOld or load + lineUsers * (uNew - uOld) <= cap * 1.1
-		end
-		return load + load / math.max(1, nLive) * uNew <= cap * 1.1
-	end
+	local fits = LabPreview.serverFits(data, live, target)
 	local reserve = LabPreview.reserve(data)
 	for k = #ModelConfig.SIZES, 1, -1 do
 		local size = ModelConfig.SIZES[k]
@@ -537,33 +555,154 @@ function LabPreview.successorPick(data: PlayerData, live: Types.LiveInfo?, targe
 	return nil
 end
 
--- The live line that lost the most fit to age (ties: model order): its name and focus, the size and plan of
--- successorPick.
-function LabPreview.successor(data: PlayerData, money: number, saveMode: boolean, live: Types.LiveInfo?): Successor?
-	local pick: ModelData? = nil
-	local pickAge = -1
+-- The Lab home's SUGGESTED tile (one model to train next) = the economy bot's line choice (sim.luau tryTrain): a free
+-- product line first while the office allows more lines (in SUGGEST_ORDER, the bot's order), else the live line
+-- whose model is weakest (overall minus age). Focus: the live model's focus, else the best fit for the line at the
+-- largest size the GPUs and servers carry. Size, plan and data plan: successorPick. The --ui-defaults economy run
+-- (agents/lab/sim.luau) calls this function and buys exactly the plan the Review then offers.
+export type Suggestion = {
+	kind: string, -- "successor" (a live line's next version) | "newline" (a free product line)
+	target: string,
+	model: ModelData?, -- the line's live model (successor)
+	name: string?, -- successor: the live model's name (the next version); new line: nil
+	focusId: string,
+	sizeId: string,
+	recipeId: string,
+	pick: SuccessorPick?, -- nil = no size beats `current` by 3 with the cash above the reserve yet
+	expected: number, -- expected overall of the suggestion, after its data plan
+	current: number, -- what it must beat by 3: the line's model after age, or the best live model - 12
+}
+LabPreview.SUGGEST_ORDER = { "general", "developers", "students", "businesses" }
+
+function LabPreview.suggest(data: PlayerData, live: Types.LiveInfo?, money: number, saveMode: boolean): Suggestion?
+	if LabPreview.isFirstModel(data) then
+		return nil -- DESIGN NEW MODEL is the first model's path (LAB_SPEC 4.9)
+	end
+	local lives: { ModelData } = {}
+	local best: ModelData? = nil
 	for _, id in data.modelOrder do
-		local model = data.models[id]
-		if model and model.status == "live" and model.release then
-			local age = ModelMath.ageFit(ModelMath.versionAge(model))
-			if age > pickAge + 1e-9 then
-				pick, pickAge = model, age
+		local m = data.models[id]
+		if m and m.status == "live" and m.release then
+			table.insert(lives, m)
+			if not best or m.overall > best.overall then
+				best = m
 			end
 		end
 	end
-	local model = pick
-	if not model or not model.release then
+	local function liveIn(target: string): ModelData?
+		local line = ModelMath.lineOf(target)
+		for _, m in lives do
+			local release = m.release
+			if release and ModelMath.lineOf(release.target) == line then
+				return m
+			end
+		end
+		return nil
+	end
+	local target: string? = nil
+	local current = 0
+	local lineModel: ModelData? = nil
+	if #lives < ModelMath.productSlots(data.empire.office) then
+		for _, t in LabPreview.SUGGEST_ORDER do
+			if ModelConfig.getLine(t) and not liveIn(t) then
+				target = t
+				break
+			end
+		end
+		if target and best then
+			current = math.max(0, effective(best) - 12)
+		end
+	end
+	if not target then
+		local worst: ModelData? = nil
+		for _, m in lives do
+			if not worst or effective(m) < effective(worst) then
+				worst = m
+			end
+		end
+		local w = worst
+		if w and w.release then
+			target = w.release.target
+			current = effective(w)
+			lineModel = w
+		end
+	end
+	local t = target
+	if not t then
+		return nil
+	end
+	local fleet = ModelMath.fleet(data.gpus)
+	local fits = LabPreview.serverFits(data, live, t)
+	local probe = "s100m"
+	for k = #ModelConfig.SIZES, 1, -1 do
+		local size = ModelConfig.SIZES[k]
+		if size.vram <= fleet.vram and (size.id ~= "s7b" or data.empire.research.frontier) and fits(size.id) then
+			probe = size.id
+			break
+		end
+	end
+	local focusId = LabPreview.bestFocus(data, probe, "steady", t)
+	local lm = lineModel
+	if lm and ModelConfig.getFocus(lm.focusId) then
+		focusId = lm.focusId
+	end
+	local pick = LabPreview.successorPick(data, live, t, focusId, money, saveMode)
+	local sizeId = if pick then pick.sizeId elseif lm and ModelConfig.getSize(lm.sizeId) then lm.sizeId else probe
+	local recipeId = if pick then pick.recipeId else "steady"
+	local sel: Sel = { sizeId = sizeId, focusId = focusId, recipeId = recipeId }
+	local view = if pick and pick.plan.cost > 0 then LabPreview.withStock(data, pick.plan.stock) else data
+	return {
+		kind = if lm then "successor" else "newline",
+		target = t,
+		model = lm,
+		name = if lm then lm.name else nil,
+		focusId = focusId,
+		sizeId = sizeId,
+		recipeId = recipeId,
+		pick = pick,
+		expected = LabPreview.estimate(view, sel, nil).overall,
+		current = current,
+	}
+end
+
+-- What a line's SUCCESSOR button (and "Design its successor") prefills: the live model's name and focus, the size,
+-- plan and data plan of successorPick (nil pick: the live model's size, Standard, no plan).
+function LabPreview.lineSuccessor(data: PlayerData, live: Types.LiveInfo?, target: string, money: number, saveMode: boolean): Suggestion?
+	local status = LabPreview.lineStatus(data, target)
+	local model = status.model
+	if not model then
 		return nil
 	end
 	local focusId = if ModelConfig.getFocus(model.focusId) then model.focusId else "balanced"
-	local preset = LabPreview.successorPick(data, live, model.release.target, focusId, money, saveMode)
+	local pick = LabPreview.successorPick(data, live, target, focusId, money, saveMode)
+	local sizeId = if pick then pick.sizeId elseif ModelConfig.getSize(model.sizeId) then model.sizeId else "s100m"
+	local recipeId = if pick then pick.recipeId else "steady"
+	local view = if pick and pick.plan.cost > 0 then LabPreview.withStock(data, pick.plan.stock) else data
 	return {
-		target = model.release.target,
+		kind = "successor",
+		target = target,
+		model = model,
 		name = model.name,
 		focusId = focusId,
-		sizeId = if preset then preset.sizeId else model.sizeId,
-		recipeId = if preset then preset.recipeId else "steady",
-		model = model,
+		sizeId = sizeId,
+		recipeId = recipeId,
+		pick = pick,
+		expected = LabPreview.estimate(view, { sizeId = sizeId, focusId = focusId, recipeId = recipeId }, nil).overall,
+		current = effective(model),
+	}
+end
+
+-- Studio prefill of a suggestion (DesignSteps.show reads it; `plan` is offered on the Review as BUY DATA PLAN).
+function LabPreview.prefillOf(s: Suggestion): { [string]: any }
+	local pick = s.pick
+	return {
+		target = s.target,
+		name = s.name,
+		sizeId = s.sizeId,
+		focusId = s.focusId,
+		recipeId = s.recipeId,
+		plan = if pick and pick.plan.cost > 0 then pick.plan else nil,
+		current = s.current,
 	}
 end
 
@@ -663,6 +802,129 @@ function LabPreview.breakdown(data: PlayerData, sel: Sel): Breakdown
 		reliabilityBonus = tonumber(b.reliability) or 0,
 		cap = ModelConfig.STAT_CAP,
 	}
+end
+
+-- "spec +6 Coding", "spec +2 each skill", "spec +6 Efficiency (not in Overall)" (CompanyConfig statBonus by stat).
+function LabPreview.specBonusText(specId: string): string
+	local spec = CompanyConfig.getSpec(specId)
+	local bonus: { [string]: number } = if spec and spec.statBonus then spec.statBonus else {}
+	local core: { string } = {}
+	for _, stat in ModelConfig.STATS do
+		if stat.weight > 0 then
+			table.insert(core, stat.id)
+		end
+	end
+	local first = bonus[core[1]]
+	local same = first ~= nil and first > 0
+	for _, id in core do
+		if bonus[id] ~= first then
+			same = false
+		end
+	end
+	if same then
+		return `spec +{first} each skill`
+	end
+	type Part = { label: string, value: number, core: boolean }
+	local parts: { Part } = {}
+	for _, stat in ModelConfig.STATS do
+		local v = bonus[stat.id]
+		if v and v > 0 then
+			table.insert(parts, { label = stat.label, value = v, core = stat.weight > 0 })
+		end
+	end
+	if #parts == 0 then
+		return "no spec bonus"
+	end
+	table.sort(parts, function(a: Part, b: Part): boolean
+		return a.value > b.value
+	end)
+	local out: { string } = {}
+	for i = 1, math.min(2, #parts) do
+		local p = parts[i]
+		table.insert(out, `+{p.value} {p.label}` .. (if p.core then "" else " (not in Overall)"))
+	end
+	return "spec " .. table.concat(out, ", ")
+end
+
+-- Deep's data check (ModelMath.recipeFactor: x0.68 below half of the size's data need or below 60 % quality):
+-- nil when the data is enough, else the short reason for the tile ("Needs 60% quality", "Needs 750M data").
+function LabPreview.deepShort(sizeId: string, summary: Types.DataSummary): string?
+	local size = ModelConfig.getSize(sizeId) or ModelConfig.SIZES[1]
+	local half = size.dataNeed * 0.5
+	local lowData = summary.total < half
+	local lowQuality = summary.quality < 0.6
+	local tokens = Format.tokens
+	if lowData and lowQuality then
+		return `Needs {tokens(half)} at 60%`
+	elseif lowQuality then
+		return "Needs 60% quality"
+	elseif lowData then
+		return `Needs {tokens(half)} data`
+	end
+	return nil
+end
+
+-- Highest expected overall `sel` can reach with ideal data (the data the size can still use, maxFill x dataNeed,
+-- at 100 % quality): the desktop spec sheet's "Ceiling". Searched over every mix of the data types in tenth steps
+-- plus today's mix (so the ceiling is never below what the Studio shows: more data and 100 % quality only raise
+-- each stat before the cap). The data mix, focus, plan, company spec, research and Lab level all count (the old
+-- "Max score" printed the size's raw potential, which the bonuses exceed). Cached by its inputs (66 estimates).
+local ceilingKey = ""
+local ceilingValue = 0
+function LabPreview.ceiling(data: PlayerData, sel: Sel): number
+	local size = ModelConfig.getSize(sel.sizeId) or ModelConfig.SIZES[1]
+	local total = size.dataNeed * ModelConfig.DATA.maxFill
+	local types = DataConfig.TYPES
+	local n = #types
+	local summary = ModelMath.dataSummary(data.data)
+	local bonus = EmpireMath.bonuses(data.empire)
+	local shareKeys: { string } = {}
+	for _, t in types do
+		table.insert(shareKeys, string.format("%.4f", summary.shares[t.id] or 0))
+	end
+	local key = `{size.id}|{sel.focusId}|{sel.recipeId}|{specOf(data)}|{bonus.core}|{bonus.reliability}|{table.concat(shareKeys, ",")}`
+	if key == ceilingKey then
+		return ceilingValue
+	end
+	local best = 0
+	local function try(weights: { number })
+		local stock: { [string]: DataStock } = {}
+		for i, w in weights do
+			if w > 0 then
+				stock[types[i].id] = { tokens = total * w, quality = 1 }
+			end
+		end
+		local est = LabPreview.estimate(LabPreview.withStock(data, stock), sel, nil)
+		if est.overall > best then
+			best = est.overall
+		end
+	end
+	-- every composition of 10 tenths over the n types
+	local w = table.create(n, 0)
+	local function walk(i: number, left: number)
+		if i == n then
+			w[i] = left / 10
+			try(w)
+			return
+		end
+		for k = 0, left do
+			w[i] = k / 10
+			walk(i + 1, left - k)
+		end
+	end
+	if n > 0 then
+		walk(1, 10)
+	end
+	-- today's mix at the ideal amount and quality
+	if summary.total > 0 then
+		local mix = table.create(n, 0)
+		for i, t in types do
+			mix[i] = summary.shares[t.id] or 0
+		end
+		try(mix)
+	end
+	ceilingKey, ceilingValue = key, best
+	return best
 end
 
 -- Best non-training overall of the company (optionally without one model).

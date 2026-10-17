@@ -1,0 +1,3485 @@
+{
+  "name": "ExecutiveLimo",
+  "generic_identity": "ExecutiveLimo - generic stretch executive limousine (no brand, no logos; emblem = one abstract chevron)",
+  "units": {
+    "studs_per_metre": 3.571429,
+    "metres_per_stud": 0.28,
+    "scale_factor_m_to_studs": 3.571429,
+    "source": "https://create.roblox.com/docs/physics/units (1 stud = 28 cm), same factor as CityCar"
+  },
+  "frame": {
+    "forward": "-Z (Model LookVector)",
+    "right": "+X",
+    "up": "+Y",
+    "origin": "ground level, car centre line, half-way between the axles",
+    "driver_side": "left (-X), like CityCar and DrivePlan.SEATS"
+  },
+  "dimensions_measured_from_mesh": {
+    "length": {
+      "m": 7.5909,
+      "studs": 27.11
+    },
+    "width_body_without_mirrors": {
+      "m": 1.9577,
+      "studs": 6.992
+    },
+    "width_over_mirrors": {
+      "m": 2.1502,
+      "studs": 7.679
+    },
+    "height": {
+      "m": 1.5593,
+      "studs": 5.569
+    },
+    "wheelbase": {
+      "m": 5.336,
+      "studs": 19.057
+    },
+    "track": {
+      "m": 1.66,
+      "studs": 5.929
+    },
+    "ground_clearance_between_axles": {
+      "m": 0.14,
+      "studs": 0.5
+    },
+    "front_overhang": {
+      "m": 0.9975,
+      "studs": 3.562
+    },
+    "rear_overhang": {
+      "m": 1.2574,
+      "studs": 4.491
+    },
+    "stretch_section": {
+      "m": 2.286,
+      "studs": 8.164
+    },
+    "wheel_diameter": {
+      "m": 0.7031,
+      "studs": 2.511
+    },
+    "overall_bbox_studs_XYZ": [
+      7.679,
+      5.569,
+      27.127
+    ],
+    "overall_bbox_min_studs": [
+      -3.8396,
+      0.0,
+      -13.1072
+    ],
+    "overall_bbox_max_studs": [
+      3.8396,
+      5.5689,
+      14.0194
+    ]
+  },
+  "dimensions_target_m": {
+    "base_sedan_length": 5.3,
+    "base_wheelbase": 3.05,
+    "stretch": 2.286,
+    "length": 7.586,
+    "wheelbase": 5.336,
+    "width": 1.96,
+    "height": 1.5,
+    "track": 1.66,
+    "front_overhang": 1.02,
+    "rear_overhang": 1.23,
+    "ground_clearance": 0.14,
+    "tyre": "245/45 R19"
+  },
+  "anchors": {
+    "DriverSeat": {
+      "position_studs": [
+        -1.4286,
+        1.75,
+        -4.3143
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        -1.4286,
+        1.75,
+        -4.3143,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        -1.4286,
+        2.445,
+        -3.9571
+      ],
+      "headliner_y_studs": 4.815,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 4.815,
+          "clearance_cushion_to_headliner": 3.065,
+          "rig_root_studs": [
+            -1.4286,
+            2.445,
+            -3.9571
+          ],
+          "sink_into_cushion": 0.805
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.575,
+          "clearance_cushion_to_headliner": 2.912,
+          "rig_root_studs": [
+            -1.3571,
+            2.205,
+            -3.7593
+          ],
+          "sink_into_cushion": 0.958
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "PassengerSeat1": {
+      "position_studs": [
+        -1.4286,
+        1.75,
+        8.975
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        -1.4286,
+        1.75,
+        8.975,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        -1.4286,
+        2.669,
+        9.2607
+      ],
+      "headliner_y_studs": 5.039,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 5.039,
+          "clearance_cushion_to_headliner": 3.289,
+          "rig_root_studs": [
+            -1.4286,
+            2.669,
+            9.2607
+          ],
+          "sink_into_cushion": 0.581
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.787,
+          "clearance_cushion_to_headliner": 3.125,
+          "rig_root_studs": [
+            -1.3571,
+            2.417,
+            8.7977
+          ],
+          "sink_into_cushion": 0.745
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "PassengerSeat2": {
+      "position_studs": [
+        0.0,
+        1.75,
+        8.975
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        0.0,
+        1.75,
+        8.975,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        0.0,
+        2.669,
+        9.2607
+      ],
+      "headliner_y_studs": 5.039,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 5.039,
+          "clearance_cushion_to_headliner": 3.289,
+          "rig_root_studs": [
+            0.0,
+            2.669,
+            9.2607
+          ],
+          "sink_into_cushion": 0.581
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.787,
+          "clearance_cushion_to_headliner": 3.125,
+          "rig_root_studs": [
+            0.0,
+            2.417,
+            8.7977
+          ],
+          "sink_into_cushion": 0.745
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "PassengerSeat3": {
+      "position_studs": [
+        1.4286,
+        1.75,
+        8.975
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        1.4286,
+        1.75,
+        8.975,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        1.4286,
+        2.669,
+        9.2607
+      ],
+      "headliner_y_studs": 5.039,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 5.039,
+          "clearance_cushion_to_headliner": 3.289,
+          "rig_root_studs": [
+            1.4286,
+            2.669,
+            9.2607
+          ],
+          "sink_into_cushion": 0.581
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.787,
+          "clearance_cushion_to_headliner": 3.125,
+          "rig_root_studs": [
+            1.3571,
+            2.417,
+            8.7977
+          ],
+          "sink_into_cushion": 0.745
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "PassengerSeat4": {
+      "position_studs": [
+        2.1964,
+        1.75,
+        4.1321
+      ],
+      "look_vector": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "cframe_components": [
+        2.1964,
+        1.75,
+        4.1321,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        2.1964,
+        2.623,
+        4.1321
+      ],
+      "headliner_y_studs": 4.993,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 4.993,
+          "clearance_cushion_to_headliner": 3.243,
+          "rig_root_studs": [
+            2.1964,
+            2.623,
+            4.1321
+          ],
+          "sink_into_cushion": 0.627
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.743,
+          "clearance_cushion_to_headliner": 3.081,
+          "rig_root_studs": [
+            2.0866,
+            2.373,
+            3.9255
+          ],
+          "sink_into_cushion": 0.789
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "PassengerSeat5": {
+      "position_studs": [
+        2.1964,
+        1.75,
+        1.6679
+      ],
+      "look_vector": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "cframe_components": [
+        2.1964,
+        1.75,
+        1.6679,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        2.1964,
+        2.623,
+        1.6679
+      ],
+      "headliner_y_studs": 4.993,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 4.993,
+          "clearance_cushion_to_headliner": 3.243,
+          "rig_root_studs": [
+            2.1964,
+            2.623,
+            1.6679
+          ],
+          "sink_into_cushion": 0.627
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.743,
+          "clearance_cushion_to_headliner": 3.081,
+          "rig_root_studs": [
+            2.0866,
+            2.373,
+            1.5845
+          ],
+          "sink_into_cushion": 0.789
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "PassengerSeat6": {
+      "position_studs": [
+        2.1964,
+        1.75,
+        -0.7964
+      ],
+      "look_vector": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "cframe_components": [
+        2.1964,
+        1.75,
+        -0.7964,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        2.1964,
+        2.623,
+        -0.7964
+      ],
+      "headliner_y_studs": 4.993,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 4.993,
+          "clearance_cushion_to_headliner": 3.243,
+          "rig_root_studs": [
+            2.1964,
+            2.623,
+            -0.7964
+          ],
+          "sink_into_cushion": 0.627
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.743,
+          "clearance_cushion_to_headliner": 3.081,
+          "rig_root_studs": [
+            2.0866,
+            2.373,
+            -0.7566
+          ],
+          "sink_into_cushion": 0.789
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "FrontPassengerSeat": {
+      "position_studs": [
+        1.4286,
+        1.75,
+        -4.3143
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        1.4286,
+        1.75,
+        -4.3143,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "seat",
+      "rig_root_studs": [
+        1.4286,
+        2.445,
+        -3.9571
+      ],
+      "headliner_y_studs": 4.815,
+      "r6_fit": {
+        "scale_1": {
+          "cushion_top_y": 1.75,
+          "headliner_y": 4.815,
+          "clearance_cushion_to_headliner": 3.065,
+          "rig_root_studs": [
+            1.4286,
+            2.445,
+            -3.9571
+          ],
+          "sink_into_cushion": 0.805
+        },
+        "scale_0.95": {
+          "cushion_top_y": 1.663,
+          "headliner_y": 4.574,
+          "clearance_cushion_to_headliner": 2.912,
+          "rig_root_studs": [
+            1.3571,
+            2.204,
+            -3.7593
+          ],
+          "sink_into_cushion": 0.958
+        }
+      },
+      "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+    },
+    "DoorL1": {
+      "position_studs": [
+        -5.4643,
+        0.0,
+        -3.7429
+      ],
+      "look_vector": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "cframe_components": [
+        -5.4643,
+        0.0,
+        -3.7429,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "kind": "entry",
+      "clear_of_open_door": true,
+      "note": "ground point 0.55 m outside the body side, facing the car (character HumanoidRootPart goes 3 studs above). It sits just behind the OPEN door (Door_Driver at its open angle): a standing R6 footprint (2 x 1 x 5 studs, +0.1 stud margin) there touches neither the open door, its glass, the body, the mirrors nor the wheels. DoorL1 = driver door, DoorL2 = rear-left door, DoorR2 = rear-right door (kerb side at the Port Meridian VIP stand, whose kerb is on the car's right)."
+    },
+    "DoorL2": {
+      "position_studs": [
+        -5.4643,
+        0.0,
+        8.5821
+      ],
+      "look_vector": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "cframe_components": [
+        -5.4643,
+        0.0,
+        8.5821,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "kind": "entry",
+      "clear_of_open_door": true,
+      "note": "ground point 0.55 m outside the body side, facing the car (character HumanoidRootPart goes 3 studs above). It sits just behind the OPEN door (Door_RearL at its open angle): a standing R6 footprint (2 x 1 x 5 studs, +0.1 stud margin) there touches neither the open door, its glass, the body, the mirrors nor the wheels. DoorL1 = driver door, DoorL2 = rear-left door, DoorR2 = rear-right door (kerb side at the Port Meridian VIP stand, whose kerb is on the car's right)."
+    },
+    "DoorR2": {
+      "position_studs": [
+        5.4643,
+        0.0,
+        8.5821
+      ],
+      "look_vector": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "cframe_components": [
+        5.4643,
+        0.0,
+        8.5821,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "kind": "entry",
+      "clear_of_open_door": true,
+      "note": "ground point 0.55 m outside the body side, facing the car (character HumanoidRootPart goes 3 studs above). It sits just behind the OPEN door (Door_RearR at its open angle): a standing R6 footprint (2 x 1 x 5 studs, +0.1 stud margin) there touches neither the open door, its glass, the body, the mirrors nor the wheels. DoorL1 = driver door, DoorL2 = rear-left door, DoorR2 = rear-right door (kerb side at the Port Meridian VIP stand, whose kerb is on the car's right)."
+    },
+    "Headlight_L": {
+      "position_studs": [
+        -2.1929,
+        2.3857,
+        -12.564
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        -2.1929,
+        2.3857,
+        -12.564,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "fx"
+    },
+    "Taillight_L": {
+      "position_studs": [
+        -2.8571,
+        3.2571,
+        13.6905
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cframe_components": [
+        -2.8571,
+        3.2571,
+        13.6905,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "kind": "fx"
+    },
+    "Exhaust_L": {
+      "position_studs": [
+        -2.1786,
+        1.2107,
+        13.8264
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cframe_components": [
+        -2.1786,
+        1.2107,
+        13.8264,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "kind": "fx"
+    },
+    "Headlight_R": {
+      "position_studs": [
+        2.1929,
+        2.3857,
+        -12.564
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        2.1929,
+        2.3857,
+        -12.564,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "fx"
+    },
+    "Taillight_R": {
+      "position_studs": [
+        2.8571,
+        3.2571,
+        13.69
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cframe_components": [
+        2.8571,
+        3.2571,
+        13.69,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "kind": "fx"
+    },
+    "Exhaust_R": {
+      "position_studs": [
+        2.1786,
+        1.2107,
+        13.8262
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cframe_components": [
+        2.1786,
+        1.2107,
+        13.8262,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "kind": "fx"
+    },
+    "CabinLight": {
+      "position_studs": [
+        0.0,
+        4.9286,
+        1.4464
+      ],
+      "look_vector": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "cframe_components": [
+        0.0,
+        4.9286,
+        1.4464,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "kind": "fx"
+    },
+    "PlateFront": {
+      "position_studs": [
+        0.0,
+        1.25,
+        -13.0304
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "cframe_components": [
+        0.0,
+        1.25,
+        -13.0304,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "kind": "fx"
+    },
+    "PlateRear": {
+      "position_studs": [
+        0.0,
+        2.7357,
+        13.997
+      ],
+      "look_vector": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cframe_components": [
+        0.0,
+        2.7357,
+        13.997,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "kind": "fx"
+    },
+    "BootLid": null
+  },
+  "game_fit": {
+    "read_from_game_code_on": "2026-10-11 (work/src, read only)",
+    "DrivePlan.CAR_LENGTH.limo": 21,
+    "DrivePlan.CAR_WIDTH.limo_incl_mirrors": 7.4,
+    "DrivePlan.WHEELBASE.limo": 13,
+    "DrivePlan.SEATS.limo_rig_roots": {
+      "driver": [
+        -1.6,
+        2.6,
+        -2.6
+      ],
+      "front": [
+        1.6,
+        2.6,
+        -2.6
+      ],
+      "rearL": [
+        -1.6,
+        2.6,
+        4.4
+      ],
+      "rearR": [
+        1.6,
+        2.6,
+        4.4
+      ]
+    },
+    "DriveController.SHAPES.limo": {
+      "w": 7.0,
+      "l": 21,
+      "h": 5.4,
+      "wb": 13,
+      "r": 1.35
+    },
+    "CampusConfig.CARS.limo": {
+      "length": 19,
+      "width": 7.4
+    },
+    "MetroPlan.VIP_LIMO": {
+      "stand_pad_studs": [
+        8,
+        22
+      ],
+      "layby_x": [
+        104,
+        200
+      ],
+      "bay_centres_x": [
+        176,
+        128
+      ],
+      "cars_face": "west (-X world)"
+    },
+    "model_length_studs": 27.11,
+    "recommended_scale": 0.95,
+    "scale_to_match_CAR_LENGTH_21": 0.7746,
+    "note": "Scale 0.950 (game_scale) keeps the width over the mirrors inside DrivePlan.CAR_WIDTH.limo = 7.4. The car is then 25.8 studs long instead of the part-built 21: it overhangs the 22-stud gold pad by about 1.9 studs at each end, but the lay-by bays are 48 studs apart, so two cars still leave about 22 studs between them. Model:ScaleTo(scale_to_match_CAR_LENGTH_21) fits the old 21-stud slot, but the cabin then gets too low for seated R6 rigs.",
+    "seat_mapping_for_DrivePlan.SEATS.limo": {
+      "driver": "DriverSeat",
+      "front": "FrontPassengerSeat",
+      "rearL": "PassengerSeat1",
+      "rearR": "PassengerSeat3",
+      "extra companions / guests": [
+        "PassengerSeat2",
+        "PassengerSeat6",
+        "PassengerSeat5",
+        "PassengerSeat4"
+      ]
+    }
+  },
+  "game_scale": {
+    "recommended": 0.95,
+    "why": "width over mirrors 7.30 studs <= DrivePlan.CAR_WIDTH.limo 7.4 (HQ B1 lane clearance) while the cabin keeps the real proportions; seated R6 rigs need the rig roots from anchors_at_scale (lowered so heads stay under the headliner)",
+    "how": "clone:ScaleTo(0.95) - the Model pivot is the origin on the ground, so every pivot and anchor position scales by 0.95 (rig roots: anchors_at_scale, already lowered for the headliner)",
+    "dimensions_studs_at_scale": {
+      "length": 25.755,
+      "width_body": 6.642,
+      "width_over_mirrors": 7.295,
+      "height_roof": 5.089,
+      "wheelbase": 18.104,
+      "wheel_radius": 1.1928
+    },
+    "pivots_studs_at_scale": {
+      "Mirror_L": [
+        -2.8471,
+        3.515,
+        -5.5575
+      ],
+      "Mirror_R": [
+        2.8471,
+        3.515,
+        -5.5575
+      ],
+      "Door_Driver": [
+        -3.325,
+        2.1036,
+        -6.7789
+      ],
+      "Door_Driver_Glass": [
+        -3.325,
+        2.1036,
+        -6.7789
+      ],
+      "Door_RearL": [
+        -3.325,
+        2.1036,
+        5.1842
+      ],
+      "Door_RearL_Glass": [
+        -3.325,
+        2.1036,
+        5.1842
+      ],
+      "Door_RearR": [
+        3.325,
+        2.1036,
+        5.1842
+      ],
+      "Door_RearR_Glass": [
+        3.325,
+        2.1036,
+        5.1842
+      ],
+      "Wheel_FL": [
+        -2.8161,
+        1.1927,
+        -9.0522
+      ],
+      "Wheel_FR": [
+        2.8161,
+        1.1927,
+        -9.0522
+      ],
+      "Wheel_RL": [
+        -2.8161,
+        1.1927,
+        9.0522
+      ],
+      "Wheel_RR": [
+        2.8161,
+        1.1927,
+        9.0522
+      ],
+      "Caliper_FL": [
+        -2.8161,
+        1.1927,
+        -9.0522
+      ],
+      "Caliper_FR": [
+        2.8161,
+        1.1927,
+        -9.0522
+      ],
+      "Caliper_RL": [
+        -2.8161,
+        1.1927,
+        9.0522
+      ],
+      "Caliper_RR": [
+        2.8161,
+        1.1927,
+        9.0522
+      ],
+      "SteeringWheel": [
+        -1.3572,
+        2.9688,
+        -5.337
+      ]
+    },
+    "anchors_at_scale": {
+      "DriverSeat": {
+        "position_studs": [
+          -1.3572,
+          1.6625,
+          -4.0986
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          -1.3572,
+          1.6625,
+          -4.0986,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          -1.3571,
+          2.205,
+          -3.7593
+        ],
+        "headliner_y_studs": 4.575,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "PassengerSeat1": {
+        "position_studs": [
+          -1.3572,
+          1.6625,
+          8.5262
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          -1.3572,
+          1.6625,
+          8.5262,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          -1.3571,
+          2.417,
+          8.7977
+        ],
+        "headliner_y_studs": 4.787,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "PassengerSeat2": {
+        "position_studs": [
+          0.0,
+          1.6625,
+          8.5262
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          0.0,
+          1.6625,
+          8.5262,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          0.0,
+          2.417,
+          8.7977
+        ],
+        "headliner_y_studs": 4.787,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "PassengerSeat3": {
+        "position_studs": [
+          1.3572,
+          1.6625,
+          8.5262
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          1.3572,
+          1.6625,
+          8.5262,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          1.3571,
+          2.417,
+          8.7977
+        ],
+        "headliner_y_studs": 4.787,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "PassengerSeat4": {
+        "position_studs": [
+          2.0866,
+          1.6625,
+          3.9255
+        ],
+        "look_vector": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "cframe_components": [
+          2.0866,
+          1.6625,
+          3.9255,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          2.0866,
+          2.373,
+          3.9255
+        ],
+        "headliner_y_studs": 4.743,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "PassengerSeat5": {
+        "position_studs": [
+          2.0866,
+          1.6625,
+          1.5845
+        ],
+        "look_vector": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "cframe_components": [
+          2.0866,
+          1.6625,
+          1.5845,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          2.0866,
+          2.373,
+          1.5845
+        ],
+        "headliner_y_studs": 4.743,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "PassengerSeat6": {
+        "position_studs": [
+          2.0866,
+          1.6625,
+          -0.7566
+        ],
+        "look_vector": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "cframe_components": [
+          2.0866,
+          1.6625,
+          -0.7566,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          2.0866,
+          2.373,
+          -0.7566
+        ],
+        "headliner_y_studs": 4.743,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "FrontPassengerSeat": {
+        "position_studs": [
+          1.3572,
+          1.6625,
+          -4.0986
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          1.3572,
+          1.6625,
+          -4.0986,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "seat",
+        "rig_root_studs": [
+          1.3571,
+          2.204,
+          -3.7593
+        ],
+        "headliner_y_studs": 4.574,
+        "note": "position = cushion top centre, LookVector = where the passenger faces. rig_root_studs = where to put an R6 HumanoidRootPart (DrivePlan convention: 1.5 above the seat surface, head + cap 2.32 above the root), moved over the rear of the cushion and lowered ('sink_into_cushion') so the head stays 0.05 under the measured headliner. r6_fit lists the numbers at scale 1 and at the game scale."
+      },
+      "DoorL1": {
+        "position_studs": [
+          -5.1911,
+          0.0,
+          -3.5558
+        ],
+        "look_vector": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "cframe_components": [
+          -5.1911,
+          0.0,
+          -3.5558,
+          0.0,
+          0.0,
+          -1.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        "kind": "entry",
+        "clear_of_open_door": true,
+        "note": "ground point 0.55 m outside the body side, facing the car (character HumanoidRootPart goes 3 studs above). It sits just behind the OPEN door (Door_Driver at its open angle): a standing R6 footprint (2 x 1 x 5 studs, +0.1 stud margin) there touches neither the open door, its glass, the body, the mirrors nor the wheels. DoorL1 = driver door, DoorL2 = rear-left door, DoorR2 = rear-right door (kerb side at the Port Meridian VIP stand, whose kerb is on the car's right)."
+      },
+      "DoorL2": {
+        "position_studs": [
+          -5.1911,
+          0.0,
+          8.153
+        ],
+        "look_vector": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "cframe_components": [
+          -5.1911,
+          0.0,
+          8.153,
+          0.0,
+          0.0,
+          -1.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        "kind": "entry",
+        "clear_of_open_door": true,
+        "note": "ground point 0.55 m outside the body side, facing the car (character HumanoidRootPart goes 3 studs above). It sits just behind the OPEN door (Door_RearL at its open angle): a standing R6 footprint (2 x 1 x 5 studs, +0.1 stud margin) there touches neither the open door, its glass, the body, the mirrors nor the wheels. DoorL1 = driver door, DoorL2 = rear-left door, DoorR2 = rear-right door (kerb side at the Port Meridian VIP stand, whose kerb is on the car's right)."
+      },
+      "DoorR2": {
+        "position_studs": [
+          5.1911,
+          0.0,
+          8.153
+        ],
+        "look_vector": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "cframe_components": [
+          5.1911,
+          0.0,
+          8.153,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "kind": "entry",
+        "clear_of_open_door": true,
+        "note": "ground point 0.55 m outside the body side, facing the car (character HumanoidRootPart goes 3 studs above). It sits just behind the OPEN door (Door_RearR at its open angle): a standing R6 footprint (2 x 1 x 5 studs, +0.1 stud margin) there touches neither the open door, its glass, the body, the mirrors nor the wheels. DoorL1 = driver door, DoorL2 = rear-left door, DoorR2 = rear-right door (kerb side at the Port Meridian VIP stand, whose kerb is on the car's right)."
+      },
+      "Headlight_L": {
+        "position_studs": [
+          -2.0833,
+          2.2664,
+          -11.9358
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          -2.0833,
+          2.2664,
+          -11.9358,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "fx"
+      },
+      "Taillight_L": {
+        "position_studs": [
+          -2.7142,
+          3.0942,
+          13.006
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "cframe_components": [
+          -2.7142,
+          3.0942,
+          13.006,
+          -1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "kind": "fx"
+      },
+      "Exhaust_L": {
+        "position_studs": [
+          -2.0697,
+          1.1502,
+          13.1351
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "cframe_components": [
+          -2.0697,
+          1.1502,
+          13.1351,
+          -1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "kind": "fx"
+      },
+      "Headlight_R": {
+        "position_studs": [
+          2.0833,
+          2.2664,
+          -11.9358
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          2.0833,
+          2.2664,
+          -11.9358,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "fx"
+      },
+      "Taillight_R": {
+        "position_studs": [
+          2.7142,
+          3.0942,
+          13.0055
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "cframe_components": [
+          2.7142,
+          3.0942,
+          13.0055,
+          -1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "kind": "fx"
+      },
+      "Exhaust_R": {
+        "position_studs": [
+          2.0697,
+          1.1502,
+          13.1349
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "cframe_components": [
+          2.0697,
+          1.1502,
+          13.1349,
+          -1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "kind": "fx"
+      },
+      "CabinLight": {
+        "position_studs": [
+          0.0,
+          4.6822,
+          1.3741
+        ],
+        "look_vector": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "cframe_components": [
+          0.0,
+          4.6822,
+          1.3741,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "kind": "fx"
+      },
+      "PlateFront": {
+        "position_studs": [
+          0.0,
+          1.1875,
+          -12.3789
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "cframe_components": [
+          0.0,
+          1.1875,
+          -12.3789,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "kind": "fx"
+      },
+      "PlateRear": {
+        "position_studs": [
+          0.0,
+          2.5989,
+          13.2971
+        ],
+        "look_vector": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "cframe_components": [
+          0.0,
+          2.5989,
+          13.2971,
+          -1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "kind": "fx"
+      },
+      "BootLid": null
+    },
+    "alternatives": {
+      "real_size": 1.0,
+      "fit_old_21_stud_slot": 0.7746
+    }
+  },
+  "triangles_total": 69910,
+  "triangle_limit_per_mesh": 20000,
+  "triangle_limit_source": "https://create.roblox.com/docs/art/modeling/specifications",
+  "objects": [
+    {
+      "name": "Body",
+      "kind": "static_root",
+      "role": "painted shell with shut lines, wheel wells, black pillar posts, frit, cowl, wipers, antenna fin, plates, light housings, front passenger door (does not open)",
+      "can_collide": true,
+      "color": [
+        18,
+        20,
+        27
+      ],
+      "material": "SmoothPlastic",
+      "reflectance": 0.12,
+      "note": "paint zone is WHITE in the vertex colours: Body.Color = paint (midnight 18,20,27)",
+      "triangles": 18448,
+      "materials": [
+        "Paint",
+        "Underbody",
+        "Cabin_Trim",
+        "Wheelwell",
+        "Trim_Black",
+        "Satin_Black",
+        "Body_Inner",
+        "Plate"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.4958,
+        0.5,
+        -13.0909
+      ],
+      "bbox_max_studs": [
+        3.4958,
+        5.5689,
+        14.0194
+      ],
+      "size_studs": [
+        6.9916,
+        5.0689,
+        27.1103
+      ],
+      "mesh_check": {
+        "tris": 18448,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 177.1598,
+        "shells": 25,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 2.53e-07
+      }
+    },
+    {
+      "name": "Glass",
+      "kind": "static",
+      "role": "clear glass: windshield, front passenger window, headlight covers",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Glass",
+      "transparency": 0.45,
+      "triangles": 1624,
+      "materials": [
+        "Glass"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1556,
+        2.1521,
+        -12.6108
+      ],
+      "bbox_max_studs": [
+        3.1896,
+        5.1176,
+        -3.0025
+      ],
+      "size_studs": [
+        6.3452,
+        2.9655,
+        9.6083
+      ],
+      "mesh_check": {
+        "tris": 1624,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.3254,
+        "shells": 4,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000101
+      }
+    },
+    {
+      "name": "GlassPrivacy",
+      "kind": "static",
+      "role": "tinted privacy glass: 4 stretch windows, rear window, partition window",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Glass",
+      "transparency": 0.22,
+      "triangles": 2048,
+      "materials": [
+        "Glass_Privacy"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1898,
+        3.4919,
+        -2.8493
+      ],
+      "bbox_max_studs": [
+        3.1898,
+        5.125,
+        11.5268
+      ],
+      "size_studs": [
+        6.3796,
+        1.6331,
+        14.3761
+      ],
+      "mesh_check": {
+        "tris": 2048,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.6569,
+        "shells": 6,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000584
+      }
+    },
+    {
+      "name": "Chrome",
+      "kind": "static",
+      "role": "DLO surround, belt + lower side strips (body parts), passenger door handle, projector bezels, exhaust tips, trunk emblem",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Metal",
+      "reflectance": 0.35,
+      "triangles": 3504,
+      "materials": [
+        "Chrome",
+        "Trim_Black"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.49,
+        0.9788,
+        -13.1072
+      ],
+      "bbox_max_studs": [
+        3.49,
+        5.0716,
+        14.0006
+      ],
+      "size_studs": [
+        6.98,
+        4.0928,
+        27.1078
+      ],
+      "mesh_check": {
+        "tris": 3504,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.1519,
+        "shells": 29,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 3.81e-05
+      }
+    },
+    {
+      "name": "Grille",
+      "kind": "static",
+      "role": "multi-bar grille, chrome surround, centre badge (one abstract chevron on a black plaque)",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Metal",
+      "reflectance": 0.25,
+      "triangles": 2608,
+      "materials": [
+        "Satin_Black",
+        "Chrome",
+        "Piano_Black"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -2.963,
+        1.2214,
+        -12.9954
+      ],
+      "bbox_max_studs": [
+        2.9333,
+        2.5673,
+        -12.3069
+      ],
+      "size_studs": [
+        5.8963,
+        1.3459,
+        0.6885
+      ],
+      "mesh_check": {
+        "tris": 2608,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.2321,
+        "shells": 22,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 4.18e-05
+      }
+    },
+    {
+      "name": "Lights_Front",
+      "kind": "light",
+      "role": "LED DRL light guides, projector lenses, high-beam LEDs, amber indicators",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "note": "Material = Neon when the lights are on (put SpotLights at anchors Headlight_L/R)",
+      "triangles": 1640,
+      "materials": [
+        "Headlight_LED",
+        "Lens",
+        "Indicator"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1095,
+        2.2028,
+        -12.5401
+      ],
+      "bbox_max_studs": [
+        3.1158,
+        2.5446,
+        -12.1855
+      ],
+      "size_studs": [
+        6.2253,
+        0.3418,
+        0.3546
+      ],
+      "mesh_check": {
+        "tris": 1640,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0125,
+        "shells": 18,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 9.66e-05
+      }
+    },
+    {
+      "name": "Lights_Rear",
+      "kind": "light",
+      "role": "full-width tail light bar, light blades, third brake light, reflectors",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "note": "Material = Neon for tail/brake light",
+      "triangles": 948,
+      "materials": [
+        "Taillight",
+        "Reflector"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1352,
+        1.5048,
+        9.774
+      ],
+      "bbox_max_studs": [
+        3.1352,
+        5.2362,
+        13.9704
+      ],
+      "size_studs": [
+        6.2704,
+        3.7314,
+        4.1964
+      ],
+      "mesh_check": {
+        "tris": 948,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0314,
+        "shells": 17,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000383
+      }
+    },
+    {
+      "name": "Mirror_L",
+      "kind": "static",
+      "role": "left door mirror (lofted housing, arm, glass, LED indicator) on the A-pillar sail (does not move with the door)",
+      "can_collide": false,
+      "color": [
+        18,
+        20,
+        27
+      ],
+      "material": "SmoothPlastic",
+      "welded_to": "Body",
+      "note": "cap is paint (white vertex colour) -> Color = paint like Body",
+      "triangles": 624,
+      "materials": [
+        "Paint",
+        "Trim_Black",
+        "Mirror_Glass",
+        "Indicator"
+      ],
+      "pivot_studs": [
+        -2.997,
+        3.7,
+        -5.85
+      ],
+      "pivot_m": [
+        -0.8392,
+        1.036,
+        -1.638
+      ],
+      "bbox_min_studs": [
+        -3.8396,
+        3.599,
+        -6.0622
+      ],
+      "bbox_max_studs": [
+        -2.9447,
+        4.0713,
+        -5.6395
+      ],
+      "size_studs": [
+        0.8949,
+        0.4723,
+        0.4227
+      ],
+      "mesh_check": {
+        "tris": 624,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0771,
+        "shells": 4,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000103
+      }
+    },
+    {
+      "name": "Mirror_R",
+      "kind": "static",
+      "role": "right door mirror on the A-pillar sail",
+      "can_collide": false,
+      "color": [
+        18,
+        20,
+        27
+      ],
+      "material": "SmoothPlastic",
+      "welded_to": "Body",
+      "note": "cap is paint (white vertex colour) -> Color = paint like Body",
+      "triangles": 624,
+      "materials": [
+        "Paint",
+        "Trim_Black",
+        "Mirror_Glass",
+        "Indicator"
+      ],
+      "pivot_studs": [
+        2.997,
+        3.7,
+        -5.85
+      ],
+      "pivot_m": [
+        0.8392,
+        1.036,
+        -1.638
+      ],
+      "bbox_min_studs": [
+        2.9447,
+        3.599,
+        -6.0622
+      ],
+      "bbox_max_studs": [
+        3.8396,
+        4.0713,
+        -5.6395
+      ],
+      "size_studs": [
+        0.8949,
+        0.4723,
+        0.4227
+      ],
+      "mesh_check": {
+        "tris": 624,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0771,
+        "shells": 4,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000103
+      }
+    },
+    {
+      "name": "Door_Driver",
+      "kind": "door",
+      "role": "opening door: outer panel, jamb faces, door card (armrest, wood, handle, speaker), belt + lower chrome strips, handle",
+      "can_collide": false,
+      "color": [
+        18,
+        20,
+        27
+      ],
+      "material": "SmoothPlastic",
+      "note": "paint zone white -> Color = paint like Body",
+      "triangles": 1458,
+      "materials": [
+        "Paint",
+        "Underbody",
+        "Cabin_Trim",
+        "Chrome",
+        "Trim_Black",
+        "Leather_Dark",
+        "Leather",
+        "Wood",
+        "Alu"
+      ],
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        -7.1357
+      ],
+      "pivot_m": [
+        -0.98,
+        0.62,
+        -1.998
+      ],
+      "bbox_min_studs": [
+        -3.4958,
+        1.24,
+        -7.0207
+      ],
+      "bbox_max_studs": [
+        -2.9107,
+        3.5636,
+        -2.8757
+      ],
+      "size_studs": [
+        0.5851,
+        2.3236,
+        4.145
+      ],
+      "mesh_check": {
+        "tris": 1458,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 3.3101,
+        "shells": 11,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 4.49e-06
+      },
+      "hinge_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "open_angle_deg": -65.0,
+      "open_cframe": "door:PivotTo(closedPivot * CFrame.Angles(0, math.rad(open_angle_deg * t), 0)), t = 0..1",
+      "hinge_note": "vertical hinge at the door's front edge (3 cm ahead of it, on the body's widest line). Left doors open with a negative angle about +Y, right doors with a positive one; the door glass (Door_Driver_Glass) uses the same pivot and angle."
+    },
+    {
+      "name": "Door_Driver_Glass",
+      "kind": "door_glass",
+      "role": "frameless door glass; moves with Door_Driver",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Glass",
+      "welded_to": "Door_Driver",
+      "transparency": 0.45,
+      "triangles": 352,
+      "materials": [
+        "Glass"
+      ],
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        -7.1357
+      ],
+      "pivot_m": [
+        -0.98,
+        0.62,
+        -1.998
+      ],
+      "bbox_min_studs": [
+        -3.1896,
+        3.488,
+        -5.5179
+      ],
+      "bbox_max_studs": [
+        -2.6096,
+        4.9779,
+        -3.0026
+      ],
+      "size_studs": [
+        0.58,
+        1.4899,
+        2.5153
+      ],
+      "mesh_check": {
+        "tris": 352,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.045,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 1.19e-06
+      },
+      "hinge_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "open_angle_deg": -65.0
+    },
+    {
+      "name": "Door_RearL",
+      "kind": "door",
+      "role": "opening door: outer panel, jamb faces, door card (armrest, wood, handle, speaker), belt + lower chrome strips, handle",
+      "can_collide": false,
+      "color": [
+        18,
+        20,
+        27
+      ],
+      "material": "SmoothPlastic",
+      "note": "paint zone white -> Color = paint like Body",
+      "triangles": 1254,
+      "materials": [
+        "Paint",
+        "Underbody",
+        "Cabin_Trim",
+        "Chrome",
+        "Trim_Black",
+        "Leather_Dark",
+        "Leather",
+        "Wood",
+        "Alu"
+      ],
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        5.4571
+      ],
+      "pivot_m": [
+        -0.98,
+        0.62,
+        1.528
+      ],
+      "bbox_min_studs": [
+        -3.4958,
+        1.24,
+        5.5721
+      ],
+      "bbox_max_studs": [
+        -2.9107,
+        3.5636,
+        8.9136
+      ],
+      "size_studs": [
+        0.5851,
+        2.3236,
+        3.3415
+      ],
+      "mesh_check": {
+        "tris": 1254,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 1.8592,
+        "shells": 11,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 7.91e-07
+      },
+      "hinge_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "open_angle_deg": -65.0,
+      "open_cframe": "door:PivotTo(closedPivot * CFrame.Angles(0, math.rad(open_angle_deg * t), 0)), t = 0..1",
+      "hinge_note": "vertical hinge at the door's front edge (3 cm ahead of it, on the body's widest line). Left doors open with a negative angle about +Y, right doors with a positive one; the door glass (Door_RearL_Glass) uses the same pivot and angle."
+    },
+    {
+      "name": "Door_RearL_Glass",
+      "kind": "door_glass",
+      "role": "frameless door glass; moves with Door_RearL",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Glass",
+      "welded_to": "Door_RearL",
+      "transparency": 0.22,
+      "triangles": 364,
+      "materials": [
+        "Glass_Privacy",
+        "Glass"
+      ],
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        5.4571
+      ],
+      "pivot_m": [
+        -0.98,
+        0.62,
+        1.528
+      ],
+      "bbox_min_studs": [
+        -3.1916,
+        3.4916,
+        5.6893
+      ],
+      "bbox_max_studs": [
+        -2.6201,
+        4.9821,
+        8.8361
+      ],
+      "size_studs": [
+        0.5715,
+        1.4905,
+        3.1468
+      ],
+      "mesh_check": {
+        "tris": 364,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0722,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 8.01e-05
+      },
+      "hinge_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "open_angle_deg": -65.0
+    },
+    {
+      "name": "Door_RearR",
+      "kind": "door",
+      "role": "opening door: outer panel, jamb faces, door card (armrest, wood, handle, speaker), belt + lower chrome strips, handle",
+      "can_collide": false,
+      "color": [
+        18,
+        20,
+        27
+      ],
+      "material": "SmoothPlastic",
+      "note": "paint zone white -> Color = paint like Body",
+      "triangles": 1250,
+      "materials": [
+        "Paint",
+        "Underbody",
+        "Cabin_Trim",
+        "Chrome",
+        "Trim_Black",
+        "Leather_Dark",
+        "Leather",
+        "Wood",
+        "Alu"
+      ],
+      "pivot_studs": [
+        3.5,
+        2.2143,
+        5.4571
+      ],
+      "pivot_m": [
+        0.98,
+        0.62,
+        1.528
+      ],
+      "bbox_min_studs": [
+        2.9107,
+        1.24,
+        5.5721
+      ],
+      "bbox_max_studs": [
+        3.4958,
+        3.5636,
+        8.9136
+      ],
+      "size_studs": [
+        0.5851,
+        2.3236,
+        3.3415
+      ],
+      "mesh_check": {
+        "tris": 1250,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 1.8592,
+        "shells": 11,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 7.85e-07
+      },
+      "hinge_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "open_angle_deg": 65.0,
+      "open_cframe": "door:PivotTo(closedPivot * CFrame.Angles(0, math.rad(open_angle_deg * t), 0)), t = 0..1",
+      "hinge_note": "vertical hinge at the door's front edge (3 cm ahead of it, on the body's widest line). Left doors open with a negative angle about +Y, right doors with a positive one; the door glass (Door_RearR_Glass) uses the same pivot and angle."
+    },
+    {
+      "name": "Door_RearR_Glass",
+      "kind": "door_glass",
+      "role": "frameless door glass; moves with Door_RearR",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Glass",
+      "welded_to": "Door_RearR",
+      "transparency": 0.22,
+      "triangles": 364,
+      "materials": [
+        "Glass_Privacy",
+        "Glass"
+      ],
+      "pivot_studs": [
+        3.5,
+        2.2143,
+        5.4571
+      ],
+      "pivot_m": [
+        0.98,
+        0.62,
+        1.528
+      ],
+      "bbox_min_studs": [
+        2.6201,
+        3.4916,
+        5.6893
+      ],
+      "bbox_max_studs": [
+        3.1916,
+        4.9821,
+        8.8361
+      ],
+      "size_studs": [
+        0.5715,
+        1.4905,
+        3.1468
+      ],
+      "mesh_check": {
+        "tris": 364,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0722,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 8.01e-05
+      },
+      "hinge_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "open_angle_deg": 65.0
+    },
+    {
+      "name": "Wheel_FL",
+      "kind": "wheel",
+      "role": "245/45 R19 tyre (sidewall bulge, 3 tread grooves), 10-spoke rim, hub, lug bolts, brake disc (spins with the wheel)",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 3896,
+      "materials": [
+        "Tire_Side",
+        "Tire",
+        "Rim_Silver",
+        "Rim_Dark",
+        "Brake_Disc"
+      ],
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "pivot_m": [
+        -0.83,
+        0.3515,
+        -2.668
+      ],
+      "bbox_min_studs": [
+        -3.3946,
+        0.0,
+        -10.7841
+      ],
+      "bbox_max_studs": [
+        -2.5339,
+        2.5111,
+        -8.273
+      ],
+      "size_studs": [
+        0.8607,
+        2.5111,
+        2.5111
+      ],
+      "mesh_check": {
+        "tris": 3896,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.4739,
+        "shells": 22,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 5.44e-05
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about the part's local +X axis; rolling forward (towards -Z) is a NEGATIVE angle: motor.Transform = CFrame.Angles(-distance / radius_studs, 0, 0)",
+      "radius_studs": 1.2555,
+      "radius_m": 0.3515,
+      "tyre": "245/45 R19 (diameter 0.7031 m)",
+      "steer_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "steer_limits_deg": [
+        -30.0,
+        30.0
+      ],
+      "steer_note": "positive angle about +Y turns the wheel's front towards the car's left (-X)"
+    },
+    {
+      "name": "Wheel_FR",
+      "kind": "wheel",
+      "role": "245/45 R19 tyre (sidewall bulge, 3 tread grooves), 10-spoke rim, hub, lug bolts, brake disc (spins with the wheel)",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 3896,
+      "materials": [
+        "Tire_Side",
+        "Tire",
+        "Rim_Silver",
+        "Rim_Dark",
+        "Brake_Disc"
+      ],
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "pivot_m": [
+        0.83,
+        0.3515,
+        -2.668
+      ],
+      "bbox_min_studs": [
+        2.5339,
+        0.0,
+        -10.7841
+      ],
+      "bbox_max_studs": [
+        3.3946,
+        2.5111,
+        -8.273
+      ],
+      "size_studs": [
+        0.8607,
+        2.5111,
+        2.5111
+      ],
+      "mesh_check": {
+        "tris": 3896,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.4739,
+        "shells": 22,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 5.44e-05
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about the part's local +X axis; rolling forward (towards -Z) is a NEGATIVE angle: motor.Transform = CFrame.Angles(-distance / radius_studs, 0, 0)",
+      "radius_studs": 1.2555,
+      "radius_m": 0.3515,
+      "tyre": "245/45 R19 (diameter 0.7031 m)",
+      "steer_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "steer_limits_deg": [
+        -30.0,
+        30.0
+      ],
+      "steer_note": "positive angle about +Y turns the wheel's front towards the car's left (-X)"
+    },
+    {
+      "name": "Wheel_RL",
+      "kind": "wheel",
+      "role": "245/45 R19 tyre (sidewall bulge, 3 tread grooves), 10-spoke rim, hub, lug bolts, brake disc (spins with the wheel)",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 3896,
+      "materials": [
+        "Tire_Side",
+        "Tire",
+        "Rim_Silver",
+        "Rim_Dark",
+        "Brake_Disc"
+      ],
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        9.5286
+      ],
+      "pivot_m": [
+        -0.83,
+        0.3515,
+        2.668
+      ],
+      "bbox_min_studs": [
+        -3.3946,
+        0.0,
+        8.273
+      ],
+      "bbox_max_studs": [
+        -2.5339,
+        2.5111,
+        10.7841
+      ],
+      "size_studs": [
+        0.8607,
+        2.5111,
+        2.5111
+      ],
+      "mesh_check": {
+        "tris": 3896,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.4739,
+        "shells": 22,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 5.44e-05
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about the part's local +X axis; rolling forward (towards -Z) is a NEGATIVE angle: motor.Transform = CFrame.Angles(-distance / radius_studs, 0, 0)",
+      "radius_studs": 1.2555,
+      "radius_m": 0.3515,
+      "tyre": "245/45 R19 (diameter 0.7031 m)"
+    },
+    {
+      "name": "Wheel_RR",
+      "kind": "wheel",
+      "role": "245/45 R19 tyre (sidewall bulge, 3 tread grooves), 10-spoke rim, hub, lug bolts, brake disc (spins with the wheel)",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 3896,
+      "materials": [
+        "Tire_Side",
+        "Tire",
+        "Rim_Silver",
+        "Rim_Dark",
+        "Brake_Disc"
+      ],
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        9.5286
+      ],
+      "pivot_m": [
+        0.83,
+        0.3515,
+        2.668
+      ],
+      "bbox_min_studs": [
+        2.5339,
+        0.0,
+        8.273
+      ],
+      "bbox_max_studs": [
+        3.3946,
+        2.5111,
+        10.7841
+      ],
+      "size_studs": [
+        0.8607,
+        2.5111,
+        2.5111
+      ],
+      "mesh_check": {
+        "tris": 3896,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 2.4739,
+        "shells": 22,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 5.44e-05
+      },
+      "spin_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "spin": "spin about the part's local +X axis; rolling forward (towards -Z) is a NEGATIVE angle: motor.Transform = CFrame.Angles(-distance / radius_studs, 0, 0)",
+      "radius_studs": 1.2555,
+      "radius_m": 0.3515,
+      "tyre": "245/45 R19 (diameter 0.7031 m)"
+    },
+    {
+      "name": "Caliper_FL",
+      "kind": "caliper",
+      "role": "dark-red brake caliper; does not spin; steers with Wheel_FL",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Metal",
+      "welded_to": "steering knuckle of Wheel_FL",
+      "triangles": 86,
+      "materials": [
+        "Caliper"
+      ],
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "pivot_m": [
+        -0.83,
+        0.3515,
+        -2.668
+      ],
+      "bbox_min_studs": [
+        -3.1643,
+        1.2874,
+        -9.2729
+      ],
+      "bbox_max_studs": [
+        -2.8429,
+        1.8655,
+        -8.7946
+      ],
+      "size_studs": [
+        0.3214,
+        0.5781,
+        0.4783
+      ],
+      "mesh_check": {
+        "tris": 86,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0468,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.00365
+      },
+      "note": "pivot = wheel centre. Front calipers: apply the same steer angle as the wheel, no spin."
+    },
+    {
+      "name": "Caliper_FR",
+      "kind": "caliper",
+      "role": "dark-red brake caliper; does not spin; steers with Wheel_FR",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Metal",
+      "welded_to": "steering knuckle of Wheel_FR",
+      "triangles": 86,
+      "materials": [
+        "Caliper"
+      ],
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "pivot_m": [
+        0.83,
+        0.3515,
+        -2.668
+      ],
+      "bbox_min_studs": [
+        2.8429,
+        1.2874,
+        -9.2729
+      ],
+      "bbox_max_studs": [
+        3.1643,
+        1.8655,
+        -8.7946
+      ],
+      "size_studs": [
+        0.3214,
+        0.5781,
+        0.4783
+      ],
+      "mesh_check": {
+        "tris": 86,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0468,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.00365
+      },
+      "note": "pivot = wheel centre. Front calipers: apply the same steer angle as the wheel, no spin."
+    },
+    {
+      "name": "Caliper_RL",
+      "kind": "caliper",
+      "role": "dark-red brake caliper; does not spin",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Metal",
+      "welded_to": "Body",
+      "triangles": 86,
+      "materials": [
+        "Caliper"
+      ],
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        9.5286
+      ],
+      "pivot_m": [
+        -0.83,
+        0.3515,
+        2.668
+      ],
+      "bbox_min_studs": [
+        -3.1643,
+        1.2874,
+        9.7842
+      ],
+      "bbox_max_studs": [
+        -2.8429,
+        1.8655,
+        10.2625
+      ],
+      "size_studs": [
+        0.3214,
+        0.5781,
+        0.4783
+      ],
+      "mesh_check": {
+        "tris": 86,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0468,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.00365
+      },
+      "note": "pivot = wheel centre. Front calipers: apply the same steer angle as the wheel, no spin."
+    },
+    {
+      "name": "Caliper_RR",
+      "kind": "caliper",
+      "role": "dark-red brake caliper; does not spin",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Metal",
+      "welded_to": "Body",
+      "triangles": 86,
+      "materials": [
+        "Caliper"
+      ],
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        9.5286
+      ],
+      "pivot_m": [
+        0.83,
+        0.3515,
+        2.668
+      ],
+      "bbox_min_studs": [
+        2.8429,
+        1.2874,
+        9.7842
+      ],
+      "bbox_max_studs": [
+        3.1643,
+        1.8655,
+        10.2625
+      ],
+      "size_studs": [
+        0.3214,
+        0.5781,
+        0.4783
+      ],
+      "mesh_check": {
+        "tris": 86,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0468,
+        "shells": 1,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.00365
+      },
+      "note": "pivot = wheel centre. Front calipers: apply the same steer angle as the wheel, no spin."
+    },
+    {
+      "name": "Interior_Front",
+      "kind": "static",
+      "role": "driver cockpit: dashboard, 2 screens, vents, column, console, gear selector, cup holders, pedals, driver + passenger seat, carpet, sill plates",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 4536,
+      "materials": [
+        "Carpet",
+        "Leather_Dark",
+        "Wood",
+        "Alu",
+        "Piano_Black",
+        "Screen",
+        "Screen_UI",
+        "Leather",
+        "Stitch"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1786,
+        0.6786,
+        -7.0821
+      ],
+      "bbox_max_studs": [
+        3.1786,
+        4.3063,
+        -2.2362
+      ],
+      "size_studs": [
+        6.3572,
+        3.6277,
+        4.8459
+      ],
+      "mesh_check": {
+        "tris": 4536,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 29.8875,
+        "shells": 90,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 6.34e-06
+      }
+    },
+    {
+      "name": "SteeringWheel",
+      "kind": "rotating",
+      "role": "3-spoke steering wheel; rotate about hinge_axis",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 844,
+      "materials": [
+        "Leather_Dark",
+        "Alu"
+      ],
+      "pivot_studs": [
+        -1.4286,
+        3.125,
+        -5.6179
+      ],
+      "pivot_m": [
+        -0.4,
+        0.875,
+        -1.573
+      ],
+      "bbox_min_studs": [
+        -2.1464,
+        2.464,
+        -5.9518
+      ],
+      "bbox_max_studs": [
+        -0.7107,
+        3.786,
+        -5.2839
+      ],
+      "size_studs": [
+        1.4357,
+        1.322,
+        0.6679
+      ],
+      "mesh_check": {
+        "tris": 844,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0776,
+        "shells": 6,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.00018
+      },
+      "hinge_axis": [
+        0.0,
+        0.40674,
+        0.91355
+      ],
+      "hinge_axis_note": "steering column axis, pointing from the dashboard towards the driver",
+      "rotation_limits_deg": [
+        -450.0,
+        450.0
+      ],
+      "suggested_game_limits_deg": [
+        -120.0,
+        120.0
+      ],
+      "rotation_note": "positive angle (right-hand rule about hinge_axis) turns the rim counter-clockwise as the driver sees it = steering LEFT"
+    },
+    {
+      "name": "Interior_Lounge",
+      "kind": "static",
+      "role": "lounge: carpet, long side bench (3 seats), rear bench (3 seats, armrests, cup holders), partition with window + TV, star-ceiling panel, sill plates",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 6148,
+      "materials": [
+        "Alu",
+        "Leather_Dark",
+        "Piano_Black",
+        "Leather",
+        "Stitch",
+        "Wood",
+        "Carpet",
+        "Screen",
+        "Screen_UI",
+        "Headliner"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1786,
+        0.6786,
+        -2.5821
+      ],
+      "bbox_max_studs": [
+        3.1915,
+        5.2035,
+        11.5821
+      ],
+      "size_studs": [
+        6.3701,
+        4.5249,
+        14.1642
+      ],
+      "mesh_check": {
+        "tris": 6148,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 66.9456,
+        "shells": 115,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 4.42e-05
+      }
+    },
+    {
+      "name": "Interior_Bar",
+      "kind": "static",
+      "role": "refreshment console: cabinet, mirrored back, tumblers, 2 water carafes, ice bucket with ice, cup holders, control panel (no alcohol, no labels)",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "SmoothPlastic",
+      "triangles": 4600,
+      "materials": [
+        "Piano_Black",
+        "Wood",
+        "Alu",
+        "Mirror_Glass",
+        "Bar_Glass",
+        "Water",
+        "Ice",
+        "Screen_UI"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.1607,
+        0.8393,
+        -2.2071
+      ],
+      "bbox_max_studs": [
+        -1.6429,
+        3.5143,
+        5.4714
+      ],
+      "size_studs": [
+        1.5178,
+        2.675,
+        7.6785
+      ],
+      "mesh_check": {
+        "tris": 4600,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 18.4781,
+        "shells": 49,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 5.41e-05
+      }
+    },
+    {
+      "name": "Ambient_LED",
+      "kind": "light",
+      "role": "ambient LED strips (ceiling, roof rails, bar, toe-kicks, partition)",
+      "can_collide": false,
+      "color": [
+        140,
+        123,
+        255
+      ],
+      "material": "Neon",
+      "note": "vertex colour white: MeshPart.Color sets the LED colour (render: 140,123,255)",
+      "triangles": 144,
+      "materials": [
+        "LED"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -3.0607,
+        0.8571,
+        -2.3357
+      ],
+      "bbox_max_studs": [
+        2.7857,
+        5.075,
+        9.2786
+      ],
+      "size_studs": [
+        5.8464,
+        4.2179,
+        11.6143
+      ],
+      "mesh_check": {
+        "tris": 144,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0709,
+        "shells": 12,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000383
+      }
+    },
+    {
+      "name": "StarLights",
+      "kind": "light",
+      "role": "150 star points of the ceiling panel",
+      "can_collide": false,
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "material": "Neon",
+      "triangles": 600,
+      "materials": [
+        "Star"
+      ],
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_min_studs": [
+        -1.9279,
+        5.0861,
+        -1.7496
+      ],
+      "bbox_max_studs": [
+        1.9369,
+        5.1161,
+        8.9517
+      ],
+      "size_studs": [
+        3.8648,
+        0.03,
+        10.7013
+      ],
+      "mesh_check": {
+        "tris": 600,
+        "non_manifold_edges": 0,
+        "signed_volume_studs3": 0.0006,
+        "shells": 150,
+        "zero_area_faces": 0,
+        "min_triangle_area_studs2": 0.000236
+      }
+    }
+  ],
+  "materials": {
+    "Paint": {
+      "srgb_hex": "0B0E15",
+      "vertex_colour_hex": "FFFFFF"
+    },
+    "Trim_Black": {
+      "srgb_hex": "0D0E10",
+      "vertex_colour_hex": "0D0E10"
+    },
+    "Satin_Black": {
+      "srgb_hex": "17181B",
+      "vertex_colour_hex": "17181B"
+    },
+    "Wheelwell": {
+      "srgb_hex": "0E0F10",
+      "vertex_colour_hex": "0E0F10"
+    },
+    "Underbody": {
+      "srgb_hex": "131416",
+      "vertex_colour_hex": "131416"
+    },
+    "Body_Inner": {
+      "srgb_hex": "1B1C1F",
+      "vertex_colour_hex": "1B1C1F"
+    },
+    "Cabin_Trim": {
+      "srgb_hex": "2B2420",
+      "vertex_colour_hex": "2B2420"
+    },
+    "Chrome": {
+      "srgb_hex": "E2E5EA",
+      "vertex_colour_hex": "E2E5EA"
+    },
+    "Plate": {
+      "srgb_hex": "EEF0F0",
+      "vertex_colour_hex": "EEF0F0"
+    },
+    "Glass": {
+      "srgb_hex": "8FA4B0",
+      "vertex_colour_hex": "2A3A44"
+    },
+    "Glass_Privacy": {
+      "srgb_hex": "12161B",
+      "vertex_colour_hex": "0E1216"
+    },
+    "Mirror_Glass": {
+      "srgb_hex": "B8C2CC",
+      "vertex_colour_hex": "B8C2CC"
+    },
+    "Headlight_LED": {
+      "srgb_hex": "F4F8FF",
+      "vertex_colour_hex": "F4F8FF"
+    },
+    "Lens": {
+      "srgb_hex": "CFE0F0",
+      "vertex_colour_hex": "CFE0F0"
+    },
+    "Indicator": {
+      "srgb_hex": "FF9A1A",
+      "vertex_colour_hex": "FF9A1A"
+    },
+    "Taillight": {
+      "srgb_hex": "E0101C",
+      "vertex_colour_hex": "E0101C"
+    },
+    "Reflector": {
+      "srgb_hex": "8A0A12",
+      "vertex_colour_hex": "8A0A12"
+    },
+    "Tire": {
+      "srgb_hex": "1A1A1C",
+      "vertex_colour_hex": "1A1A1C"
+    },
+    "Tire_Side": {
+      "srgb_hex": "222225",
+      "vertex_colour_hex": "222225"
+    },
+    "Rim_Silver": {
+      "srgb_hex": "C7CCD2",
+      "vertex_colour_hex": "C7CCD2"
+    },
+    "Rim_Dark": {
+      "srgb_hex": "3A3E44",
+      "vertex_colour_hex": "3A3E44"
+    },
+    "Brake_Disc": {
+      "srgb_hex": "55585D",
+      "vertex_colour_hex": "55585D"
+    },
+    "Caliper": {
+      "srgb_hex": "8E1C24",
+      "vertex_colour_hex": "8E1C24"
+    },
+    "Leather": {
+      "srgb_hex": "D9CDB5",
+      "vertex_colour_hex": "D9CDB5"
+    },
+    "Leather_Dark": {
+      "srgb_hex": "3A2F28",
+      "vertex_colour_hex": "3A2F28"
+    },
+    "Stitch": {
+      "srgb_hex": "B8A88C",
+      "vertex_colour_hex": "B8A88C"
+    },
+    "Carpet": {
+      "srgb_hex": "221F1C",
+      "vertex_colour_hex": "221F1C"
+    },
+    "Headliner": {
+      "srgb_hex": "17171A",
+      "vertex_colour_hex": "17171A"
+    },
+    "Piano_Black": {
+      "srgb_hex": "08090A",
+      "vertex_colour_hex": "08090A"
+    },
+    "Wood": {
+      "srgb_hex": "4A2C1A",
+      "vertex_colour_hex": "4A2C1A"
+    },
+    "Alu": {
+      "srgb_hex": "A9AEB4",
+      "vertex_colour_hex": "A9AEB4"
+    },
+    "Screen": {
+      "srgb_hex": "0A1626",
+      "vertex_colour_hex": "0A1626"
+    },
+    "Screen_UI": {
+      "srgb_hex": "3A86D8",
+      "vertex_colour_hex": "3A86D8"
+    },
+    "Bar_Glass": {
+      "srgb_hex": "DCE8EE",
+      "vertex_colour_hex": "DCE8EE"
+    },
+    "Water": {
+      "srgb_hex": "BFD8E2",
+      "vertex_colour_hex": "BFD8E2"
+    },
+    "Ice": {
+      "srgb_hex": "E8F2F6",
+      "vertex_colour_hex": "E8F2F6"
+    },
+    "LED": {
+      "srgb_hex": "8C7BFF",
+      "vertex_colour_hex": "FFFFFF"
+    },
+    "Star": {
+      "srgb_hex": "FFFFFF",
+      "vertex_colour_hex": "FFFFFF"
+    }
+  },
+  "export": {
+    "fbx": "ExecutiveLimo.fbx",
+    "obj": "ExecutiveLimo.obj",
+    "mtl": "ExecutiveLimo.mtl",
+    "fbx_settings": "axis_forward=Z, axis_up=Y, apply_scale_options=FBX_SCALE_UNITS, global_scale=1, bake_space_transform, mesh_smooth_type=FACE, colors_type=SRGB, triangulated, no leaf bones, no animation, path_mode=COPY+embed (no textures used)",
+    "blender_units": "1 Blender unit = 1 stud (scene Unit System None, Unit Scale 1.0)"
+  },
+  "problems": []
+}

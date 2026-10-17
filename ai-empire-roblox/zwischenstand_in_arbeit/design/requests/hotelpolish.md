@@ -30,6 +30,7 @@ STATUS: done by corefix (PlotService.refresh: LobbyHouseSign and ParapetNameBand
   (empty) staff chair at (-113.4, 101.7). Every hop of post 13 is walkable for a radius-1.0 body
   (tests/hotelpolish, tests/life/test_routes.py, tests/buildings/test_geometry.py).
 STATUS: deferred to guests_jet (info for the hotel-guest NPCs: lobby seats, greet point, counter, second staff chair)
+STATUS: done by guests_jet (guests check in / out on the guest side of the counter at (-107.3, 97.6 / 100.6), sit on Wait1..4 (sofa / armchairs) and the window-bar stools; the greet point and staff chairs stay the receptionist's)
 
 ## 4. ExteriorDesign `garden()` (owner: lead / garden) — move the WestPath bench off the path's centre line
 `Kit.bench(m, B, Kit.place(-92, 0.14, 150, "E"), 6, seed + 5)` puts the two seats (Office/Site/Garden/Seat, x -92.8..-91.2,

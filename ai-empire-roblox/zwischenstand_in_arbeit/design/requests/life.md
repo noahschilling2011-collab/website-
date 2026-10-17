@@ -55,6 +55,7 @@ The garage guard's patrol ends at the ramp foot ("checks the barrier" = looks up
 ramp. If the guard should really open it, add e.g. `Doors.requestNPC(npc, door, {remote = true})` for the
 `Door_SITE_BARRIER` that skips the range check when the NPC stands in B1_GARAGE.
 STATUS: deferred to drivers (the fleet car leaves through Door_SITE_BARRIER; if drivers want the barrier to open for it or for the guard, DoorService needs a remote flag - optional today, the guard's 'check' is a pose)
+STATUS: done by drivers (no DoorService change needed: DriverService opens Door_SITE_BARRIER for every company car with the existing Doors.requestNPC through an invisible support-role proxy NPC "DriverProxy" inside the office, placed 3 studs inside the barrier, from 3 s before until 2 s after the car's pass time, at most once per second; the guard's patrol is untouched. tests/drivers/test_service checks the calls)
 
 ## 6. EmployeeNavigation.module.luau — nothing required
 Job hops inside a room use direct `Humanoid:MoveTo` (StaffJobs) and are counted in the office movers cap

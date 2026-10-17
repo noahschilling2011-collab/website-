@@ -87,3 +87,74 @@ Assistentin bucht, Fahrer holt ab, Mitarbeiter reist mit, Shuttle/Jet, VIP-Limo,
 - Prewire 2b: JetService/DriverService/ItineraryService (init + tick, Main.server nach PhoneService, Reihenfolge Jet → Driver → Itinerary, tick in der Campus-Schleife), Drive/Guest/Jet/ItineraryController (Main.client nach PhoneController), Net "TripAction".
 - Lab-Paket lief parallel (eigene Dateien, nicht angefasst); phone #3 und apps #8 an lab.
 - Baseline: agents/stable/src_r2b_base. Logs: agents/integrate/ (runall_1/2, harness_1, world_dump_1, clearance1).
+- 10.10. 18:41 — Sicherung ins Repo (Commit 30eaca5): zwischenstand_in_arbeit/ (src/tests/design WIP 18:41, Pläne inkl. round2b.js/lab_build.js/Workflow-Skripte/Briefs, Recherche) + assets/vehicles (Blender 320/380/CityCar ohne _scratch/_research). Stand Workflows: integrate fertig (Triage, run_all grün mit allen Paket-Suites, Prewire), drivers + guests_jet bauen, lab bei GUI-Renders.
+- 10.10. 19:50–20:10 Session-Limit #2 (lab build + drivers/guests_jet Builds abgebrochen). 20:12: round2b resumed (w2d3wum9c, integrate gecacht, RESUME-Note für drivers/guests_jet), lab neu gestartet mit RESUME-Note (wdnoetpta, wf_840483a3-525). Integrate-Ergebnis: 86 Request-Abschnitte triagiert (32 done/39 already/6 dropped/9 deferred), run_all 99 Suites grün (233,105 Checks), Harness ok, Ticket $700, empire.prefs, Prewire + Snapshot src_r2b_base. Entscheidung staffops #10: sichtbare Ops-Posten = bezahlt (Stufe 2: 8 Posten).
+- 10.10. 20:2x — Nutzerwunsch 27: detailreiche Blender-Limousine (ExecutiveLimo) für Fahrer/Flughafen. Workflow wtg13v9f3 (wf_ca88dc6a-71b): model → critique → fix → verify (→ fix2). Ziel assets/vehicles/executivelimo/ (FBX/OBJ, manifest mit Anker/Scharnieren, Renders, README+Import). Spielanbindung als Request in design/requests/drivers.md; nach drivers-Fix einbauen (Mesh wenn ReplicatedStorage.Assets.Vehicles.ExecutiveLimo vorhanden, sonst Teile-Limo).
+- 10.10. 21:4x — Nutzerwunsch 28: Tutorial (erste KI rausbringen), Menü einfacher, Robux-Shop (existiert: ShopService/ShopApp/ShopConfig, alle ids=0 bis Owner sie anlegt). Design-Workflow wnlhm0goa (wf_cb981e20-042) → design/ONBOARDING_SPEC.md + Mockups out/onboarding_design/. Bau erst NACH Lab-Fertigstellung (Tutorial führt durchs Model Studio); Paket 'onboarding' besitzt dann Computer/HUD/Intro/Tutorial-UI/ShopApp/ShopService/ShopConfig/AssistantService-Zeilen + empire.tutorial (Template additiv mit Migrationstest). Meridian-Grand-Renders: Hintergrund-Agent → out/meridian_grand/.
+- 11.10. 06:1x — Session-Limit #3 (~22:30–01:10 UTC), danach idle bis 06:11. Neu gestartet: round2b we3iug40e (integrate gecacht, drivers/guests_jet mit RESUME), lab wxdjc04s4 (build+reviews gecacht, fix:lab mit RESUME), limo w78pwrfr1 (model mit RESUME), onboarding design wey1k04t6 (research gecacht), Meridian-Agent per SendMessage fortgesetzt.
+- 11.10. 07:1x — Nutzerwunsch 29: Robux-Forschungs-Skip + viel größerer Shop, Ideen von Build a Phone Empire übernehmen, aber eigene KI-Produkte (keine kopierten Namen/Texte/Bilder). Design-Workflow wahk8kpuy (wf_968568b6-1d6) → design/SHOP_SPEC.md + out/shop_design/. Bau zusammen mit onboarding (ONBOARDING_SPEC + SHOP_SPEC) nach Lab-Ende. Wirtschafts-Leitplanken: Zahler schneller, Nicht-Zahler unverändert, Caps, Sim mit Nicht-/Leicht-/Viel-Zahler.
+
+## 07:35 UTC – Meridian Grand Renders fertig (out/meridian_grand/hotel_1..4.png), an User geschickt
+Ehrliche Bewertung: wirkt wie Bürobau. Geplantes Paket "grandhotel" (NACH Runde 2b, da drivers ggf. CityBuilder/Vorplatz anfasst):
+- Fassade: Sockel/Podium, Säulen, Gesims, Balkone/Rücksprünge, Sprossen oben; Fenster mit MetroNightGlow taggen (aktuell 0)
+- Eingang: Vordach groß (Porte-cochère), Drehtür/Türen, Stufen, Fahnen, Pflanzkübel, Vorfahrt-Spur (passt zu Limo-Drop-off), Doorman-NPC + Gepäckwagen
+- Lobby: verkleinern/zonieren, Teppiche, Kronleuchter, Säulen, Bar/Café, bessere Möbel (keine Würfel), Bodenbelag
+- Helipad: von unten sichtbar machen oder Lift-Teleport ehrlich kennzeichnen
+
+## 07:40 UTC – User-Wunsch 30: Meridian Grand: "Zimmer die richtig krass sein müssen", Wellness-Etage, Hotel-Mitarbeiter
+- Design-Workflow wjnb2xm5b / wf_026d3e6f-48f (scout code+research → 3 Vorschläge wow/iphone/life → 2 Judges → design/GRANDHOTEL_SPEC.md + out/grandhotel_design/plan_*.png → Critic)
+- Build ERST nach Runde 2b (Konflikt: drivers pm_hotel Drop-off, itinerary "Your room"-Marker im Meridian Grand). Danach Paket(e) laut Spec.
+- Ehrlich an User: großes Paket, Risiko Performance iPhone (10 Etagen Innenleben) → Spec muss faken/streamen wo nötig.
+
+## 07:52 UTC – Onboarding-Design fertig (wf_cb981e20-042): design/ONBOARDING_SPEC.md (Critic: 21 Fixes, Abschnitt 0.6), out/onboarding_design/phone_1..9 + desktop_1..2 neu gerendert
+- Offene Owner-Entscheidungen (0.3): Series A/B Cash-Pack-Cap (0.5x/1.0x nächster Bürопreis, ändert CORE_SPEC 11.7), Robux-Preise, Firmennamen-Ideen, kompaktes Phone-Panel
+- Vor Build: Shop-v2-Design (wf_968568b6-1d6, inkl. Forschung-Überspringen) abwarten und in Spec mergen; Build erst nach lab (Studio-Dateien) → dann User einmal zu Cap/Preisen fragen
+- tests/apps/test_ui.luau:116-121 prüft den Bug (Goal→Datasets) – muss im Build umgeschrieben werden
+- Grandhotel-Research: PM hat 40/40 echte Lights → Glow per Neon/NightGlow/Client-Lights; Teile 5.253/20.000; Terrain-Wasser für echtes Schwimmen
+
+## 11:15 UTC – Limit-Treffer ~08:00 (reset 11:10). Alles fortgesetzt:
+- lab wu1cr4cvt (resume wf_840483a3-525: build/reviews/fix1 cached, verify:lab live)
+- round2b w6s1jrnfd (resume wf_c03a1790-02a: integrate+build:drivers cached; build:guests_jet + review:drivers live)
+- shop v2 wsph1afbp (resume wf_968568b6-1d6: research cached, design live)
+- grandhotel CONTINUATION w10mtnijb / wf_25a5df47-499 (script ai-empire-grandhotel-design-cont.js: research als Konstante, scout:code mit RESUME) – weil scout:code VOR research in Aufrufreihenfolge lag
+- limo ww9y6t5iq (resume wf_ca88dc6a-71b: nichts cached, model:limo mit RESUME live)
+- Check-in 8 in 90 min
+
+## 12:00 UTC – LAB FERTIG (wf_840483a3-525): verify:lab verdict good, 0 blocking; run_all 99/99 (233,105 checks) beim Verifier; 45/45 Mutationen; Balance 12/12 PASS byte-identisch
+- Release-Snapshot agents/stable/snap_lab_1150 = src_r2b_base + LabApp + UI/Lab/* (ohne Runde-2b-WIP). run_all + pack + roundtrip läuft (bwr55i4uu) → out/rel1150/AIEmpire_Stand_2026-10-11_ki-studio.rbxlx → Repo/PR #18
+- 7 Lab-PNGs an User geschickt
+- Offene lab-Requests (design/requests/lab.md #1-8): HUD-Toast ohne Score, JourneyMath section, Toast.hold, kompaktes Computer-Chrome → ins onboarding-Paket (besitzt HUD/Computer)
+
+## 12:35 UTC – Release gepusht: 65a4615 auf claude/ai-empire-roblox-tycoon (PR #18 Beschreibung aktualisiert): AIEmpire_Stand_2026-10-11_ki-studio.rbxlx (snap_lab_1150, run_all 99/99, ROUNDTRIP OK 155 Skripte), ki_studio_bilder/, projekt/ aktualisiert (tests ohne gen*-Ordner, ohne Runde-2b-Tests)
+
+## 16:15 UTC – Limit-Treffer ~13:30 (reset 16:10). Alles fortgesetzt mit RESUME-Notizen nur an den abgebrochenen Agenten:
+- round2b wmwnra3vh (fix:drivers RESUME; review/fix guests_jet, itinerary, verify live)
+- shop v2 w98jmjlof (critique RESUME)
+- grandhotel wpe26qu2w (spec:synth RESUME; critic danach)
+- limo w4s1byv55 (fix:limo RESUME; Critic-Funde: Fahrertür-Boolean schneidet Armaturenbrett, Lounge ragt in hintere Radkästen, ...)
+
+## 16:30 UTC – User-Wunsch 31: Plugin 'roblox-dev' (ID 0093771a-…, Community/Ivar, Anthropic Directory) 'dort anwenden'. Plugin NICHT installiert (ListPlugins leer) → Install-Karte gezeigt. Inzwischen eigener Profi-Review mit denselben Linsen (Security/DataStores/Performance/UI+Typen) auf snap_lab_1150, read-only: w5avty6mr / wf_f41f44df-76b → agents/robloxreview/REPORT.md, ZUSAMMENFASSUNG.md, fix_plan.json. Fixes später als eigenes Paket (nicht während Runde 2b).
+
+## 16:45 UTC – Shop-v2-Design fertig (SHOP_SPEC.md, 23 Items, Eureka-Forschungs-Skip, Critic 25 Fixes). User-Entscheidung S1: kleine Geld-Pakete (10/20/30 % nächstes Büro, je 1x pro Büro) – 'soll schon dauern'. O2 Preise=Vorschläge, O3 Namensliste, L1 kompaktes Phone-HUD, S2 nicht gebaut.
+- Build gestartet: w33x6k0e6 / wf_fc7f2e55-a5a: build:menu (Tutorial+Menü+lab req #1/#2/#5/#6) → build:shop → review fn/ux → fix → verify (+fix2). Runde-2b-Dateien gesperrt (Requests → design/requests/onboarding.md).
+
+## 05:05 UTC (12.10.) – Limit ~18:30 (reset 21:10), Nacht idle. Fortgesetzt: round2b wtqch2949 (fix:drivers + fix:guests_jet mit RESUME, dann itinerary, verify), onboarding/shop w85svxfku (build:menu RESUME), limo wp69tul67 (fix+verify), grandhotel critic wlf9127iv. ZURÜCKGESTELLT: Profi-Review wf_f41f44df-76b (find:security+datastores fertig; Rest später per resume, Prefix ok).
+
+## 05:45 UTC – GRANDHOTEL_SPEC fertig + Critic (CC-1..30): Limo-Stop x19, Porch-Keepout, Juice-Bar statt Alkohol, Staff-Timing, Budget ≤3.250 Teile, GrandLifts; Request an itinerary in design/requests/grandhotel.md §1. Pakete: A grandhotel_shell, B grandhotel_inside (nach Runde 2b).
+
+## 06:10 UTC – LIMO FERTIG (wf_ca88dc6a-71b): fix 4/4 blocking behoben, verify good (0 blocking). 29 MeshParts, 69.910 Tris, alle <20k. FBX/OBJ/manifest/README in assets/vehicles/executivelimo/. Mesh-Hook laut Hotel-Critic schon in DriveController live (drivers fix). Repo-Kopie von design/requests/drivers.md ist veraltet (Entry-Points) → bei nächstem Release mitnehmen. Finale Bilder an User. Front-Form (kastig) offen – User fragen ob Extrarunde.
+
+## 07:05 UTC – drivers fix + guests_jet fix FERTIG (round2b), itinerary build läuft. MENU-Paket FERTIG (Tutorial P1+P2, Menü, lab req #1/#2/#5/#6): menu suites 111+83+45/0, sizes 279/0, neg 31/31, regress 1256/0, run_all 99/99, Non-payer byte-identisch. P3 (alte Tabs neu layouten) NICHT gebaut. 5 Bilder an User. Shop-Build läuft.
+
+## 2026-10-17 08:25 UTC — resume after weekly limit
+- Weekly limit reset. Added RESUME notes: build:shop (onboarding/shop script), review:itinerary (round2b.js, k==='itinerary' only).
+- Resumed wf_c03a1790-02a (round 2b), wf_fc7f2e55-a5a (onboarding/shop), wf_f41f44df-76b (pro review).
+- Launched roblox-dev:roblox-reviewer (plugin agent, read-only) on new modules (Driver/Jet/Guest/Itinerary/Shop/Tutorial/Guide/Home) in work/src.
+- 08:40 roblox-dev reviewer done: 11 raw findings (1 high R1 pass purchase trust, 3 medium R2 save race = pro F1, R3 itinerary go/cancel flood, R4 jet+driver double hold; 7 low). Saved agents/robloxdev_review/FINDINGS_RAW.md. Launched verify workflow wf_71a31831-4a3 (8 skeptics + plan, read-only, sandbox probes) -> VERIFIED.md, fix_plan.json, ZUSAMMENFASSUNG.md. Fixes go in a package AFTER round 2b + shop finish (file ownership).
+- 09:20 Owner wish 32: airport also on the other island (PM already has Airfield + ArrivalTerminal in MetroBuilder; City Airport = AirportBuilder) -> main airport much better, PM airport even better; very impressive hotel on PM (= Meridian Grand, GRANDHOTEL_SPEC, already planned); better game logic; show new menu (sent 4 phone PNGs).
+  Launched design workflow wf_44a8a949-832 (no src edits): airports audit -> 3 concepts -> synth AIRPORTS_SPEC.md -> critic -> plan renders (design/airports, out/airports_design); logic audit+sim -> 3 lenses -> LOGIC2_SPEC.md -> critic (design/logic2).
+  Build order after round 2b release: grandhotel A/B -> airports packages -> logic2 packages (owner decisions first); fix package for verified review findings; cabin package, pickup video still open.
+- 09:45 Pro review wf_f41f44df-76b done: 0 critical, 2 high (DS-1 BindToClose vs final save; P1 rig posing - verifier says medium), 5 medium, 8 low; report input was truncated -> lead appended perf + UI verifier verdicts (UI-1 high: old Computer 5-9 pt on phones, partly replaced by menu; UI-2/UI-5 medium). Files: agents/robloxreview/REPORT.md, ZUSAMMENFASSUNG.md, fix_plan.json, fix.diff (save fixes DS-1..4, untested on work/src). Fix package after round 2b + shop.
+- 10:15 Session limit hit ~09:55 (reset 10:10). Logic audit + airports audit done (design/logic2/audit/AUDIT.md: content ends ~3.2-3.5 h, no reason to come back, 83-86 min late-game wait, world has no economy effect; design/airports/audit/). Added RESUME notes (fix:itinerary, build:shop update, plan) + null guard in design script; resumed all 4 workflows (round2b, onbshop, robloxdev verify, design).
+- 10:25 robloxdev verify done: confirmed R2 (medium, save race = DS-3; fixR closes DS-2 too), R3 (medium, go() accepts declined keys -> add rec.declined check; round-2b owner), R6/R7/R8/R10 low; refuted R1 R4 R5 R9 R11. agents/robloxdev_review/VERIFIED.md, fix_plan.json, ZUSAMMENFASSUNG.md; patches per finding under agents/robloxdev_review/<group>/. Fix package after round 2b release = pro review DS-1..4 + P1 + UI-2/5 + these.
+- 11:50 fix:itinerary done (726/0, 56/56 mutations, run_all 99 rc=0); verify running. Lead must apply agents/itinerary/sb_drivers/drivers_request1.patch + sb_jet/guests_jet_request2.patch after verify (headline "driver brings you with colleague" + "fly together"), then re-test. build:shop done; review:function BLOCKING: cash packs "once per office" only enforced client-side -> repeat buys via Roblox shop reach Global HQ in ~9 min (S1 violated); fix:onbshop running (proposed: pack credit paid at next office move). review:ux: old tabs 8.8-10.4 pt text / 25.6-28 pt targets; UseSheet not modal for gamepad.

@@ -1136,13 +1136,28 @@ These are the numbers and functions the subsystem specs must use. The source of 
 - **Model chat** (request 16) reads `model.name/stats/overall/sizeId/focusId` only and has **no** economic effect.
 
 ### 11.7 Shop (Robux)
-- Cash packs: share of the **next** office price: Seed 0.25, Series A 0.75, Series B 2.0.
-  - Garage: $6,750 / $20,250 / $54,000.
-  - At stage 5: base = 1.9M × `ShopConfig.CASH.topFactor` = **1.0** (was 3.5), because there is nothing left to buy but sinks.
+- Cash packs (owner decision S1, 2026-10-12; replaces 0.25 / 0.75 / 2.0 and ONBOARDING_SPEC O1): share of the **next**
+  office price: Seed **0.10**, Series A **0.20**, Series B **0.30**, and **each size at most once per office**
+  (`ShopConfig.CASH.oncePerOffice`, save field `data.shop.packs[key] = office`; the buy chip hides while it equals the
+  current office; a late receipt still grants). Reason: with the old shares a buyer reached Global HQ in 5.7 min
+  (SHOP_SPEC 10.2); the owner wants buying to help, not to skip the game ("it should take time").
+  - Garage: $2,700 / $5,400 / $8,100. Founder HQ: $10,000 / $20,000 / $30,000. Startup Campus: $38,000 / $76,000 /
+    $114,000. Innovation Campus: $190,000 / $380,000 / $570,000.
+  - At stage 5: base = 1.9M × `ShopConfig.CASH.topFactor` = **1.0** (was 3.5), because there is nothing left to buy but
+    sinks: $190,000 / $380,000 / $570,000.
   - `CASH.minimum = 2,000`.
+  - Simulator proof with the shipped code: `scratchpad/agents/shop2/sim/` (make.sh, run.sh, out/table.md,
+    out/bounds.txt; re-run 2026-10-17, unchanged): a company that buys nothing is byte-identical to the game without the
+    shop changes (seed 4242, seed 7 at 12:00, two companies; 180 min); heavy payer (every pack once per office, all
+    Eurekas, Last Epoch on every run, 4 + 4 boosts, Investor) reaches Global HQ at 89–105 min (non-payers 165–169),
+    every stage ≥ 0.48× the same seed's non-payer time; light payer (Series A + 3 Eurekas + 1 Keynote) stays in every
+    casual window; a non-payer next to a heavy payer reaches Global HQ +5.0 % later (182.1 vs 173.5 min, 200-min run).
 - `ShopConfig.INVESTOR_MULTIPLIER = 1.10` (was 1.2). It applies to the player's own **market** revenue after shares (`MarketService.tick:187`), never to B2B, never to other players.
 - Never sell: market share, hype, NPC changes, B2B trust.
-- Executive Limo pass: cosmetic car. Headhunter voucher: one applicant with k ≥ 4.
+- Executive Limo pass: cosmetic car. Headhunter voucher: one applicant with skill exactly 4 for the smallest team
+  (deterministic since the shop package, SHOP_SPEC 3.12; no paid random item).
+- Keynote Boost voucher: +0.20 **added** to the market revenue factor for 15 min of play (with Investor 1.10 + 0.20 =
+  1.30), Overclock: training ×1.5 (12 s floor kept); 4 starts each per UTC day, at most 60 min left (SHOP_SPEC 3.3, 4.1).
 
 ### 11.8 Tech, network, save
 - **Remotes** (add to `Net.FUNCTIONS`; bind with `{burst = 4, perSecond = 2, company = true}`):

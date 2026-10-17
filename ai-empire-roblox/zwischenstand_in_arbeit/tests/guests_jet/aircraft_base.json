@@ -1,0 +1,29 @@
+{
+ "note": "guests_jet: airliner fingerprints of agents/stable/src_r2b_base (tests/guests_jet/aircraft.sh --write-base)",
+ "fingerprints": {
+  "320_full": {
+   "count": 385,
+   "sha256": "f197c14ebc0f241c52b1992a43b658fa3bd65f9753a076b21caecf9a45599463"
+  },
+  "320_medium": {
+   "count": 103,
+   "sha256": "4772138bc5b5a95087c67240ae1d72b385dc7fdddbfb437f0d032d831d1efe41"
+  },
+  "320_low": {
+   "count": 53,
+   "sha256": "cc4207d347e596473b85d6f3a5cc082bf3e676633706d176294f8711caf8a8d2"
+  },
+  "380_full": {
+   "count": 390,
+   "sha256": "0d12cba7fe253a58e02c0f18c9d418e4ba8d5ae572bbbc63c0038eba574b3683"
+  },
+  "380_medium": {
+   "count": 162,
+   "sha256": "940053ba8a0955c05875c740d3ef7d5497f82053bc231904718473df99aed6e4"
+  },
+  "380_low": {
+   "count": 71,
+   "sha256": "7f79be4330c317fa730600a605355d90cbe8ddb2b7b293533600681cd5e8b511"
+  }
+ }
+}

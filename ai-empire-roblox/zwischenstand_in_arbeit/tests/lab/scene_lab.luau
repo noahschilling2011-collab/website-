@@ -2,8 +2,9 @@
 -- guiprev scene of the lab package: the Lab home and every mode of the Model Studio in the states of lab_setup.
 --   python3 tools/guiprev/guiprev.py --scene tests/lab/scene_lab.luau --gen harness/.gen_labprev --state rich \
 --       --viewport phone --dpr 2 --out out/lab/x.png view=design step=2
--- extra: view=home|design|training|reveal|launch|live|market|benchmark  step=1..6 (design)  ls=1..3 (launch)
+-- extra: view=home|design|training|reveal|launch|live|market|benchmark|suggest (scale=0.25)|banner  step=1..6 (design)  ls=1..3 (launch)
 --        event=1 (training paused for a decision)  progress=0.45 (training)  breakdown=1 (review)  custom=1
+--        wait=3 (reveal: dump during the record confetti instead of the settled final frame)
 local M = require("../../harness/mock")
 local GuiDump = require("../../tools/guiprev/guidump")
 local setup = require("./lab_setup")
@@ -87,7 +88,8 @@ local function body()
 		else
 			ui.AIModelService.finishNow(s)
 			ui.push()
-			settle(6)
+			-- wait=<s>: catch the reveal mid-ceremony (the record confetti bursts ~2.5 s in and lives 2.2 s)
+			settle(tonumber(OPT.wait) or 6)
 			if VIEW == "benchmark" then
 				ui.LabApp.openSection("evaluation")
 				settle(0.5)
@@ -121,6 +123,26 @@ local function body()
 	elseif VIEW == "market" then
 		ui.Computer.open("market")
 		settle(0.5)
+	elseif VIEW == "suggest" then
+		-- the Lab home's SUGGESTED tile with less data (scale=0.25): the Review offers the suggestion's data plan
+		local k = tonumber(OPT.scale) or 1
+		for _, st in d.data do st.tokens *= k end
+		ui.push()
+		settle(0.5)
+		for _, x in ui.playerGui:GetDescendants() do
+			if x:IsA("TextButton") and x.Name == "SuccessorTile" then M.fire(x.Activated) end
+		end
+		settle(0.5)
+	elseif VIEW == "banner" then
+		-- a training finishes while the player designs: the READY banner in the top bar, the step stays
+		Studio.open("design", { step = tonumber(OPT.step) or 3 })
+		settle(0.5)
+		ui.binds.StartTraining(s, { name = "Vega", sizeId = "s100m", focusId = "creative", recipeId = "steady", target = "students" })
+		ui.push()
+		settle(0.3)
+		ui.AIModelService.finishNow(s)
+		ui.push()
+		settle(1)
 	end
 	ui.push()
 	GuiDump.setViewport(ui.playerGui, VW, VH, INSETS)

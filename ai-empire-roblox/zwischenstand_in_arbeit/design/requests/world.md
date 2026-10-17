@@ -67,6 +67,7 @@ STATUS: already done (integrate: pack.py / agents/stable/pack_stable.py set the 
   "hotel_reception", `BuildingId`, `ClientId`) in every office/tower and both hotels — the staff/talk
   packages can place an NPC there.
 STATUS: deferred to itinerary (customers / trips API: clientOffice, route, meeting handler, guide, state; drivers use CityPlan.route as well)
+STATUS: done by itinerary (uses CityPlan.clientOffice / CITY_HOTEL / INTL_HOTEL / AIRPORT / ABROAD, CityService.guide + state + trips, the existing "Start meeting" prompts via EmpireService's meeting handler; CityService gained the additive City.onMeeting(fn) listener so the itinerary follows the prompt at once)
 
 ## 7. EconomyService — FYI
 A cancelled flight (player respawned/left while the arrival area streamed) refunds the ticket with

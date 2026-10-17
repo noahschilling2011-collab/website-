@@ -98,3 +98,4 @@ STATUS: already done (integrate: info; HUD keeps publishing LaneWidth)
   `PhoneService.onAction("itinerary", ...)`; the phone keeps saying "The travel desk that uses it is coming soon" until
   the hook is registered.
 STATUS: deferred to itinerary (autoTrips wiring through PhoneService.onAction("itinerary") + the auto-trip countdown)
+STATUS: done by itinerary (PhoneService.onAction("itinerary") registered in ItineraryService.init, BUILTIN_TRIP_CALLS = false, the assistant rings with the real booking; setting autoTrips -> assistant message + 10 s countdown banner with Go / Not now (Cancel); calendar items "itin:<seq>:<step>" via addCalendarItem; tests/itinerary/test_service.luau offer scenario)

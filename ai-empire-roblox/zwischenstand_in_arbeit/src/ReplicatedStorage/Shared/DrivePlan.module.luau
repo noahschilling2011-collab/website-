@@ -4,7 +4,7 @@
 -- DriveController (client: the same cars posed every frame from workspace:GetServerTimeNow()). Nothing here
 -- creates instances; the same inputs give bit-identical results on server and client, so the server only
 -- publishes {from, to, start time} and every client rebuilds the identical path.
---   * Places (Drive.places / Drive.place): hq_garage (the fleet bay in B1, depot) and hq_entrance (the driveway
+--   * Places (Drive.places / Drive.place): pm_depot (the limousines' garage in the east tunnel), hq_garage (the fleet bay in B1, depot) and hq_entrance (the driveway
 --     beside the visitor parking: pick-up in the outbound lane, drop-off in the inbound lane) per plot;
 --     airport_departures / airport_arrivals (kerb spots in the City Airport drop-off lane, between the parked
 --     taxis, cars and buses); every Business City building of CityPlan.BUILDINGS (kerb in front of the door, on
@@ -15,6 +15,8 @@
 --   * Road graphs: home = CityPlan.NODES / EDGES (district streets, Business City, Airport Road), abroad = the
 --     junctions of MetroPlan.ROADS. Directed routing (right-hand traffic): a kerb stop is only approached in its
 --     own direction, U-turns only at junctions (penalty Drive.UTURN), never across the boulevard median.
+--     The limousine service's own garage (pm_depot) lies inside the east tunnel of Arrivals Drive (MetroPlan.TUNNELS):
+--     limousines that are not waiting at the stand come from there and go back there (a road-graph spur past x 700).
 --   * Path: centre-line route -> lane polyline (each road segment shifted to the right by the road's outer lane
 --     offset, corners = intersections of neighbouring lane lines) -> rounded corners (fillets, Drive.FILLET)
 --     -> resampled points (<= Drive.STEP) -> speed profile (class cruise speeds, corner limit sqrt(A_LAT * R),
@@ -24,23 +26,32 @@ local Shared = script.Parent
 local City = require(Shared.Config.CityPlan)
 local Metro = require(Shared.Config.MetroPlan)
 local Campus = require(Shared.Config.CampusConfig)
+local Ops = require(Shared.CompanyOps)
 
 local Drive = {}
 
-Drive.SPEED = { road = 52, access = 18, site = 14, ramp = 9, garage = 7 } :: { [string]: number } -- cruise studs/s per class
-Drive.ACCEL = 9 -- studs/s^2
-Drive.DECEL = 11
-Drive.A_LAT = 9 -- corner speed limit: v = sqrt(A_LAT * R)
+-- cruise studs/s per class; "metro" = the road class abroad (Port Meridian traffic: CityLifeController's cars cruise at
+-- about 30 studs/s and stop at lights, so the limousine keeps their pace on the same lanes)
+Drive.SPEED = { road = 64, metro = 30, access = 18, site = 14, ramp = 9, garage = 7 } :: { [string]: number }
+Drive.ACCEL = 10 -- studs/s^2
+Drive.DECEL = 12
+Drive.A_LAT = 10 -- corner speed limit: v = sqrt(A_LAT * R)
 Drive.FILLET = 16 -- target corner radius (clamped by the free length on both sides)
 Drive.STEP = 3 -- resample spacing of straight parts
 Drive.UTURN = 400 -- routing penalty (studs) of a U-turn at a junction
+Drive.UTURN_SWING = 10 -- a U-turn swings at most this far past its junction / turn point
 Drive.WALK = 6 -- seconds the driver needs from his post to the car in B1 (he is not shown meanwhile)
+Drive.WALK_NIGHT = 20 -- 22:00-06:00 the drivers are on call in the drivers' room (not at the canopy): a longer walk
+Drive.POST_HOURS = { from = 6, to = 22 } -- company hours (CompanyOps.hour) the drivers wait under the entrance canopy
 Drive.WAIT = 90 -- seconds a car waits at the pick-up for its passenger
 Drive.BOARD_RADIUS = 18 -- a passenger gets in within this distance of the waiting car (flat), |dy| < BOARD_DY
 Drive.BOARD_DY = 10
 Drive.BOARD_DELAY = 2 -- seconds from "get in" to the car pulling away (doors)
 Drive.PICKUP_RADIUS = { hq = 260, airport = 140, building = 90, pm = 110 } :: { [string]: number } -- nearest pick-up
+Drive.LEG_CACHE = 800 -- routed legs kept (least recently used dropped first)
 Drive.CAR_LENGTH = { fleet = 15, limo = 21, compact = 12, van = 15, executive = 15, sport = 13.5 } :: { [string]: number }
+Drive.CAR_WIDTH = { fleet = 7.0, limo = 7.4 } :: { [string]: number } -- incl. mirrors (B1 lane: see hqPoints)
+Drive.WHEELBASE = { fleet = 9.3, limo = 13, compact = 7.4, van = 9.3, executive = 9.3, sport = 8.4 } :: { [string]: number }
 
 export type Place = {
 	id: string,
@@ -67,6 +78,7 @@ export type Leg = {
 	pts: { Vector3 },
 	cum: { number }, -- distance along the path at pts[i]
 	t: { number }, -- seconds after the leg start at pts[i]
+	v: { number }, -- speed at pts[i] (studs/s)
 	len: number,
 	dur: number,
 }
@@ -92,6 +104,12 @@ local function lookCF(p: Vector3, hx: number, hz: number): CFrame
 	return CFrame.lookAt(p, p + Vector3.new(hx, 0, hz))
 end
 
+-- Lane centre of a two-way road: the middle of the right-hand half. (The outer lane of the 48 / 50 wide district
+-- roads would brush the Founder Square props beside the East Ring Road.)
+function Drive.laneOff(width: number): number
+	return width / 4
+end
+
 ------------------------------------------------------------------------------------------------ graphs
 type Edge = { a: string, b: string, off: number, len: number }
 type Graph = { nodes: { [string]: Vector3 }, edges: { Edge }, adj: { [string]: { { to: string, e: number } } }, ids: { string } }
@@ -102,8 +120,7 @@ local function laneOffHome(axis: string, c: number, a1: number, a2: number): num
 	for _, list in { City.ROADS, City.DISTRICT_ROADS } do
 		for _, r in list do
 			if r.axis == axis and math.abs(r.c - c) < 1 and r.a2 > lo - 30 and r.a1 < hi + 30 then
-				local w = r.width
-				local off = if w >= 44 then 0.75 * w / 2 else w / 4
+				local off = Drive.laneOff(r.width)
 				if best == nil or off < best then best = off end
 			end
 		end
@@ -127,6 +144,10 @@ local function finish(g: Graph): Graph
 	for _, list in g.adj do table.sort(list, function(p, q) return p.to < q.to end) end
 	return g
 end
+-- the limousine garage (pm_depot): inside Arrivals Drive's east tunnel, 90 studs past the gate (x = a2 = 700)
+local arrivalsRoad = Metro.road("pm_arrivals")
+Drive.PM_DEPOT_X = (if arrivalsRoad then arrivalsRoad.a2 else 700) + 90
+Drive.TURN_POINTS = { ap_turn_e = Vector3.new(420, 0, 2380), ap_turn_w = Vector3.new(-420, 0, 2380) } :: { [string]: Vector3 }
 local homeGraph: Graph? = nil
 local function home(): Graph
 	local cached = homeGraph
@@ -137,6 +158,22 @@ local function home(): Graph
 		local a, b = City.NODES[e[1]], City.NODES[e[2]]
 		local off = if math.abs(a.Z - b.Z) < 0.5 then laneOffHome("x", a.Z, a.X, b.X) else laneOffHome("z", a.X, a.Z, b.Z)
 		table.insert(g.edges, { a = e[1], b = e[2], off = off, len = 0 })
+	end
+	-- turnaround points on Airport Road (40 wide): a car leaving the airport kerbs eastbound may U-turn there
+	-- instead of circling the whole ring road (CityPlan's graph itself is unchanged)
+	for id, p in Drive.TURN_POINTS do
+		for i, e in g.edges do
+			local a, b = g.nodes[e.a], g.nodes[e.b]
+			local onX = math.abs(a.Z - p.Z) < 0.5 and math.abs(b.Z - p.Z) < 0.5 and p.X > math.min(a.X, b.X) + 1 and p.X < math.max(a.X, b.X) - 1
+			local onZ = math.abs(a.X - p.X) < 0.5 and math.abs(b.X - p.X) < 0.5 and p.Z > math.min(a.Z, b.Z) + 1 and p.Z < math.max(a.Z, b.Z) - 1
+			if onX or onZ then
+				g.nodes[id] = Vector3.new(p.X, RT, p.Z)
+				table.remove(g.edges, i)
+				table.insert(g.edges, { a = e.a, b = id, off = e.off, len = 0 })
+				table.insert(g.edges, { a = id, b = e.b, off = e.off, len = 0 })
+				break
+			end
+		end
 	end
 	homeGraph = finish(g)
 	return homeGraph :: Graph
@@ -170,6 +207,19 @@ local function abroad(): Graph
 		end
 	end
 	for _, r in Metro.ROADS do along(r) end
+	-- the limousine garage spur: Arrivals Drive on into its east tunnel (the client-only road continuation, MetroPlan
+	-- `beyond`) to the depot; a dead end, so no other route ever uses it (U-turn penalty)
+	local arr = arrivalsRoad
+	if arr then
+		local lastX: number? = nil
+		for _, rz in zs do
+			if g.nodes[key(rz.c, arr.c)] and (lastX == nil or rz.c > (lastX :: number)) then lastX = rz.c end
+		end
+		if lastX then
+			g.nodes.pm_depot_end = Vector3.new(Drive.PM_DEPOT_X + 20, RT, arr.c)
+			table.insert(g.edges, { a = key(lastX :: number, arr.c), b = "pm_depot_end", off = metroOff(arr), len = 0 })
+		end
+	end
 	abroadGraph = finish(g)
 	return abroadGraph :: Graph
 end
@@ -211,33 +261,38 @@ end
 -- Outbound lane x = 107.5, inbound x = 98.5 (the B1 drive arrows), clear of the convex mirror arm (x <= 94.6 at
 -- z -38.5), the pick-up bay of the founder's own car (x 95.2..104.8, z -7.3..11.3) and the garage wall (x 112).
 Drive.HQ = {
-	depot = Vector3.new(107.5, -16, 56), -- fleet car parked deep in B1, nose towards the ramp
-	park = Vector3.new(107.5, -16, 44),
+	depot = Vector3.new(107.4, -16, 56), -- fleet car parked deep in B1, nose towards the ramp
+	park = Vector3.new(107.4, -16, 44),
 	stop = Vector3.new(107.5, 0.1, -162), -- pick-up: outbound lane, beside the visitor parking
 	drop = Vector3.new(98.5, 0.1, -168), -- drop-off: inbound lane
-	post = { CFrame.new(18, 3.12, -60) * CFrame.Angles(0, math.pi, 0), CFrame.new(23, 3.12, -60) * CFrame.Angles(0, math.pi, 0) }, -- drivers wait at the entrance
+	-- drivers wait under the entrance canopy beside its east column (x 17, z -63), facing the forecourt and turned a
+	-- little towards the drive to the pick-up (players walking up or coming out of the doors see them from the front)
+	post = { CFrame.lookAt(Vector3.new(19, 3.12, -59.5), Vector3.new(26, 3.12, -79.5)), CFrame.lookAt(Vector3.new(23.5, 3.12, -61.5), Vector3.new(30.5, 3.12, -81.5)) },
 	board = Vector3.new(90, 3.1, -162), -- where the founder walks to (visitor parking edge, left of the car)
 	alight = CFrame.lookAt(Vector3.new(92.5, 3.1, -168), Vector3.new(77, 3.1, -140)), -- after the drop-off: towards the visitor path
 }
 local function hqPoints(cf: CFrame): ({ Vector3 }, { string }, { Vector3 }, { string }, { Vector3 }, { string }, { Vector3 }, { string })
 	local function w(x: number, y: number, z: number): Vector3 return cf:PointToWorldSpace(Vector3.new(x, y, z)) end
 	-- garage -> stop -> mouth (outbound) ; mouth -> drop -> park (inbound) ; stop -> U-turn -> inbound (cancel)
-	local gOut = { w(107.5, -16, 56), w(107.5, -16, -30), w(107.5, -16, -36), w(107.5, 0, -146), w(107.5, 0.1, -150), w(107.5, 0.1, -162) }
+	local gOut = { w(107.4, -16, 56), w(107.4, -16, -30), w(107.4, -16, -36), w(107.4, 0, -146), w(107.5, 0.1, -150), w(107.5, 0.1, -162) }
 	local gOutCls = { "", "garage", "garage", "ramp", "site", "site" }
 	local sOut = { w(107.5, 0.1, -162), w(107.5, 0.1, -205), w(107.5, 0.1, -217) }
 	local sOutCls = { "", "site", "site" }
 	local mIn = { w(98.5, 0.1, -217), w(98.5, 0.1, -205), w(98.5, 0.1, -168) }
 	local mInCls = { "", "site", "site" }
-	local dPark = { w(98.5, 0.1, -168), w(98.5, 0.1, -150), w(98.5, 0, -146), w(98.5, -16, -36), w(98.5, -16, -30), w(107.5, -16, -12), w(107.5, -16, 44) }
-	local dParkCls = { "", "site", "site", "ramp", "garage", "garage", "garage" }
+	-- back to the depot side (x 107.4) gently over the whole ramp (4.6 degrees): a lane change inside B1 would swing
+	-- the car's corner into the garage wall (x 112) or into the founder's car in the pick-up bay (spawn x 100, at most
+	-- 7.4 wide -> x <= 103.7); the fleet car is 7.0 wide (Drive.CAR_WIDTH), so x 107.4 leaves 0.2 / 1.1 studs
+	local dPark = { w(98.5, 0.1, -168), w(98.5, 0.1, -150), w(98.5, 0, -146), w(107.4, -16, -36), w(107.4, -16, 44) }
+	local dParkCls = { "", "site", "site", "ramp", "garage" }
 	return gOut, gOutCls, sOut, sOutCls, mIn, mInCls, dPark, dParkCls
 end
 local function hqUturn(cf: CFrame): ({ Vector3 }, { string })
 	local function w(x: number, y: number, z: number): Vector3 return cf:PointToWorldSpace(Vector3.new(x, y, z)) end
 	-- a left U-turn over the visitor parking (x 70..92 is asphalt), back into the inbound lane before the ramp
 	return { w(107.5, 0.1, -162), w(107.5, 0.1, -196), w(89.5, 0.1, -196), w(89.5, 0.1, -176), w(98.5, 0.1, -152), w(98.5, 0, -146),
-		w(98.5, -16, -36), w(98.5, -16, -30), w(107.5, -16, -12), w(107.5, -16, 44) },
-		{ "", "site", "site", "site", "site", "site", "ramp", "garage", "garage", "garage" }
+		w(107.4, -16, -36), w(107.4, -16, 44) },
+		{ "", "site", "site", "site", "site", "site", "ramp", "garage" }
 end
 
 local function plotCF(plot: number): CFrame?
@@ -280,16 +335,19 @@ end
 local function airportPlaces(): { Place }
 	local out: { Place } = {}
 	-- departures: between the parked car (x 23.7..36.3) and the taxi (x 103.7..116.3) at the kerb (z 2413.5),
-	-- 66 studs from the central departure door; approached from Airport Road eastbound, leaves eastbound
+	-- 66 studs from the central departure door; approached from Airport Road eastbound, leaves eastbound. The car
+	-- pulls in past the parked car and stands straight at the kerb (a car still angled at the stop would touch the
+	-- bollard row at z 2419.4)
 	table.insert(out, kerbPlace("airport_departures", "City Airport (departures)", "the airport", "home", "airport", Vector3.new(66, RT, 2413.5), 1, 0,
-		{ Vector3.new(10, RT, 2390), Vector3.new(36, RT, 2405), Vector3.new(56, RT, 2411.6) },
+		{ Vector3.new(10, RT, 2390), Vector3.new(36, RT, 2400), Vector3.new(54, RT, 2413.5) },
 		{ Vector3.new(90, RT, 2406.5), Vector3.new(130, RT, 2398), Vector3.new(175, RT, 2391), Vector3.new(200, RT, 2390) },
 		CFrame.lookAt(Vector3.new(66, WT + 3, 2421.5), Vector3.new(66, WT + 3, 2440)), "airport"))
-	-- arrivals: east of the buses (x <= 257) and the arrivals-exit zebra (x 264..276); the arrivals door is x 270
-	table.insert(out, kerbPlace("airport_arrivals", "City Airport (arrivals)", "the airport arrivals", "home", "airport", Vector3.new(286, RT, 2413.5), 1, 0,
-		{ Vector3.new(200, RT, 2390), Vector3.new(262, RT, 2398) },
-		{ Vector3.new(305, RT, 2410), Vector3.new(325, RT, 2402), Vector3.new(350, RT, 2393), Vector3.new(380, RT, 2390) },
-		CFrame.lookAt(Vector3.new(282, WT + 3, 2421.5), Vector3.new(270, WT + 3, 2440)), "airport"))
+	-- arrivals: east of the buses (x <= 257) and the arrivals-exit zebra (x 264..276); the arrivals door is x 270.
+	-- The car merges into the kerb after the zebra and stops straight at x 300 (between the bollards at 291 / 306)
+	table.insert(out, kerbPlace("airport_arrivals", "City Airport (arrivals)", "the airport arrivals", "home", "airport", Vector3.new(300, RT, 2413.5), 1, 0,
+		{ Vector3.new(200, RT, 2390), Vector3.new(262, RT, 2400), Vector3.new(288, RT, 2413.5) },
+		{ Vector3.new(318, RT, 2411), Vector3.new(340, RT, 2402), Vector3.new(366, RT, 2393), Vector3.new(396, RT, 2390) },
+		CFrame.lookAt(Vector3.new(298, WT + 3, 2421.5), Vector3.new(272, WT + 3, 2440)), "airport"))
 	return out
 end
 
@@ -309,7 +367,7 @@ local function buildingPlaces(): { Place }
 		local road = roadOf(axis, if axis == "x" then c.Z else c.X)
 		local width = if road then road.width else 40
 		local walk = if road then road.walk else 8
-		local laneOff = if width >= 44 then 0.75 * width / 2 else width / 4
+		local laneOff = Drive.laneOff(width)
 		local kerbOff = width / 2 - 4.6
 		local rx, rz = -look.X, -look.Z -- towards the building (the car's right side)
 		local hx, hz = rz, -rx -- heading whose right-hand side faces the building
@@ -328,22 +386,33 @@ local function metroPlaces(): { Place }
 	local out: { Place } = {}
 	local PT = Metro.PLAZA_TOP
 	-- the VIP limousine stand (bay 1 of the lay-by, cars face west); bay 2 holds the decorative limousine
-	-- (x 118.5..137.5), so the limo pulls out into Arrivals Drive's westbound lane (z 7776) before passing it
+	-- (x 118.5..137.5), so the limo pulls out into Arrivals Drive's westbound lane (z 7776) before passing it. The
+	-- last / first 16 studs at the stand are straight along the kerb, so a car that arrives or leaves stands exactly
+	-- at the stand's pose (the idle limousine, a waiting ride and a departing one are drawn at the same CFrame)
 	local stand = Metro.VIP_LIMO.stand
 	local sp = stand.Position
 	local limo = kerbPlace("pm_limo", "VIP limousine stand", "the limousine stand", "abroad", "limo", Vector3.new(sp.X, RT, sp.Z), stand.LookVector.X, stand.LookVector.Z,
-		{ Vector3.new(262, RT, 7776), Vector3.new(222, RT, 7772), Vector3.new(204, RT, 7765) },
-		{ Vector3.new(156, RT, 7767), Vector3.new(130, RT, 7774), Vector3.new(100, RT, 7776), Vector3.new(80, RT, 7776) },
+		{ Vector3.new(262, RT, 7776), Vector3.new(222, RT, 7772), Vector3.new(206, RT, 7764.5), Vector3.new(sp.X + 16, RT, sp.Z) },
+		{ Vector3.new(sp.X - 12, RT, sp.Z), Vector3.new(150, RT, 7767.5), Vector3.new(130, RT, 7774), Vector3.new(100, RT, 7776), Vector3.new(80, RT, 7776) },
 		CFrame.lookAt(Vector3.new(sp.X - 2, PT + 3, 7751.5), Vector3.new(sp.X - 2, PT + 3, 7700)), "pm")
 	table.insert(out, limo)
+	-- the limousine garage inside Arrivals Drive's east tunnel: out in the westbound lane, back in the eastbound lane
+	if arrivalsRoad then
+		local off = metroOff(arrivalsRoad)
+		local x = Drive.PM_DEPOT_X
+		local outP = Vector3.new(x, RT, arrivalsRoad.c - off)
+		local inP = Vector3.new(x, RT, arrivalsRoad.c + off)
+		table.insert(out, mk("pm_depot", "Limousine garage", "the limousine garage", "abroad", "garage", lookCF(outP, -1, 0), lookCF(inP, 1, 0), lookCF(outP, -1, 0),
+			{ outP, Vector3.new(x - 40, RT, outP.Z) }, { "road", "road" }, { Vector3.new(x - 40, RT, inP.Z), inP }, { "road", "road" }, 1))
+	end
 	-- Port Meridian Airport: terminal drop-off on Arrivals Drive (westbound kerb, west of the boulevard junction)
 	table.insert(out, kerbPlace("pm_airport", "Port Meridian Airport", "the airport", "abroad", "airport", Vector3.new(-75, RT, 7772.6), -1, 0,
-		{ Vector3.new(-56, RT, 7776) }, { Vector3.new(-100, RT, 7776), Vector3.new(-130, RT, 7776) },
+		{ Vector3.new(-40, RT, 7776), Vector3.new(-62, RT, 7772.6) }, { Vector3.new(-100, RT, 7776), Vector3.new(-130, RT, 7776) },
 		CFrame.lookAt(Vector3.new(-80, PT + 3, 7757), Vector3.new(-80, PT + 3, 7700)), "pm"))
 	-- Meridian Grand Hotel: Harbour Street eastbound kerb, east of the boulevard junction (x -52..52)
 	local hotel = City.INTL_HOTEL
 	table.insert(out, kerbPlace("pm_hotel", if hotel then hotel.name else "Meridian Grand Hotel", "the Meridian Grand", "abroad", "hotel", Vector3.new(70, RT, 8347.4), 1, 0,
-		{ Vector3.new(55, RT, 8344) }, { Vector3.new(110, RT, 8344) },
+		{ Vector3.new(38, RT, 8344), Vector3.new(58, RT, 8347.4) }, { Vector3.new(110, RT, 8344) },
 		CFrame.lookAt(Vector3.new(66, WT + 3, 8356.5), Vector3.new(30, WT + 3, 8380)), "pm"))
 	-- client towers on Meridian Boulevard (outer lane 45 from the axis, kerb 52, sidewalk to 64)
 	local boulevard = Metro.road("pm_boulevard")
@@ -425,11 +494,20 @@ function Drive.zoneAt(p: Vector3): string?
 	if z == nil or z == "harbour" then return nil end
 	return if z == "abroad" then "abroad" else "home"
 end
--- The pick-up place nearest to a standing position (own plot -> HQ entrance), or nil, "TOO_FAR".
+-- Port Meridian's arrivals hall and plaza (where the shuttle and the company jet put the founder down): the VIP
+-- limousine stand by the hall is the pick-up for anyone in there (the hall is up to ~260 studs from the stand)
+Drive.PM_STAND_AREA = { City.ABROAD.terminal, City.ABROAD.plaza } :: { any }
+-- The pick-up place nearest to a standing position (own plot -> HQ entrance; Port Meridian arrivals hall / plaza ->
+-- the limousine stand), or nil, "TOO_FAR".
 function Drive.nearestPickup(p: Vector3, zone: string, plot: number?): (Place?, string?)
 	if zone == "home" and plot then
 		local info = City.plots()[plot]
 		if info and City.inRect(info.rect, p.X, p.Z, 40) then return Drive.place("hq_entrance", plot), nil end
+	end
+	if zone == "abroad" then
+		for _, rect in Drive.PM_STAND_AREA do
+			if City.inRect(rect, p.X, p.Z, 12) then return Drive.place("pm_limo"), nil end
+		end
 	end
 	local best: Place? = nil
 	local bestD = math.huge
@@ -441,6 +519,17 @@ function Drive.nearestPickup(p: Vector3, zone: string, plot: number?): (Place?, 
 	end
 	if best then return best, nil end
 	return nil, "TOO_FAR"
+end
+-- The pick-up place nearest to a position whatever the distance (for "walk to ... first"), and that distance.
+function Drive.nearestAny(p: Vector3, zone: string, plot: number?): (Place?, number)
+	local best: Place? = nil
+	local bestD = math.huge
+	for _, place in Drive.places(zone, plot) do
+		if place.kind == "garage" then continue end
+		local d = math.min(flat(p, place.door.Position), flat(p, place.stop.Position))
+		if d < bestD then best, bestD = place, d end
+	end
+	return best, bestD
 end
 
 ------------------------------------------------------------------------------------------------ routing
@@ -463,43 +552,89 @@ end
 
 -- Directed shortest path on graph g from point S (on edge sEdge, param sT) to point E (on edge eEdge, param eT).
 -- sDir / eDir: +1 = travel a->b, -1 = b->a, 0 = either. Returns the node list between S and E and the start /
--- end travel directions, or nil.
+-- end travel directions, or nil. Dijkstra over states (node, previous node) with a binary heap ordered by (cost,
+-- state key) - a strict total order, so the server and every client find the identical route - and parent links
+-- instead of copied paths.
 type Search = { nodes: { string }, sd: number, ed: number }
+type HState = { node: string, prev: string, cost: number, parent: HState?, sd: number, key: string }
+local function hless(a: HState, b: HState): boolean
+	if a.cost ~= b.cost then return a.cost < b.cost end
+	return a.key < b.key
+end
+local function hpush(h: { HState }, st: HState)
+	table.insert(h, st)
+	local i = #h
+	while i > 1 do
+		local up = i // 2
+		if hless(h[i], h[up]) then
+			h[i], h[up] = h[up], h[i]
+			i = up
+		else
+			break
+		end
+	end
+end
+local function hpop(h: { HState }): HState
+	local top = h[1]
+	local last = table.remove(h) :: HState
+	local n = #h
+	if n > 0 then
+		h[1] = last
+		local i = 1
+		while true do
+			local l, r = 2 * i, 2 * i + 1
+			local m = i
+			if l <= n and hless(h[l], h[m]) then m = l end
+			if r <= n and hless(h[r], h[m]) then m = r end
+			if m == i then break end
+			h[i], h[m] = h[m], h[i]
+			i = m
+		end
+	end
+	return top
+end
+local function pathOf(st: HState): { string }
+	local rev: { string } = {}
+	local cur: HState? = st
+	while cur do
+		table.insert(rev, cur.node)
+		cur = cur.parent
+	end
+	local out: { string } = table.create(#rev)
+	for i = #rev, 1, -1 do table.insert(out, rev[i]) end
+	return out
+end
 local function search(g: Graph, sEdge: number, sT: number, sDir: number, eEdge: number, eT: number, eDir: number): Search?
 	local se, ee = g.edges[sEdge], g.edges[eEdge]
 	local best: Search? = nil
+	local bestState: HState? = nil
+	local bestSd, bestEd = 0, 0
 	local bestCost = math.huge
 	-- same edge, E ahead of S in an allowed direction: drive straight there
 	if sEdge == eEdge then
 		for _, d in { 1, -1 } do
 			if (sDir == 0 or sDir == d) and (eDir == 0 or eDir == d) and ((d == 1 and eT >= sT) or (d == -1 and eT <= sT)) then
 				local cost = math.abs(eT - sT) * se.len
-				if cost < bestCost then bestCost = cost; best = { nodes = {}, sd = d, ed = d } end
+				if cost < bestCost then bestCost = cost; best = { nodes = {}, sd = d, ed = d }; bestState = nil end
 			end
 		end
 	end
-	-- Dijkstra over states (node, previous node); U-turns at a node cost Drive.UTURN
-	type State = { node: string, prev: string, cost: number, path: { string }, sd: number }
-	local open: { State } = {}
+	-- U-turns at a node cost Drive.UTURN
+	local open: { HState } = {}
 	for _, d in { 1, -1 } do
 		if sDir == 0 or sDir == d then
 			local node = if d == 1 then se.b else se.a
 			local prev = if d == 1 then se.a else se.b
 			local cost = (if d == 1 then (1 - sT) else sT) * se.len
-			table.insert(open, { node = node, prev = prev, cost = cost, path = { node }, sd = d })
+			hpush(open, { node = node, prev = prev, cost = cost, parent = nil, sd = d, key = node .. ">" .. prev })
 		end
 	end
 	local done: { [string]: boolean } = {}
 	while #open > 0 do
-		local bi = 1
-		for i = 2, #open do
-			if open[i].cost < open[bi].cost - 1e-9 or (math.abs(open[i].cost - open[bi].cost) <= 1e-9 and open[i].node .. open[i].prev < open[bi].node .. open[bi].prev) then bi = i end
-		end
-		local st = table.remove(open, bi) :: State
+		local st = hpop(open)
 		if st.cost >= bestCost then break end
-		local k = st.node .. ">" .. st.prev
-		if done[k] then continue end
-		done[k] = true
+		if done[st.key] then continue end
+		done[st.key] = true
 		-- reached the start node of E's edge in an allowed direction?
 		for _, d in { 1, -1 } do
 			if eDir == 0 or eDir == d then
@@ -509,17 +644,18 @@ local function search(g: Graph, sEdge: number, sT: number, sDir: number, eEdge: 
 					local extra = (if d == 1 then eT else (1 - eT)) * ee.len
 					if st.prev == other then extra += Drive.UTURN end
 					local total = st.cost + extra
-					if total < bestCost then bestCost = total; best = { nodes = st.path, sd = st.sd, ed = d } end
+					if total < bestCost then bestCost = total; best = nil; bestState = st; bestSd = st.sd; bestEd = d end
 				end
 			end
 		end
 		for _, n in g.adj[st.node] do
+			local key = n.to .. ">" .. st.node
+			if done[key] then continue end
 			local cost = st.cost + g.edges[n.e].len + (if n.to == st.prev then Drive.UTURN else 0)
-			local p = table.clone(st.path)
-			table.insert(p, n.to)
-			table.insert(open, { node = n.to, prev = st.node, cost = cost, path = p, sd = st.sd })
+			hpush(open, { node = n.to, prev = st.node, cost = cost, parent = st, sd = st.sd, key = key })
 		end
 	end
+	if bestState then return { nodes = pathOf(bestState), sd = bestSd, ed = bestEd } end
 	return best
 end
 
@@ -547,6 +683,8 @@ local function networkCtrl(c: Ctrl, g: Graph, from: Place, to: Place): string?
 	local eDir = dirOf(to, ee, to.inPts[1], to.inPts[math.min(#to.inPts, 2)])
 	local r = search(g, sEdge, sT, sDir, eEdge, eT, eDir)
 	if not r then return "NO_ROUTE" end
+	-- both mouths on the same lane line at the same point (kerbs of one road): connect them directly
+	if #r.nodes == 0 and flat(sQ, eQ) < 2 then return nil end
 	-- mouth -> S (perpendicular stub, offset 0), S -> nodes -> E along the lanes, E -> mouth (stub)
 	addPts(c, { sQ }, { "access" })
 	local prevNode: string? = nil
@@ -603,8 +741,9 @@ local function corner(pts: { Vector3 }, offs: { number }, classes: { string }): 
 				push(Vector3.new(ax - dx[a] * l, v.Y, az - dz[a] * l), cl)
 				push(Vector3.new(bx + dx[a] * l, v.Y, bz + dz[a] * l), classes[b])
 			end
-		else -- U-turn at this vertex: swing across in front of it
-			local u = math.max(6, (math.abs(o1) + math.abs(o2)) / 2)
+		else -- U-turn at this vertex: swing across in front of it (at most Drive.UTURN_SWING past the junction, so a
+			-- U-turn across the wide boulevard stays inside the cross street instead of cutting into the plaza beyond)
+			local u = math.clamp((math.abs(o1) + math.abs(o2)) / 2, 6, Drive.UTURN_SWING)
 			push(Vector3.new(ax + dx[a] * u, v.Y, az + dz[a] * u), cl)
 			push(Vector3.new(bx + dx[a] * u, v.Y, bz + dz[a] * u), classes[b])
 		end
@@ -728,19 +867,48 @@ local function profile(samples: { Sample }, key: string, from: string, to: strin
 		local ds = cum[i] - cum[i - 1]
 		t[i] = t[i - 1] + ds / math.max((v[i] + v[i - 1]) / 2, 0.6)
 	end
-	return { key = key, from = from, to = to, pts = pts, cum = cum, t = t, len = s, dur = t[n] }
+	return { key = key, from = from, to = to, pts = pts, cum = cum, t = t, v = v, len = s, dur = t[n] }
 end
 
+-- Leg cache: legs between static places (airport, Business City, Port Meridian) are shared by every plot; a leg
+-- with an HQ end is kept per plot. Least recently used legs are dropped (half at a time) above Drive.LEG_CACHE.
 local legCache: { [string]: Leg } = {}
+local legUsed: { [string]: number } = {}
 local legCount = 0
+local legTick = 0
+local function cachePut(key: string, leg: Leg)
+	if legCache[key] == nil then legCount += 1 end
+	legCache[key] = leg
+	legTick += 1
+	legUsed[key] = legTick
+	if legCount > Drive.LEG_CACHE then
+		local keys: { string } = {}
+		for k in legCache do table.insert(keys, k) end
+		table.sort(keys, function(a, b) return (legUsed[a] or 0) < (legUsed[b] or 0) end)
+		local drop = #keys // 2
+		for i = 1, drop do
+			legCache[keys[i]] = nil
+			legUsed[keys[i]] = nil
+		end
+		legCount = #keys - drop
+	end
+end
+function Drive.legCacheSize(): number
+	return legCount
+end
 
 -- Leg between two places. `fromSide` = "drop" when the car stands at the drop-off stop of `from` (only the HQ
 -- entrance has a separate drop-off; a car there can only go back to the garage).
 function Drive.leg(fromId: string, toId: string, plot: number?, fromSide: string?): (Leg?, string?)
 	local side = if fromSide == "drop" then "drop" else "stop"
-	local key = fromId .. ":" .. side .. ">" .. toId .. "#" .. tostring(plot)
+	local perPlot = string.sub(fromId, 1, 3) == "hq_" or string.sub(toId, 1, 3) == "hq_"
+	local key = fromId .. ":" .. side .. ">" .. toId .. "#" .. (if perPlot then tostring(plot) else "*")
 	local cached = legCache[key]
-	if cached then return cached, nil end
+	if cached then
+		legTick += 1
+		legUsed[key] = legTick
+		return cached, nil
+	end
 	if fromId == toId then return nil, "SAME_PLACE" end
 	local from, to = Drive.place(fromId, plot), Drive.place(toId, plot)
 	if not from or not to then return nil, "BAD_PLACE" end
@@ -791,11 +959,13 @@ function Drive.leg(fromId: string, toId: string, plot: number?, fromSide: string
 		end
 	end
 	if #pts < 2 then return nil, "NO_ROUTE" end
+	if from.zone == "abroad" then
+		-- Port Meridian: the road class keeps the city traffic's pace
+		for i, cl in classes do if cl == "road" then classes[i] = "metro" end end
+	end
 	local L, LC = corner(pts, offs, classes)
 	local leg = profile(fillet(L, LC), key, fromId, toId)
-	legCount += 1
-	if legCount > 400 then table.clear(legCache); legCount = 0 end -- bounded memory (12 plots x a few dozen legs)
-	legCache[key] = leg
+	cachePut(key, leg)
 	return leg, nil
 end
 
@@ -820,52 +990,90 @@ function Drive.posAt(leg: Leg, s: number): Vector3
 	local f = if b > a then (x - a) / (b - a) else 0
 	return leg.pts[i]:Lerp(leg.pts[i + 1], f)
 end
--- Distance along the leg after `t` seconds (constant acceleration inside each sample interval).
+-- Distance along the leg after `t` seconds (constant acceleration inside each sample interval, so a car really
+-- starts from a standstill and rolls to a stop).
 function Drive.distAt(leg: Leg, t: number): number
 	local n = #leg.t
 	if t <= 0 or n < 2 then return 0 end
 	if t >= leg.dur then return leg.len end
 	local i = bsearch(leg.t, t)
 	local t0, t1 = leg.t[i], leg.t[i + 1]
-	local f = if t1 > t0 then (t - t0) / (t1 - t0) else 1
-	return leg.cum[i] + (leg.cum[i + 1] - leg.cum[i]) * f
+	local ds = leg.cum[i + 1] - leg.cum[i]
+	local dt = t1 - t0
+	if dt <= 0 then return leg.cum[i + 1] end
+	local tau = t - t0
+	local v0, v1 = leg.v[i], leg.v[i + 1]
+	if math.abs((v0 + v1) / 2 * dt - ds) < 1e-6 * math.max(1, ds) then
+		local a = (v1 - v0) / dt
+		return leg.cum[i] + v0 * tau + 0.5 * a * tau * tau
+	end
+	return leg.cum[i] + ds * tau / dt -- crawling interval (minimum speed clamp): uniform
 end
--- Car pivot CFrame (+ speed, distance) `t` seconds after the leg started. Heading from a chord of +-2 studs
--- (smooth through the samples), pitched along ramps.
-function Drive.at(leg: Leg, t: number): (CFrame, number, number)
-	local s = Drive.distAt(leg, t)
+-- Car pivot CFrame at distance s along the leg for a car with wheelbase `wb`: the pivot stays on the path in plan
+-- view, its height is the mean of the two axle points and the body points from the rear axle to the front axle, so
+-- the car pitches with a ramp only as far as both axles really are on it (no bumper digging into the floor where
+-- the ramp meets the garage).
+function Drive.poseAtDist(leg: Leg, s: number, wb: number?): CFrame
+	local half = (wb or Drive.WHEELBASE.fleet) / 2
 	local p = Drive.posAt(leg, s)
-	local a = Drive.posAt(leg, s - 2)
-	local b = Drive.posAt(leg, s + 2)
+	local a = Drive.posAt(leg, s - half)
+	local b = Drive.posAt(leg, s + half)
 	local d = b - a
 	if d.Magnitude < 1e-3 then
 		local n = #leg.pts
 		d = if n >= 2 then leg.pts[n] - leg.pts[n - 1] else Vector3.new(0, 0, -1)
+		if d.Magnitude < 1e-3 then d = Vector3.new(0, 0, -1) end
 	end
+	local q = Vector3.new(p.X, (a.Y + b.Y) / 2, p.Z)
+	return CFrame.lookAt(q, q + d.Unit)
+end
+-- Car pivot CFrame (+ speed, distance) `t` seconds after the leg started.
+function Drive.at(leg: Leg, t: number, wb: number?): (CFrame, number, number)
+	local s = Drive.distAt(leg, t)
 	local speed = 0
 	if t > 0 and t < leg.dur then
 		local s2 = Drive.distAt(leg, t + 0.1)
 		speed = (s2 - s) / 0.1
 	end
-	return CFrame.lookAt(p, p + d.Unit), speed, s
+	return Drive.poseAtDist(leg, s, wb), speed, s
 end
 -- Pose at the very end of a leg (where the car stops).
-function Drive.endCF(leg: Leg): CFrame
-	local cf = Drive.at(leg, leg.dur)
-	return cf
+function Drive.endCF(leg: Leg, wb: number?): CFrame
+	return Drive.poseAtDist(leg, leg.len, wb)
 end
 
 ------------------------------------------------------------------------------------------------ seats + looks
 -- Seat offsets in the car frame (pivot = centre at ground level, -Z forward, +X right). R6 rigs sit with the
--- root 1 above the seat surface (EmployeeController.pose hips at pi/2).
+-- root 1.5 above the seat surface (EmployeeController.pose hips at pi/2); the head (with a driver's cap) reaches
+-- 2.32 above the root, under the cars' roofs (DriveController SHAPES, roof underside >= 4.95).
 Drive.SEATS = {
-	fleet = { driver = CFrame.new(-1.55, 2.75, -0.9), front = CFrame.new(1.55, 2.75, -0.9), rearL = CFrame.new(-1.55, 2.75, 3.1), rearR = CFrame.new(1.55, 2.75, 3.1) },
-	limo = { driver = CFrame.new(-1.6, 2.75, -3.4), front = CFrame.new(1.6, 2.75, -3.4), rearL = CFrame.new(-1.6, 2.75, 4.6), rearR = CFrame.new(1.6, 2.75, 4.6) },
+	fleet = { driver = CFrame.new(-1.55, 2.6, -0.6), front = CFrame.new(1.55, 2.6, -0.6), rearL = CFrame.new(-1.55, 2.6, 3.0), rearR = CFrame.new(1.55, 2.6, 3.0) },
+	limo = { driver = CFrame.new(-1.6, 2.6, -2.6), front = CFrame.new(1.6, 2.6, -2.6), rearL = CFrame.new(-1.6, 2.6, 4.4), rearR = CFrame.new(1.6, 2.6, 4.4) },
 } :: { [string]: { [string]: CFrame } }
+-- "View" camera on the back seat: the middle of the rear bench, between the two rear occupants' heads (DriveController
+-- uses the rear seat z of the car's own seat table; the local founder clone's head is hidden in this view)
 Drive.CAMERA = {
 	chase = CFrame.new(0, 9, 26) * CFrame.Angles(math.rad(-14), 0, 0),
-	inside = CFrame.new(0.9, 3.9, 2.4) * CFrame.Angles(math.rad(-4), 0, 0),
+	inside = CFrame.new(0, 3.75, 3.1) * CFrame.Angles(math.rad(-4), 0, 0),
 } :: { [string]: CFrame }
+-- Seated occupants are scaled down (Model:ScaleTo): an R6 rig is 4 studs wide over the arms, so at full size two
+-- people side by side and the side glass cannot both be cleared. Drive.seatFit(glassHalf) -> (scale, x): the largest
+-- scale <= RIG_SCALE whose outer arm stays inside the glass (half width glassHalf), x = 2 * scale (the inner arms of
+-- two neighbours just touch). The root stands 1.5 * scale above the cushion (Drive.SEAT_SURFACE).
+Drive.RIG_SCALE = 0.8
+Drive.SEAT_SURFACE = 1.1
+function Drive.seatFit(glassHalf: number): (number, number)
+	-- 0.12 studs of margin for gloves / cuffs that stand a little proud of the R6 arm box
+	local sc = math.min(Drive.RIG_SCALE, (glassHalf - 0.12) / 4)
+	return sc, 2 * sc + 0.01
+end
+-- Rig root of a seated occupant in the car frame (seat key of Drive.SEATS, the car's look, its glass half width).
+function Drive.seatCF(seat: string, look: string, glassHalf: number): CFrame
+	local base = Drive.SEATS[if look == "limo" then "limo" else "fleet"][seat] or CFrame.new()
+	local sc, x = Drive.seatFit(glassHalf)
+	local side = if base.Position.X < 0 then -1 else 1
+	return CFrame.new(side * x, Drive.SEAT_SURFACE + 1.5 * sc, base.Position.Z) * base.Rotation
+end
 -- Look of the car a ride uses: the founder's own company car when the driver takes it from the pick-up bay,
 -- else the fleet sedan (company colour) / the VIP limousine abroad.
 function Drive.look(id: any): string
@@ -876,10 +1084,191 @@ function Drive.seatsOf(look: string): { [string]: CFrame }
 	return Drive.SEATS[if look == "limo" then "limo" else "fleet"]
 end
 
+------------------------------------------------------------------------------------------------ ride plans
+-- A ride is a short list of legs ("segments") with server start times; the car stands at the end of a segment until
+-- the next one starts (waiting at the pick-up, at the destination). DriverService publishes it ONCE per change as a
+-- string attribute (Drive.encode) and every client poses the car from it (Drive.pose), so nothing moves over the
+-- network per frame. who = the occupants in seat order (Drive.SEAT_ORDER), comma separated: "D" the driver
+-- (template Driver<i> / Chauffeur), "R" the rider (the founder: a stand-in of his character), "C1".."C3" companions,
+-- "G1"/"G2" client guests (templates in the ride folder), "" an empty seat.
+export type Seg = { from: string, to: string, side: string?, t0: number, who: string }
+Drive.SEAT_ORDER = { "driver", "rearR", "rearL", "front" } :: { string }
+Drive.MAX_SEGS = 6
+Drive.OCCUPANTS = { D = true, R = true, C1 = true, C2 = true, C3 = true, G1 = true, G2 = true } :: { [string]: boolean }
+
+local function validWho(who: string): boolean
+	if #who > 24 then return false end
+	local n = 0
+	for code in string.gmatch(who .. ",", "([^,]*),") do
+		n += 1
+		if code ~= "" and not Drive.OCCUPANTS[code] then return false end
+	end
+	return n <= #Drive.SEAT_ORDER
+end
+-- "hq_garage>hq_entrance|D@1700000000.25;hq_entrance>airport_departures|D,R@1700000031.50" (side "drop" = "~d")
+function Drive.encode(segs: { Seg }): string
+	local parts: { string } = {}
+	for _, sg in segs do
+		table.insert(parts, string.format("%s>%s%s|%s@%.2f", sg.from, sg.to, if sg.side == "drop" then "~d" else "", sg.who, sg.t0))
+	end
+	return table.concat(parts, ";")
+end
+-- Parse + validate (places exist for this plot, legs route, start times rise); nil for anything malformed.
+function Drive.decode(str: any, plot: number?): { Seg }?
+	if typeof(str) ~= "string" or #str > 600 then return nil end
+	if str == "" then return {} end
+	local out: { Seg } = {}
+	local last = -math.huge
+	for item in string.gmatch(str .. ";", "([^;]*);") do
+		local from, to, drop, who, t = string.match(item, "^([%w_]+)>([%w_]+)(~?d?)|([%w,]*)@([%d%.%-]+)$")
+		local t0 = tonumber(t)
+		if not from or not to or not t0 or t0 ~= t0 or not validWho(who :: string) then return nil end
+		if drop ~= "" and drop ~= "~d" then return nil end
+		if t0 < last then return nil end
+		last = t0
+		local side = if drop == "~d" then "drop" else nil
+		if not Drive.leg(from :: string, to :: string, plot, side) then return nil end
+		table.insert(out, { from = from :: string, to = to :: string, side = side, t0 = t0, who = who :: string })
+		if #out > Drive.MAX_SEGS then return nil end
+	end
+	return out
+end
+-- Seats of a who string: {driver = "D", rearR = "R", ...} (empty seats left out).
+function Drive.seating(who: string): { [string]: string }
+	local out: { [string]: string } = {}
+	local i = 0
+	for code in string.gmatch(who .. ",", "([^,]*),") do
+		i += 1
+		local seat = Drive.SEAT_ORDER[i]
+		if seat and code ~= "" then out[seat] = code end
+	end
+	return out
+end
+function Drive.segLeg(sg: Seg, plot: number?): Leg?
+	local leg = Drive.leg(sg.from, sg.to, plot, sg.side)
+	return leg
+end
+-- Server time when segment i ends (its leg's duration after its start).
+function Drive.segEnd(sg: Seg, plot: number?): number
+	local leg = Drive.segLeg(sg, plot)
+	return sg.t0 + (if leg then leg.dur else 0)
+end
+-- When the last segment ends (the car is parked again), or nil for an empty plan.
+function Drive.planEnd(segs: { Seg }, plot: number?): number?
+	local n = #segs
+	if n == 0 then return nil end
+	return Drive.segEnd(segs[n], plot)
+end
+export type Pose = { cf: CFrame, index: number, phase: string, speed: number, who: string, place: string }
+-- Where the car of a plan is at server time t: phase "before" (driver walking to the car: parked at the start of
+-- segment 1), "moving" (segment `index` running), "waiting" (standing at the end of segment `index` until the next
+-- starts), "done" (after the last segment). place = the place the car stands at / drives to. wb = wheelbase.
+function Drive.pose(segs: { Seg }, plot: number?, t: number, wb: number?): Pose?
+	local n = #segs
+	if n == 0 then return nil end
+	local first = segs[1]
+	if t < first.t0 then
+		local leg = Drive.segLeg(first, plot)
+		if not leg then return nil end
+		return { cf = Drive.poseAtDist(leg, 0, wb), index = 1, phase = "before", speed = 0, who = first.who, place = first.from }
+	end
+	for i = n, 1, -1 do
+		local sg = segs[i]
+		if t >= sg.t0 then
+			local leg = Drive.segLeg(sg, plot)
+			if not leg then return nil end
+			local tau = t - sg.t0
+			if tau < leg.dur then
+				local cf, speed = Drive.at(leg, tau, wb)
+				return { cf = cf, index = i, phase = "moving", speed = speed, who = sg.who, place = sg.to }
+			end
+			return { cf = Drive.endCF(leg, wb), index = i, phase = if i == n then "done" else "waiting", speed = 0, who = sg.who, place = sg.to }
+		end
+	end
+	return nil
+end
+
+------------------------------------------------------------------------------------------------ company drivers
+-- Company drivers on the payroll: exactly CompanyOps' rule (Ops.step pays (posts + drivers) x OPS_WAGE with
+-- drivers = 2 from Ops.DRIVER.more, 1 from Ops.DRIVER.from, else 0). No company (or no empire) = 0.
+function Drive.drivers(e: any): number
+	if typeof(e) ~= "table" then return 0 end
+	local stage = Ops.stageIndex(e)
+	return if stage >= Ops.DRIVER.more then 2 elseif stage >= Ops.DRIVER.from then 1 else 0
+end
+Drive.FIRST_DRIVER_STAGE = Ops.DRIVER.from
+-- Working hours (user request 2): CompanyOps pays the drivers a fixed daily wage for an on-call chauffeur service
+-- around the clock. 06:00-22:00 (company clock, CompanyOps.hour of the server time) they wait under the entrance
+-- canopy; at night they are on call in the drivers' room, so a car needs Drive.WALK_NIGHT instead of Drive.WALK.
+function Drive.onPost(clock: number): boolean
+	local h = Ops.hour(clock)
+	return h >= Drive.POST_HOURS.from and h < Drive.POST_HOURS.to
+end
+function Drive.walkAt(clock: number): number
+	return if Drive.onPost(clock) then Drive.WALK else Drive.WALK_NIGHT
+end
+
+------------------------------------------------------------------------------------------------ getting out
+local function onAnyRoad(zone: string, x: number, z: number, m: number): boolean
+	if zone == "abroad" then
+		for _, r in Metro.ROADS do
+			local rr = Metro.roadRect(r)
+			if x >= rr.x1 - m and x <= rr.x2 + m and z >= rr.z1 - m and z <= rr.z2 + m then return true end
+		end
+		return false
+	end
+	return City.onRoad(Vector3.new(x, 0, z), m)
+end
+-- Where a passenger may stand after getting out of a car at pose cf in the middle of a ride ("let me out here"):
+-- off the asphalt on the car's right (kerb) side, on the sidewalk (WALK_TOP + 3), facing the car's heading; then the
+-- other side, then stepping along the road (16 studs at a time). Inside a plot site (driveway / ramp / garage) only
+-- the HQ's own alight point. In order of preference; DriverService takes the first one that is free of props
+-- (workspace:GetPartBoundsInBox - this module is pure and does not see the world).
+function Drive.kerbCandidates(cf: CFrame, zone: string, plot: number?): { CFrame }
+	local p = cf.Position
+	if zone == "home" and plot then
+		local info = City.plots()[plot]
+		if info and City.inRect(info.rect, p.X, p.Z, 8) then
+			return { info.cframe * Drive.HQ.alight }
+		end
+	end
+	local f = cf.LookVector
+	local fx, fz = f.X, f.Z
+	local fl = math.sqrt(fx * fx + fz * fz)
+	if fl < 1e-6 then fx, fz, fl = 0, -1, 1 end
+	fx, fz = fx / fl, fz / fl
+	local rx, rz = -fz, fx -- right-hand side (kerb side in right-hand traffic)
+	local out: { CFrame } = {}
+	for _, along in { 0, -16, 16, -32, 32, -48, 48 } do
+		local bx, bz = p.X + fx * along, p.Z + fz * along
+		for _, side in { 1, -1 } do
+			local d = 4
+			while d <= 30 and onAnyRoad(zone, bx + rx * side * d, bz + rz * side * d, 0) do d += 1 end
+			if d <= 30 then
+				local q = Vector3.new(bx + rx * side * (d + 2.5), WT + 3, bz + rz * side * (d + 2.5))
+				table.insert(out, CFrame.lookAt(q, q + Vector3.new(fx, 0, fz)))
+			end
+		end
+	end
+	if #out == 0 then
+		local q = Vector3.new(p.X + rx * 6, WT + 3, p.Z + rz * 6)
+		table.insert(out, CFrame.lookAt(q, q + Vector3.new(fx, 0, fz)))
+	end
+	return out
+end
+-- The preferred spot of Drive.kerbCandidates.
+function Drive.kerbSide(cf: CFrame, zone: string, plot: number?): CFrame
+	return Drive.kerbCandidates(cf, zone, plot)[1]
+end
+
 ------------------------------------------------------------------------------------------------ texts
 function Drive.clock(seconds: number): string
 	local s = math.max(0, math.floor(seconds + 0.5))
 	return string.format("%d:%02d", s // 60, s % 60)
+end
+-- A place's name inside a sentence: "waiting for you at the HQ entrance", "... at City Airport (departures)"
+function Drive.atName(place: Place): string
+	return if place.kind == "hq" or place.kind == "limo" or place.kind == "garage" then "the " .. place.name else place.name
 end
 -- "To City Airport · 0:48"
 function Drive.hudText(placeName: string, seconds: number): string

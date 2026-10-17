@@ -53,6 +53,7 @@ STATUS: already done (integrate: FYI for flight, no change needed)
 - Lounge staff marker: invisible part `LoungeConciergePost` (attribute LoungePost = "concierge", LookVector = facing)
   behind the concierge desk of the Port Meridian `BusinessLounge` — for a hostess NPC (staff / talk packages).
 STATUS: deferred to drivers (VIP limo stand bay 1 / bay 2 / lay-by for the chauffeur car)
+STATUS: done by drivers (DrivePlan place pm_limo = MetroPlan.VIP_LIMO.stand (bay 1); booked limousines wait there and leave west through the lay-by into Arrivals Drive's westbound lane passing bay 2; DriveController shows an idle limousine + chauffeur in bay 1 while no ride stands there; the decorative Limousine in bay 2 stays as built)
 
 ## 5. Everyone — client city life (FYI, no API needed)
 CityLifeController runs only while the camera is inside `MetroPlan.REGIONS` (Port Meridian x +-2600, z 6500..10200;

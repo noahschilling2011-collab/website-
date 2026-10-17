@@ -8,6 +8,10 @@
 --   * input: tiles and bar buttons are Selectable; Return = primary button (no text box focused);
 --     gamepad L1/R1 = previous/next step, B = back (ContextActionService, bound only while open)
 --   * while open on a touch screen the thumbstick/jump controls are switched off (GuiService.TouchControlsEnabled)
+--   * opens only while the Computer is open and the Lab is the shown app: a remote reply that arrives after the player
+--     closed the Computer (× while STARTING…) must not re-bind input or switch the touch controls off again
+--   * gamepad: the root is a SelectionGroup that stops at its edges (nothing behind the opaque Studio is reachable)
+--   * Studio.token() changes on every open/close: a mode that waits for a remote reply checks it before switching
 -- The modes live in DesignSteps (design), Stages (training, reveal, live) and LaunchDay (launch).
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -23,7 +27,9 @@ local Client = UI.Parent
 local StateController = require(Client.Controllers.StateController)
 local Theme = require(UI.Theme)
 local Kit = require(UI.Kit)
+local Toast = require(UI.Toast)
 local Parts = require(script.Parent.StudioParts)
+local UseSheet = require(UI.Shop.UseSheet) -- shop fix round 1: the use sheet over the Studio is modal (Return, B)
 
 local C = Theme.colors
 local F = Theme.font
@@ -61,7 +67,10 @@ local touchSaved: boolean? = nil
 local bound = false
 
 local scale: UIScale? = nil
-local labButton: TextButton? = nil
+local lastCanvas = Vector2.new(1254, 520)
+local generation = 0
+local bannerButton: TextButton? = nil
+local bannerAction: (() -> ())? = nil
 local closeButton: TextButton? = nil
 local titleLabel: TextLabel? = nil
 local subLabel: TextLabel? = nil
@@ -102,7 +111,10 @@ local function applyScale()
 	local canvas = if a.X > 0 and a.Y > 0 then Vector2.new(a.X / s, a.Y / s) else Vector2.new(1254, 648)
 	Studio.canvas = canvas
 	local compact = canvas.Y - 184 < 440
-	if compact ~= Studio.compact then
+	local resized = (canvas - lastCanvas).Magnitude > 1
+	lastCanvas = canvas
+	if compact ~= Studio.compact or resized then
+		-- a class change, or a new canvas size in the same class (the regular card grows with the preview zone)
 		Studio.compact = compact
 		for _, view in views do
 			view.setClass(compact)
@@ -121,8 +133,13 @@ function Studio.setTitle(title: string?, subtitle: string?)
 		return
 	end
 	local ceremony = title == nil
-	t.Visible = not ceremony
-	s.Visible = not ceremony
+	local banner = bannerButton
+	local bannerOn = banner ~= nil and bannerAction ~= nil and not ceremony
+	if banner then
+		banner.Visible = bannerOn
+	end
+	t.Visible = not ceremony and not bannerOn
+	s.Visible = not ceremony and not bannerOn
 	x.Visible = not ceremony
 	cc.Visible = ceremony
 	ct.Visible = ceremony
@@ -161,6 +178,12 @@ local function build()
 	root.BackgroundTransparency = 0
 	root.BackgroundColor3 = C.bg
 	root.Active = true -- swallows clicks that would reach the Computer window underneath
+	-- gamepad: selection stays inside the Studio (the Lab home's tiles behind it are still Selectable)
+	root.SelectionGroup = true
+	root.SelectionBehaviorUp = Enum.SelectionBehavior.Stop
+	root.SelectionBehaviorDown = Enum.SelectionBehavior.Stop
+	root.SelectionBehaviorLeft = Enum.SelectionBehavior.Stop
+	root.SelectionBehaviorRight = Enum.SelectionBehavior.Stop
 	local uiScale = Instance.new("UIScale")
 	uiScale.Parent = root
 	scale = uiScale
@@ -175,17 +198,35 @@ local function build()
 	local lab = Parts.button(root, "‹ LAB", "ghost", UDim2.fromOffset(16, 8), UDim2.fromOffset(140, 74), 24)
 	lab.Name = "BackToLab"
 	lab.TextColor3 = C.text
-	labButton = lab
 	Kit.onClick(lab, function()
 		Studio.close()
 	end)
 	titleLabel = Parts.label(root, "Model Studio", 32, F.display, C.text, UDim2.fromOffset(172, 8), UDim2.fromOffset(340, 40))
 	subLabel = Parts.label(root, "", 20, F.medium, C.muted, UDim2.fromOffset(172, 50), UDim2.fromOffset(340, 26))
-	local cc = Parts.label(root, "", 22, F.bold, C.muted, UDim2.new(0.5, -300, 0, 6), UDim2.fromOffset(600, 28), Enum.TextXAlignment.Center)
+	-- "Nova v2 ready · REVEAL ›": a finished training while the player designs or launches something else takes the
+	-- title's place (left of the toast lane) instead of switching modes under the player's finger
+	local banner = Parts.button(root, "", "primary", UDim2.fromOffset(172, 8), UDim2.fromOffset(330, 74), 22)
+	banner.Name = "ReadyBanner"
+	banner.Visible = false
+	bannerButton = banner
+	Kit.onClick(banner, function()
+		local fn = bannerAction
+		if fn then
+			fn()
+		end
+	end)
+	-- ceremony caption ("INTRODUCING / Nova v2", "NOW LIVE / Consumer Chat"): left, where the title sits, so the
+	-- top-centre toast lane stays free (a toast must not cover the model's name; Toast.hold is request lab #5)
+	local cc = Parts.label(root, "", 22, F.bold, C.muted, UDim2.fromOffset(172, 6), UDim2.fromOffset(330, 28))
 	cc.Name = "CenterCaption"
 	centerCaption = cc
-	local ct = Parts.label(root, "", 44, F.display, C.text, UDim2.new(0.5, -300, 0, 32), UDim2.fromOffset(600, 54), Enum.TextXAlignment.Center)
+	local ct = Parts.label(root, "", 44, F.display, C.text, UDim2.fromOffset(172, 32), UDim2.fromOffset(330, 54))
 	ct.Name = "CenterTitle"
+	ct.TextScaled = true -- long names shrink instead of running into the toast lane
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = 44
+	fit.MinTextSize = 24
+	fit.Parent = ct
 	centerTitle = ct
 	cashCaption = Parts.label(root, "CASH", 20, F.bold, C.muted, UDim2.new(1, -402, 0, 8), UDim2.fromOffset(300, 24), Enum.TextXAlignment.Right)
 	local cash = Parts.label(root, "$0", 30, F.display, C.text, UDim2.new(1, -402, 0, 34), UDim2.fromOffset(300, 40), Enum.TextXAlignment.Right)
@@ -303,8 +344,54 @@ function Studio.refresh()
 	end
 end
 
--- Opens (or switches) the Studio to `mode`. opts go to the mode's show().
+-- Changes on every open and close: a mode that waits for a remote reply compares it before it switches modes.
+function Studio.token(): number
+	return generation
+end
+
+-- Can the Studio be shown now? Only inside an open Computer that shows the Lab.
+local function hostReady(): boolean
+	local nav = Studio.nav
+	if nav and not nav.isOpen() then
+		return false
+	end
+	local labFrame = container
+	if labFrame and not labFrame.Visible then
+		return false
+	end
+	return true
+end
+
+-- The top-bar banner (nil text = hidden). Shown in the normal modes; ceremonies keep their centre caption.
+function Studio.setBanner(text: string?, onTap: (() -> ())?)
+	build()
+	local banner = bannerButton
+	if not banner then
+		return
+	end
+	bannerAction = if text then onTap else nil
+	banner.Text = text or ""
+	local view = current
+	Studio.setTitle(if view then view.title else "Model Studio", nil)
+	if view and view.title then
+		local t = titleLabel
+		if t then
+			t.Text = view.title
+		end
+	end
+end
+
+function Studio.bannerShown(): boolean
+	local banner = bannerButton
+	return banner ~= nil and banner.Visible
+end
+
+-- Opens (or switches) the Studio to `mode`. opts go to the mode's show(). Ignored while the Computer is closed or
+-- shows another app (a late remote reply must not re-open it behind the player's back).
 function Studio.open(mode: string, opts: any?)
+	if not hostReady() then
+		return
+	end
 	build()
 	local root = Studio.root
 	if not root then
@@ -321,6 +408,9 @@ function Studio.open(mode: string, opts: any?)
 	end
 	Studio.mode = mode
 	current = view
+	generation += 1
+	-- lab request #5 (menu package): info toasts wait during the ceremonies (LAB_SPEC 3.6)
+	Toast.hold(mode == "reveal" or mode == "launch" or mode == "live")
 	root.Visible = true
 	view.frame.Visible = true
 	Studio.setTitle(view.title, nil)
@@ -341,6 +431,7 @@ end
 
 -- Back to the Lab home (every choice stays in StateController.ui / LabState).
 function Studio.close()
+	UseSheet.close() -- a sheet never outlives the Studio it was opened from
 	local view = current
 	current = nil
 	if view then
@@ -349,13 +440,18 @@ function Studio.close()
 	end
 	local wasOpen = Studio.mode ~= "closed"
 	Studio.mode = "closed"
+	generation += 1
+	Toast.hold(false)
 	local root = Studio.root
 	if root then
 		root.Visible = false
 	end
 	unbindInput()
 	if wasOpen and UserInputService.GamepadEnabled then
-		GuiService.SelectedObject = nil
+		-- back on the Lab home: its DESIGN NEW MODEL tile takes the selection (nil when the Lab is not shown)
+		local labFrame = container
+		local design = if labFrame and labFrame.Visible then labFrame:FindFirstChild("DesignNewModel", true) else nil
+		GuiService.SelectedObject = if design and design:IsA("GuiObject") then design else nil
 	end
 	if wasOpen then
 		for _, callback in Studio.onClosed do
@@ -386,24 +482,27 @@ function Studio.init(labContainer: Frame, navigation: Kit.Nav)
 	end)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		local view = current
-		if processed or not view or Studio.mode == "closed" then
+		-- an open use sheet (shop) answers Return itself: the Studio's primary must not run under it
+		if processed or not view or Studio.mode == "closed" or UseSheet.isOpen() then
 			return
 		end
 		if (input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter) and UserInputService:GetFocusedTextBox() == nil then
 			view.primary()
 		end
 	end)
-	-- live cash in the top bar (one text per frame only while open)
-	local last = ""
+	-- live cash in the top bar while open; the text is only formatted when the whole-dollar value changes
+	-- (no string per frame when the cash stands still)
+	local lastValue = math.huge
 	game:GetService("RunService").RenderStepped:Connect(function()
 		local cash = cashLabel
 		if Studio.mode == "closed" or not cash then
+			lastValue = math.huge
 			return
 		end
-		local text = cashText()
-		if text ~= last then
-			last = text
-			cash.Text = text
+		local value = math.floor(StateController.money())
+		if value ~= lastValue then
+			lastValue = value
+			cash.Text = Parts.money(value)
 		end
 	end)
 end

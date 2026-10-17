@@ -218,7 +218,9 @@ do
 	SPECS["bizjet"].points={
 		doorL1=CFrame.lookAt(Vector3.new(-3.42,6.0,-10.6),Vector3.new(-10,6.0,-10.6)),doorR1=CFrame.lookAt(Vector3.new(3.42,6.0,-10.6),Vector3.new(10,6.0,-10.6)),
 		doorL2=CFrame.lookAt(Vector3.new(-3.42,6.4,2.6),Vector3.new(-10,6.4,2.6)),
-		captain=CFrame.new(-1.15,6.2,-16.4),firstOfficer=CFrame.new(1.15,6.2,-16.4),
+		-- (x +-1.05 / y 5.75 / z -16.1: every pilot build 0.92..1.06 keeps head and cap inside the side glazing and skin
+		-- with the window-side arm hidden by JetController - tests/guests_jet seat test)
+		captain=CFrame.new(-1.05,5.75,-16.1),firstOfficer=CFrame.new(1.05,5.75,-16.1),
 		cockpitCamera=CFrame.lookAt(Vector3.new(0,8.15,-13.7),Vector3.new(0,8.15-math.tan(math.rad(7))*12,-25.7)),
 		cabinCamera=CFrame.lookAt(Vector3.new(-1.75,7.85,-4.9),Vector3.new(-30,7.85-math.tan(math.rad(7))*28.3,-4.9-math.tan(math.rad(14))*28.3)),
 		cabinSeats={CFrame.new(-1.55,6.25,-8.6)*AFT,CFrame.new(1.55,6.25,-8.6)*AFT,CFrame.new(-1.55,6.25,-4.6),CFrame.new(1.55,6.25,-4.6),
@@ -998,10 +1000,10 @@ local function bizCockpit(ctx: Ctx,body: Color3)
 	end
 	part(ctx,"Pedestal",Vector3.new(0.7,0.65,1.4),CFrame.new(0,4.05,-17.4),rgb(58,60,66))
 	part(ctx,"ThrustLevers",Vector3.new(0.5,0.3,0.15),CFrame.new(0,4.5,-17.6)*CFrame.Angles(math.rad(-25),0,0),rgb(28,30,34))
-	for _,x in {-1.15,1.15} do
-		part(ctx,"PilotSeat",Vector3.new(1.2,0.35,1.2),CFrame.new(x,4.7,-16.35),rgb(196,184,160),{material=Enum.Material.Fabric})
-		part(ctx,"PilotSeatBack",Vector3.new(1.2,2.2,0.3),CFrame.new(x,5.95,-15.65)*CFrame.Angles(math.rad(-8),0,0),rgb(196,184,160),{material=Enum.Material.Fabric})
-		part(ctx,"Headrest",Vector3.new(0.9,0.55,0.32),CFrame.new(x,7.3,-15.45),rgb(206,196,174),{material=Enum.Material.Fabric})
+	for _,x in {-1.05,1.05} do
+		part(ctx,"PilotSeat",Vector3.new(1.2,0.35,1.2),CFrame.new(x,4.6,-16.05),rgb(196,184,160),{material=Enum.Material.Fabric})
+		part(ctx,"PilotSeatBack",Vector3.new(1.2,2.2,0.3),CFrame.new(x,5.85,-15.35)*CFrame.Angles(math.rad(-8),0,0),rgb(196,184,160),{material=Enum.Material.Fabric})
+		part(ctx,"Headrest",Vector3.new(0.9,0.55,0.32),CFrame.new(x,7.2,-15.15),rgb(206,196,174),{material=Enum.Material.Fabric})
 	end
 end
 -- Rear engine pods on short horizontal pylons from the tail cone.

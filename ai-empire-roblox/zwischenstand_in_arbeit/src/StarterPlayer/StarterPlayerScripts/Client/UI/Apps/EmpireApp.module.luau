@@ -13,6 +13,10 @@ local Math = require(Shared.EmpireMath)
 local Ops = require(Shared.CompanyOps)
 local ModelMath = require(Shared.ModelMath)
 local Format = require(Shared.Format)
+local TutorialMath = require(Shared.TutorialMath)
+local ShopMath = require(Shared.ShopMath) -- shop package (SHOP_SPEC 5.2.2, 5.2.6)
+local ShopConfigRebrand = require(Shared.Config.ShopConfig).REBRAND_COOLDOWN
+local CompanyConfig = require(Shared.Config.CompanyConfig)
 local UI = script.Parent.Parent
 local Client = UI.Parent
 local State = require(Client.Controllers.StateController)
@@ -22,6 +26,7 @@ local Conversation = require(UI.Screens.Conversation)
 local Kit = require(UI.Kit)
 local Theme = require(UI.Theme)
 local Toast = require(UI.Toast)
+local ShopCore = require(UI.Shop.ShopCore) -- shop package: Eureka buttons, focus requests
 local C, F = Theme.colors, Theme.font
 local App = {}
 local scroll: ScrollingFrame? = nil
@@ -29,8 +34,13 @@ local current = "overview"
 local updaters: { (any) -> () } = {}
 local nav: any = nil
 local tabButtons: { [string]: TextButton } = {}
+-- Menu pages (ONBOARDING_SPEC B, menu package): App.mountPart renders one tab builder (or a composite) into a page
+-- frame of the Menu. Every part keeps its own updater list; `building` is the list watch() fills right now and
+-- `inPage` is true while a part renders (cards that duplicate another Menu page are left out there).
+local building: { (any) -> () } = updaters
+local inPage = false
 local function watch(fn: (any) -> ())
-	table.insert(updaters, fn)
+	table.insert(building, fn)
 	if State.snapshot then fn(State.snapshot) end
 end
 -- Touch-first screens: row buttons and switches are at least TAP design px tall. The Computer window is drawn at about
@@ -317,7 +327,7 @@ local function overview(parent: Instance)
 	end)
 	local goal = Kit.card(parent, 6)
 	title(goal, "A business with a plan")
-	para(goal, "1. Buy data and train a model in Models.\n2. Launch it at the Recommended price.\n3. Sign business clients: you and your Growth & Sales reps visit them by yourselves.\n4. Hire a team, research upgrades and move into a bigger office.\n5. Build a frontier model and climb the server board.")
+	para(goal, "1. Buy data and train a model in the Lab.\n2. Launch it at the Recommended price.\n3. Sign business clients: you and your Growth & Sales reps visit them by yourselves.\n4. Hire a team, research upgrades and move into a bigger office.\n5. Build a frontier model and climb the server board.")
 end
 
 -- Clients (CORE_SPEC 3.2): the B2B pipeline -------------------------------------------------------------------
@@ -1084,25 +1094,27 @@ local function roster(parent: Instance, order: number)
 		filter = id
 		signature = nil
 		if State.snapshot then update(State.snapshot) end
-	end)
+	end, Kit.tap(38, 62)) -- fix round 1 (review): 56 px chips on touch = 44.8 pt on an iPhone (legacy page x 0.80)
 	selector.frame.LayoutOrder = 3
 	rows = Kit.stack(card, 4, 4)
 	more = para(card, "", 5)
 	watch(update)
 end
+-- fix round 1 (review, B9 "hire cards first" / B10 "Hire: 3 taps, 0 swipes"): applications and the four Hire cards
+-- come first, the roster and the long explanation under them
 local function team(parent: Instance)
-	local intro = Kit.card(parent, 1)
+	local intro = Kit.card(parent, 8)
 	title(intro, "Specialists, real advantages")
 	local capacity = para(intro, "")
 	watch(function(s)
 		local e = s.data.empire
-		capacity.Text = string.format("%d / %d desks filled. Staff earn wages every second, day and night (also on vacation and sick days). Bonuses stop when you dismiss an employee. Hiring fees are non-refundable. Agency hires start at once with average skill (★2–★3); interviewing applicants is how you find stronger people. Automatic HR and apprentices: Company → Settings.",Math.staff(e),Config.OFFICES[e.office].staff)
+		capacity.Text = string.format("%d / %d desks filled. Staff earn wages every second, day and night (also on vacation and sick days). Bonuses stop when you dismiss an employee. Hiring fees are non-refundable. Agency hires start at once with average skill (★2–★3); interviewing applicants is how you find stronger people. Automatic HR and apprentices: Team → Settings.",Math.staff(e),Config.OFFICES[e.office].staff)
 	end)
 	safetyNote(intro, 3)
-	applications(parent, 2)
-	roster(parent, 3)
+	applications(parent, 1)
+	roster(parent, 7)
 	for i, role in Config.ROLES do
-		local card = Kit.card(parent, i+3)
+		local card = Kit.card(parent, i+1)
 		title(card, role.name)
 		para(card, role.desc)
 		local info = para(card, "", 3)
@@ -1128,50 +1140,246 @@ local function team(parent: Instance)
 		end)
 	end
 end
+-- Lab → Research (shop package, SHOP_SPEC 5.2.2): a status row (RESEARCH POINTS · SPEED IN OFFICE HOURS · message) and
+-- the projects as cards in 2 columns. Each card has its free action first (START · $cost, or why not) and, only when
+-- it works right now, a secondary Eureka button beside it (ShopCore.eurekaOffer: guide over, Shop unlocked, never
+-- within 10 s of a failure; the Robux state only for a saving >= 30 s). The note line says what a Eureka saves and
+-- what it does not cover. Sizes for this page's scale (0.80 on an iPhone): text >= 15 px = 12 pt, buttons 56 px.
+-- Fix round 1 (review): the Robux (buy) state shows on ONE idle card only (the card a deep link asked for, else the
+-- cheapest one it works on), so a page with 0 RP is never a wall of Robux buttons; an owned Eureka shows on every
+-- card it works on (a bought voucher is never stranded).
+local RT = { caption = 15, body = 16, title = 21, button = 56 }
 local function research(parent: Instance)
-	local active=Kit.card(parent,1)
-	title(active,"The research lab")
-	local info=para(active,"")
-	local bar=Kit.bar(active,8,3)
-	watch(function(s)
-		local e=s.data.empire
-		local job=e.researchJob
-		local b=Math.bonuses(e)
-		info.Text=string.format("%.0f RP available · +%.2f RP/s at full staff (only during office hours)\n",e.points,b.points*(if s.data.company.spec=="research" then 1.2 else 1)) ..
-			(if job then "Researching " .. Config.find(Config.RESEARCH,job.id).name .. " · " .. tostring(math.ceil(job.seconds-job.elapsed)) .. "s left" else "Pick your next breakthrough. Research continues while you are online.")
-		bar.frame.Visible=job~=nil
-		if job then bar.set(job.elapsed/job.seconds) end
-	end)
-	for i,def in Config.RESEARCH do
-		local card=Kit.card(parent,i+1)
-		title(card,def.name)
-		para(card,def.desc)
-		local cardInfo=para(card,"",3)
-		local b=button(card,"Research",function() call("StartResearch",{researchId=def.id},"Research started: " .. def.name) end)
-		watch(function(s)
-			local e=s.data.empire
-			local locked=def.prereq and not e.research[def.prereq]
-			local done=e.research[def.id]==true
-			cardInfo.Text=string.format("%s · %d RP · %ds",Format.money(def.cost),def.points,def.seconds) ..
-				(if locked then "\nRequires: " .. Config.find(Config.RESEARCH,def.prereq).name else "")
-			b.Text=if done then "Completed" elseif e.researchJob and e.researchJob.id==def.id then "Researching..." elseif locked then "Locked" else "Start research"
-			Kit.setDisabled(b,done or locked==true or e.researchJob~=nil or e.points<def.points or s.data.money<def.cost)
+	local status = Kit.card(parent, 1, 8)
+	status.Name = "ResearchStatus"
+	local cells = Kit.frame(status, UDim2.new(1, 0, 0, 52))
+	cells.LayoutOrder = 1
+	Kit.list(cells, 24, true)
+	local function cell(caption: string, order: number, width: number): TextLabel
+		local f = Kit.frame(cells, UDim2.new(0, width, 1, 0))
+		f.LayoutOrder = order
+		local c = Kit.text(f, caption, RT.caption, F.bold, C.muted)
+		c.Position = UDim2.fromOffset(0, 0)
+		local v = Kit.text(f, "", 24, F.bold, C.text)
+		v.Position = UDim2.fromOffset(0, 22)
+		return v
+	end
+	local pointsValue = cell("RESEARCH POINTS", 1, 190)
+	pointsValue.Name = "ResearchPoints"
+	local speedValue = cell("SPEED IN OFFICE HOURS", 2, 220)
+	speedValue.Name = "ResearchSpeed"
+	local message = Kit.para(status, "", RT.body, C.muted, 2)
+	message.Name = "ResearchMessage"
+	local bar = Kit.bar(status, 8, 3)
+	local grid = Kit.frame(parent, UDim2.fromScale(1, 0))
+	grid.Name = "ResearchCards"
+	grid.LayoutOrder = 2
+	grid.AutomaticSize = Enum.AutomaticSize.Y
+	Kit.list(grid, 12)
+	type CardRefs = { def: any, card: Frame, stroke: UIStroke, done: TextLabel, meta: TextLabel, free: TextButton, offer: ShopCore.OfferButton, note: TextLabel, bar: Kit.Bar, buttons: Frame }
+	local cards: { CardRefs } = {}
+	local row: Frame? = nil
+	for i, def in Config.RESEARCH do
+		if i % 2 == 1 then
+			local r = Kit.frame(grid, UDim2.fromScale(1, 0))
+			r.LayoutOrder = i
+			r.AutomaticSize = Enum.AutomaticSize.Y
+			Kit.list(r, 12, true).VerticalAlignment = Enum.VerticalAlignment.Top -- cards of a row start at the same line
+			row = r
+		end
+		local card = Kit.card(row :: Frame, i, 8)
+		card.Name = "Research_" .. def.id
+		card.Size = UDim2.new(0.5, -6, 0, 0)
+		local stroke = Kit.stroke(card, 1, Theme.accent, 3)
+		stroke.Name = "Focus"
+		local head = Kit.frame(card, UDim2.new(1, 0, 0, 30))
+		head.LayoutOrder = 1
+		local name = Kit.text(head, def.name, RT.title, F.bold, C.text)
+		name.Name = "Name"
+		local done = Kit.text(head, "✓ DONE", RT.caption, F.bold, C.good)
+		done.Name = "Done"
+		done.AnchorPoint = Vector2.new(1, 0)
+		done.Position = UDim2.fromScale(1, 0)
+		done.BackgroundTransparency = 0.85
+		done.BackgroundColor3 = C.good
+		Kit.corner(done, 6)
+		Kit.padding(done, 3, 8, 3, 8)
+		local meta = Kit.text(card, string.format("%s · %d RP · %s", Format.money(def.cost), def.points, Format.duration(def.seconds)), RT.body, F.bold, C.text)
+		meta.LayoutOrder = 2
+		local desc = Kit.para(card, def.desc, RT.body, C.muted, 3)
+		desc.Name = "Desc"
+		local buttons = Kit.frame(card, UDim2.new(1, 0, 0, RT.button))
+		buttons.Name = "Buttons"
+		buttons.LayoutOrder = 4
+		Kit.list(buttons, 10, true)
+		local free = Kit.button(buttons, "", "primary", UDim2.new(0.5, -5, 1, 0))
+		free.Name = "Start"
+		free.TextSize = RT.body
+		free.TextWrapped = true
+		free.LayoutOrder = 1
+		free.Selectable = true
+		local offer = ShopCore.offerButton(buttons, "EUREKA", UDim2.new(0.5, -5, 1, 0), RT.body)
+		offer.button.Name = "Eureka"
+		offer.button.LayoutOrder = 2
+		local cardBar = Kit.bar(card, 8, 5)
+		local note = Kit.para(card, "", RT.caption, C.muted, 6)
+		note.Name = "Note"
+		note.RichText = true
+		local refs: CardRefs = { def = def, card = card, stroke = stroke, done = done, meta = meta, free = free, offer = offer, note = note, bar = cardBar, buttons = buttons }
+		table.insert(cards, refs)
+		Kit.onClick(free, function()
+			call("StartResearch", { researchId = def.id }, "Research started: " .. def.name)
+		end)
+		Kit.onClick(offer.button, function()
+			local snapshot = State.snapshot
+			if not snapshot then return end
+			local job = snapshot.data.empire.researchJob
+			local target = if job then job.id else def.id
+			local state = offer.button:GetAttribute("OfferState")
+			if state == "owned" then
+				ShopCore.use("eureka", target)
+			elseif state == "buy" then
+				ShopCore.buy("eureka", target)
+			else
+				ShopCore.buy("eureka", target) -- preview: says "Not set up", never prompts
+			end
 		end)
 	end
+	local focusUntil = 0
+	local lastFocus: string? = nil
+	watch(function(s)
+		local data = s.data
+		local e = data.empire
+		local job = e.researchJob
+		local money = State.money()
+		local now = ShopCore.serverNow(s)
+		local doneCount = 0
+		for _, def in Config.RESEARCH do if e.research[def.id] then doneCount += 1 end end
+		pointsValue.Text = Format.int(e.points) .. " RP"
+		speedValue.Text = string.format("+%.1f/s", ShopMath.peakRate(data, now))
+		if job then
+			local def = Config.find(Config.RESEARCH, job.id)
+			message.Text = string.format("Researching %s · %s left. %d of %d done.", if def then def.name else job.id, Format.duration(job.seconds - job.elapsed), doneCount, #Config.RESEARCH)
+		else
+			message.Text = string.format("No project running. Research points come in office hours. %d of %d done.", doneCount, #Config.RESEARCH)
+		end
+		bar.frame.Visible = job ~= nil
+		if job then bar.set(job.elapsed / math.max(1, job.seconds)) end
+		-- a deep link from the Model Studio (OPEN RESEARCH ›) asks for one card: outline it for a moment
+		local focus = ShopCore.takeFocus("research")
+		if focus then
+			focusUntil = os.clock() + 3
+			lastFocus = focus
+		end
+		type Plan = { label: string, enabled: boolean, primary: boolean, offerTarget: string?, running: boolean }
+		local plans: { [CardRefs]: Plan } = {}
+		local offers: { [CardRefs]: { state: string?, check: ShopMath.Check?, right: string } } = {}
+		local buyCard: CardRefs? = nil
+		for _, r in cards do
+			local def = r.def
+			local isDone = e.research[def.id] == true
+			local running = job ~= nil and job.id == def.id
+			local locked = def.prereq ~= nil and not e.research[def.prereq]
+			r.done.Visible = isDone
+			r.buttons.Visible = not isDone
+			r.bar.frame.Visible = running
+			if focus == def.id then
+				ShopCore.scrollTo(r.card)
+			end
+			r.stroke.Transparency = if os.clock() < focusUntil and focus ~= nil and focus == def.id then 0.1 else 1
+			local label, enabled, primary = "", false, false
+			local offerTarget: string? = nil
+			if isDone then
+				label = ""
+			elseif running then
+				label = Format.duration(job.seconds - job.elapsed) .. " left"
+				r.bar.set(job.elapsed / math.max(1, job.seconds))
+				offerTarget = def.id
+			elseif job ~= nil then
+				label = "Another project is running"
+			elseif locked then
+				local pre = Config.find(Config.RESEARCH, def.prereq)
+				label = "NEEDS " .. string.upper(if pre then pre.name else def.prereq) .. " FIRST"
+			elseif money < def.cost then
+				label = "NEEDS " .. Format.money(def.cost)
+			elseif e.points < def.points then
+				label = string.format("NEEDS %d RP", def.points)
+				offerTarget = def.id
+			else
+				label, enabled, primary = "START · " .. Format.money(def.cost), true, true
+				offerTarget = def.id
+			end
+			plans[r] = { label = label, enabled = enabled, primary = primary, offerTarget = offerTarget, running = running }
+			local state, check, right = nil, nil, ""
+			if offerTarget and not isDone then
+				state, check, right = ShopCore.eurekaOffer(s, offerTarget, money)
+			end
+			offers[r] = { state = state, check = check, right = right }
+			-- the one card that may show the Robux (buy / preview) state: the deep link's card, else the cheapest
+			if state ~= nil and state ~= "owned" and not running then
+				local pick = buyCard
+				if pick == nil or (lastFocus == def.id) or (lastFocus ~= pick.def.id and def.cost < pick.def.cost) then
+					buyCard = r
+				end
+			end
+		end
+		for _, r in cards do
+			local def = r.def
+			local plan = plans[r]
+			local running, label, enabled, primary = plan.running, plan.label, plan.enabled, plan.primary
+			r.free.Text = label
+			Kit.setDisabled(r.free, not enabled)
+			r.free.BackgroundColor3 = if primary then Theme.accent else C.raised
+			r.free.TextColor3 = if primary then C.bg else C.muted
+			local o = offers[r]
+			local state, check, right = o.state, o.check, o.right
+			if state ~= nil and state ~= "owned" and not running and r ~= buyCard then
+				state, check, right = nil, nil, ""
+			end
+			r.offer.set(state, right)
+			r.offer.label.Text = if running then "FINISH NOW · EUREKA" else "EUREKA"
+			local width = if state == nil then 1 elseif running then 0.28 else 0.5 -- "0:25 left" | FINISH NOW · EUREKA | R$ 15
+			r.free.Size = UDim2.new(width, if state == nil then 0 else -5, 1, 0)
+			r.offer.button.Size = UDim2.new(1 - width, -5, 1, 0)
+			if state and check then
+				local saves = ShopMath.savingText(check.seconds)
+				if running then
+					r.note.Text = string.format("Eureka <b>saves %s</b>: its %d RP come back.", saves, check.points)
+				elseif e.points >= def.points then
+					r.note.Text = string.format("Eureka <b>saves %s</b>: you keep your %s RP, you still pay %s.", saves, Format.int(e.points), Format.money(def.cost))
+				else
+					r.note.Text = string.format("Eureka <b>saves %s</b>: covers the %d RP, you still pay %s.", saves, def.points, Format.money(def.cost))
+				end
+				r.note.Visible = true
+			else
+				r.note.Text = ""
+				r.note.Visible = false
+			end
+		end
+	end)
 end
+-- fix round 1 (review): a goal shows a COLLECT button only when it can be collected; progress and "Collected ✓" are a
+-- text line (no full-width disabled buttons that make the page several screens long)
 local function milestones(parent: Instance)
 	for i,def in Config.QUESTS do
 		local card=Kit.card(parent,i)
 		title(card,def.name)
 		para(card,def.desc .. "  Reward: " .. Format.money(def.reward) .. " + " .. tostring(def.xp) .. " XP")
 		local bar=Kit.bar(card,7,3)
-		local b=button(card,"In progress",function() call("ClaimQuest",{questId=def.id},"Milestone reward collected!") end)
+		local status=para(card,"",4)
+		status.Name="GoalStatus"
+		local b=button(card,"Collect",function() call("ClaimQuest",{questId=def.id},"Milestone reward collected!") end)
 		watch(function(s)
 			local p=Math.progress(s.data,def)
 			local done=s.data.empire.quests[def.id]==true
+			local ready=not done and p>=def.target
 			bar.set(math.min(1,p/def.target))
-			b.Text=if done then "Collected" elseif p>=def.target then "Collect " .. Format.money(def.reward) else Format.compact(p) .. " / " .. Format.compact(def.target)
-			Kit.setDisabled(b,done or p<def.target)
+			bar.frame.Visible=not done
+			status.Text=if done then "Collected ✓" else Format.compact(math.min(p,def.target)) .. " / " .. Format.compact(def.target)
+			status.TextColor3=if done then C.good else C.muted
+			status.Visible=not ready
+			b.Text="Collect " .. Format.money(def.reward)
+			b.Visible=ready
 		end)
 	end
 end
@@ -1232,7 +1440,124 @@ local function apprenticeList(e: any): { { name: string, role: string, day: numb
 	return out
 end
 App.apprenticeList = apprenticeList
+-- Team → Settings: "Change colour & logo" (shop package, SHOP_SPEC 3.5 / 5.2.6, owner decision S4): free for everyone.
+-- The 8 Identity Kit colours and 6 Kit logos show with a small lock for non-owners and one line "More colours with
+-- Identity Kit (Shop)"; there is no buy button here. 60 s between two changes (server: REBRAND_COOLDOWN).
+local REBRAND_TILE = 56 -- 44.8 pt on an iPhone at this page's 0.80 scale
+local function rebrandCard(parent: Instance, order: number)
+	local card = Kit.card(parent, order, 10)
+	card.Name = "Rebrand"
+	title(card, "Change colour & logo")
+	local intro = Kit.para(card, "Free for everyone. Your GPU racks change at once; HQ trim, cars and the jet at their next build.", 15, C.muted, 2)
+	intro.Name = "RebrandIntro"
+	local pickColor: string? = nil
+	local pickLogo: string? = nil
+	local lastSave = -math.huge
+	type Tile = { button: TextButton, stroke: UIStroke, lock: Frame?, kit: boolean, id: string }
+	local tiles: { Tile } = {}
+	local refresh: () -> () = function() end
+	local function tileRow(order2: number, list: { any }, kit: boolean, isColor: boolean)
+		local row = Kit.frame(card, UDim2.new(1, 0, 0, REBRAND_TILE))
+		row.LayoutOrder = order2
+		Kit.list(row, 8, true)
+		for i, item in list do
+			local id = if isColor then item.id else item
+			local b = Instance.new("TextButton")
+			b.Name = (if isColor then "Color_" else "Logo_") .. (if isColor then id else tostring(i + (if kit then #CompanyConfig.LOGOS else 0)))
+			b.AutoButtonColor = false
+			b.BorderSizePixel = 0
+			b.Size = UDim2.fromOffset(REBRAND_TILE, REBRAND_TILE)
+			b.LayoutOrder = i
+			b.Selectable = true
+			b.Text = if isColor then "" else id
+			b.Font = F.bold
+			b.TextSize = 26
+			b.TextColor3 = C.text
+			b.BackgroundColor3 = if isColor then Theme.rgb(item.rgb) else C.raised
+			b.Parent = row
+			Kit.corner(b, 12)
+			local stroke = Kit.stroke(b, 0.75, C.line, 1)
+			local lock: Frame? = nil
+			if kit then
+				local l = Kit.frame(b, UDim2.fromOffset(22, 22), UDim2.new(1, -3, 1, -3))
+				l.Name = "Lock"
+				l.AnchorPoint = Vector2.new(1, 1)
+				l.BackgroundTransparency = 0.15
+				l.BackgroundColor3 = C.bg
+				Kit.corner(l, 6)
+				local icon = Kit.icon(l, "lock", 14)
+				icon.frame.AnchorPoint = Vector2.new(0.5, 0.5)
+				icon.frame.Position = UDim2.fromScale(0.5, 0.5)
+				icon.setColor(C.text)
+				lock = l
+			end
+			local tile: Tile = { button = b, stroke = stroke, lock = lock, kit = kit, id = id }
+			table.insert(tiles, tile)
+			Kit.onClick(b, function()
+				local snapshot = State.snapshot
+				local owns = snapshot ~= nil and ShopMath.ownsPass((snapshot.live :: any).shop and (snapshot.live :: any).shop.passes, CompanyConfig.KIT_PASS)
+				if kit and not owns then
+					Toast.show("info", "This colour comes with Identity Kit.")
+					return
+				end
+				if isColor then pickColor = id else pickLogo = id end
+				refresh()
+			end)
+		end
+	end
+	tileRow(3, CompanyConfig.COLORS, false, true)
+	tileRow(4, CompanyConfig.KIT_COLORS, true, true)
+	tileRow(5, CompanyConfig.LOGOS, false, false)
+	tileRow(6, CompanyConfig.KIT_LOGOS, true, false)
+	local more = Kit.para(card, "More colours with Identity Kit (Shop)", 15, C.dim, 7)
+	more.Name = "KitLine"
+	local status = Kit.para(card, "", 15, C.muted, 8)
+	status.Name = "RebrandStatus"
+	local save = Kit.button(card, "SAVE COLOUR & LOGO", "primary", UDim2.new(1, 0, 0, REBRAND_TILE))
+	save.Name = "RebrandSave"
+	save.LayoutOrder = 9
+	save.TextSize = 16
+	Kit.onClick(save, function()
+		local snapshot = State.snapshot
+		local company = if snapshot then snapshot.data.company else nil
+		if not company then return end
+		local color, logo = pickColor or company.color, pickLogo or company.logo
+		lastSave = os.clock()
+		queued("EmpireAction", { action = "rebrand", color = color, logo = logo }, "New company colour and logo saved.")
+		pickColor, pickLogo = nil, nil
+	end)
+	refresh = function()
+		local snapshot = State.snapshot
+		local company = if snapshot then snapshot.data.company else nil
+		if not snapshot or not company then return end
+		local liveShop = (snapshot.live :: any).shop
+		local owns = ShopMath.ownsPass(if typeof(liveShop) == "table" then liveShop.passes else nil, CompanyConfig.KIT_PASS)
+		local color, logo = pickColor or company.color, pickLogo or company.logo
+		for _, t in tiles do
+			local on = t.id == color or t.id == logo
+			-- fix round 1 (review): a locked Kit tile shows its TRUE colour / glyph (the player can judge it); only the
+			-- lock badge and a grey border say that it needs Identity Kit
+			local lockedKit = t.kit and not owns
+			t.stroke.Color = if on then C.white elseif lockedKit then C.dim else C.line
+			t.stroke.Transparency = if on then 0 elseif lockedKit then 0.2 else 0.75
+			t.stroke.Thickness = if on then 3 elseif lockedKit then 2 else 1
+			if t.lock then
+				t.lock.Visible = not owns
+			end
+			t.button.BackgroundTransparency = 0
+			t.button.TextTransparency = 0
+		end
+		more.Visible = not owns
+		local wait = math.ceil(ShopConfigRebrand - (os.clock() - lastSave))
+		local changed = color ~= company.color or logo ~= company.logo
+		status.Text = if wait > 0 then string.format("You can change it again in %d s", wait) elseif changed then "Not saved yet." else "Your company colour and logo."
+		Kit.setDisabled(save, wait > 0 or not changed)
+	end
+	watch(function(_s) refresh() end)
+end
+
 local function settings(parent: Instance)
+	rebrandCard(parent, 0) -- shop package (SHOP_SPEC 5.2.6, S4)
 	-- automatic HR
 	local hr = Kit.card(parent, 1)
 	title(hr, "Automatic HR")
@@ -1327,11 +1652,12 @@ local function settings(parent: Instance)
 		queued("EmpireAction", { action = "buyJet" }, "The company jet is yours. It waits in the airport hangar with your 2 pilots.")
 	end)
 	jetButton.Name = "BuyJet"
-	-- Lab level lives in the Models app
+	-- Lab level lives in the Models app (a duplicate card: not on the Menu's Team → Settings page, ONBOARDING_SPEC B9)
 	local lab = Kit.card(parent, 6)
+	lab.Visible = not inPage
 	title(lab, "Lab level")
 	local labText = para(lab, "", 2)
-	local labButton = Kit.button(lab, "Open Models", "secondary", UDim2.new(1, 0, 0, Kit.tap(40, TAP)))
+	local labButton = Kit.button(lab, "Open the Lab", "secondary", UDim2.new(1, 0, 0, Kit.tap(40, TAP)))
 	labButton.LayoutOrder = 3
 	Kit.onClick(labButton, function() if nav then nav.show("lab") end end)
 	local apprSig: string? = nil
@@ -1443,7 +1769,7 @@ local function settings(parent: Instance)
 			local pts, cost = Ops.labCost(level)
 			local treeDone = true
 			for _, def in Config.RESEARCH do if not e.research[def.id] then treeDone = false end end
-			labText.Text = string.format("Lab level %d / %d. The next level costs %s research points + %s%s and adds +1 to every core stat of future models. It lives in Models.", level, Ops.LAB_MAX, Format.int(pts), dollars(cost), if treeDone then "" else " (after the whole research tree)")
+			labText.Text = string.format("Lab level %d / %d. The next level costs %s research points + %s%s and adds +1 to every core stat of future models. It lives in Lab → Models.", level, Ops.LAB_MAX, Format.int(pts), dollars(cost), if treeDone then "" else " (after the whole research tree)")
 		end
 	end)
 end
@@ -1452,7 +1778,8 @@ local function board(parent: Instance)
 	title(head,"Company rankings")
 	local status=para(head,"Global rankings load in a published game with saving enabled.")
 	local mode="overall"
-	local selector=Kit.segmented(head,{{id="overall",label="Overall"},{id="coding",label="Coding"},{id="math",label="Math"},{id="reasoning",label="Reasoning"},{id="creativity",label="Creative"},{id="arena",label="Arena"}},mode,function(id) mode=id;if State.snapshot then for _,fn in updaters do fn(State.snapshot) end end end)
+	local mine=building -- this tab's updaters (a Menu page renders the board next to other parts)
+	local selector=Kit.segmented(head,{{id="overall",label="Overall"},{id="coding",label="Coding"},{id="math",label="Math"},{id="reasoning",label="Reasoning"},{id="creativity",label="Creative"},{id="arena",label="Arena"}},mode,function(id) mode=id;if State.snapshot then for _,fn in mine do fn(State.snapshot) end end end)
 	selector.frame.LayoutOrder=3
 	watch(function(s) status.Text=if s.live.rankings then s.live.rankings.status.." · best self-trained records, refreshed every three minutes" else "Server preview · strongest self-trained AI" end)
 	for i=1,10 do
@@ -1466,7 +1793,100 @@ local function board(parent: Instance)
 		end)
 	end
 end
+-- Menu composites (ONBOARDING_SPEC B4, menu package) ---------------------------------------------------------
+-- Home → Money: Company → Overview's metrics, profit chart and market cycle on top of the Money builder
+local function homeMoney(parent: Instance)
+	local metrics = Kit.grid(parent, 3, 96, 10, 1)
+	metric(metrics, "Cash available", function(s) return Format.money(s.data.money) end, 1)
+	-- nothing booked yet reads "$0/day", never "+$0" (apps rule: no "+$0" anywhere)
+	metric(metrics, "Profit per game day", function(s) local net = s.live.revenue-s.live.cost; return if net == 0 then "$0/day" else Format.perDay(net) end, 2)
+	metric(metrics, "Active users", function(s) return Format.compact(s.live.users) end, 3)
+	profitChart(parent, 2)
+	local cycle = Kit.card(parent, 3)
+	local cycleTitle = title(cycle, "Market cycle")
+	local cycleText = para(cycle, "")
+	watch(function(s)
+		local def, left = Config.cycle(s.serverTime)
+		cycleTitle.Text = "Market cycle · " .. def.name
+		cycleText.Text = def.desc .. "  Next cycle in " .. tostring(math.ceil(left)) .. "s."
+	end)
+	local ledger = Kit.stack(parent, 12, 4)
+	money(ledger)
+end
+-- "Guide & tips" (ONBOARDING_SPEC A12): skip the guide, restart it before the first launch, tips on/off, replay tips
+local function guideCard(parent: Instance, order: number)
+	local card = Kit.card(parent, order)
+	card.Name = "GuideTips"
+	title(card, "Guide & tips")
+	local state = para(card, "", 2)
+	local row = Kit.grid(card, 2, Kit.tap(40, TAP), 10, 3)
+	local skip = Kit.button(row, "Skip guide", "secondary", UDim2.new())
+	skip.Name = "SkipGuide"
+	skip.LayoutOrder = 1
+	local restart = Kit.button(row, "Restart first steps", "secondary", UDim2.new())
+	restart.Name = "RestartGuide"
+	restart.LayoutOrder = 2
+	local tips = Kit.button(row, "Tips: on", "secondary", UDim2.new())
+	tips.Name = "TipsToggle"
+	tips.LayoutOrder = 3
+	local replay = Kit.button(row, "Replay tips", "secondary", UDim2.new())
+	replay.Name = "ReplayTips"
+	replay.LayoutOrder = 4
+	local tipsOn = true
+	Kit.onClick(skip, function() queued("EmpireAction", { action = "tutorial", op = "skip" }, "Guide skipped. Restart it here any time before your first launch.") end)
+	Kit.onClick(restart, function() queued("EmpireAction", { action = "tutorial", op = "restart" }, "First steps restarted: follow the gold ring.") end)
+	Kit.onClick(tips, function() queued("EmpireAction", { action = "tutorial", op = "tips", on = not tipsOn }, if tipsOn then "Tips are off." else "Tips are on.") end)
+	Kit.onClick(replay, function() queued("EmpireAction", { action = "tutorial", op = "replayTips" }, "Tips will show again.") end)
+	watch(function(s)
+		local t = s.data.empire.tutorial
+		t = if typeof(t) == "table" then t else {}
+		local released = (tonumber(s.data.stats.modelsReleased) or 0) >= 1
+		local active = TutorialMath.active(s.data)
+		card.LayoutOrder = if active then 0 else order -- fix round 1: first on Home → Goals while the guide runs
+		tipsOn = t.tipsOff ~= true
+		state.Text = if active then string.format("First steps: step %d of %d. The gold ring shows the next button.", math.max(1, TutorialMath.reachable(s.data)), TutorialMath.STEPS)
+			elseif t.skipped == true and not released then "First steps skipped. Restart them any time before your first launch."
+			elseif t.done == true or released then "First steps done. One-time tips explain new things as they appear."
+			else "First steps skipped."
+		skip.Visible = active
+		restart.Visible = not active and not released
+		tips.Text = if tipsOn then "Tips: on" else "Tips: off"
+	end)
+end
+-- Home → Goals: Collect all, the goals, "A business with a plan" and "Guide & tips"
+local function homeGoals(parent: Instance)
+	local top = Kit.card(parent, 1)
+	title(top, "Goals")
+	local info = para(top, "", 2)
+	local collect = button(top, "Collect all", function()
+		task.spawn(function()
+			local ok, res = Action.call("ClaimQuest", { all = true })
+			if ok and typeof(res.total) == "number" and res.total > 0 then
+				Toast.show("success", TutorialMath.collectText(res.total, if typeof(res.claimed) == "table" then #res.claimed else 0), 4)
+			end
+		end)
+	end)
+	collect.Name = "CollectAll"
+	watch(function(s)
+		local done = 0
+		for _, q in Config.QUESTS do if s.data.empire.quests[q.id] then done += 1 end end
+		local total, count = TutorialMath.claimable(s.data)
+		info.Text = string.format("%d of %d goals done%s", done, #Config.QUESTS, if count > 0 then string.format(" · %d ready to collect", count) else "")
+		collect.Text = "Collect all · " .. Format.money(total)
+		collect.Visible = total > 0 -- fix round 1: no disabled "Nothing to collect yet" button
+	end)
+	local list = Kit.stack(parent, 12, 2)
+	milestones(list)
+	local plan = Kit.card(parent, 3)
+	title(plan, "A business with a plan")
+	para(plan, "1. Buy data and train a model in the Lab.\n2. Launch it at the Recommended price.\n3. Sign business clients: you and your Growth & Sales reps visit them by yourselves.\n4. Hire a team, research upgrades and move into a bigger office.\n5. Build a frontier model and climb the server board.")
+	guideCard(parent, 4)
+end
+
 local builders: { [string]: (Instance) -> () } = {overview=overview,clients=clients,money=money,team=team,research=research,milestones=milestones,office=office,settings=settings,board=board}
+local PART_BUILDERS: { [string]: (Instance) -> () } = {homeMoney=homeMoney,homeGoals=homeGoals,overview=overview,clients=clients,money=money,team=team,research=research,milestones=milestones,office=office,settings=settings,board=board}
+-- the legacy tab name a part's stack carries ("Tab_<id>", tests and the HUD find it by name)
+local PART_TAB: { [string]: string } = {homeMoney="money",homeGoals="milestones"}
 local TABS = {{"overview","Overview"},{"clients","Clients"},{"money","Money"},{"team","Team"},{"research","Research"},{"milestones","Goals"},{"office","Office"},{"settings","Settings"},{"board","Board"}}
 local function paintTabs()
 	for id,btn in tabButtons do btn.BackgroundColor3=if id==current then Theme.accent:Lerp(C.panel,0.6) else C.raised end
@@ -1475,6 +1895,7 @@ local function render()
 	local container=scroll
 	if not container then return end
 	updaters={}
+	building=updaters
 	for _,child in container:GetChildren() do
 		if child:IsA("GuiObject") then child:Destroy() end
 	end
@@ -1485,8 +1906,18 @@ local function render()
 	container.CanvasPosition=Vector2.zero
 	paintTabs()
 end
+-- EMPIRE_NOTICE toasts (research complete, new office), registered once for App.mount and the Menu parts
+local noticesBound = false
+local function bindNotices()
+	if noticesBound then return end
+	noticesBound = true
+	State.onNotify(function(kind,payload)
+		if kind=="EMPIRE_NOTICE" and typeof(payload.text)=="string" then Toast.show("success",payload.text,5) end
+	end)
+end
 function App.mount(parent: Frame, navigation: any)
 	nav=navigation
+	bindNotices()
 	local head=Kit.frame(parent,UDim2.new(1,0,0,38))
 	local label=Kit.text(head,"Company",24,F.display,C.text)
 	label.Position=UDim2.fromOffset(0,2)
@@ -1524,13 +1955,77 @@ function App.mount(parent: Frame, navigation: any)
 		if #updaters==0 then render() end
 		for _,fn in updaters do fn(s) end
 	end)
-	State.onNotify(function(kind,payload)
-		if kind=="EMPIRE_NOTICE" and typeof(payload.text)=="string" then Toast.show("success",payload.text,5) end
-	end)
 end
 function App.onShow()
 	if #updaters==0 and State.snapshot and State.snapshot.data.company then render() end
 end
+
+-- A Menu page part: one builder rendered into `frame` (no own scroll; the Menu page scrolls). Rendered on its first
+-- show, updated in place on snapshots while it is visible. Returns the part handle the Menu keeps.
+export type Part = { frame: Frame, id: string, show: () -> (), rebuild: () -> () }
+type PartState = { frame: Frame, id: string, updaters: { (any) -> () }, built: boolean }
+local partStates: { PartState } = {}
+local partsBound = false
+local function shown(inst: Instance): boolean
+	local node: Instance? = inst
+	while node do
+		if node:IsA("GuiObject") and not (node :: GuiObject).Visible then return false end
+		if node:IsA("LayerCollector") then return true end
+		node = node.Parent
+	end
+	return true
+end
+local function renderPart(part: PartState)
+	local snapshot = State.snapshot
+	if not snapshot or not snapshot.data.company then return end
+	for _, child in part.frame:GetChildren() do
+		if child:IsA("GuiObject") then child:Destroy() end
+	end
+	part.updaters = {}
+	local before, beforePage = building, inPage
+	building, inPage = part.updaters, true
+	local stack = Kit.stack(part.frame, 12)
+	stack.Name = "Tab_" .. (PART_TAB[part.id] or part.id)
+	local builder = PART_BUILDERS[part.id]
+	local ok, err = pcall(function()
+		builder(stack)
+	end)
+	building, inPage = before, beforePage
+	if not ok then warn("[EmpireApp] part " .. part.id .. ": " .. tostring(err)) end
+	part.built = true
+end
+function App.mountPart(frame: Frame, id: string, navigation: any): Part
+	assert(PART_BUILDERS[id], "unknown EmpireApp part " .. id)
+	nav = nav or navigation
+	bindNotices()
+	frame.AutomaticSize = Enum.AutomaticSize.Y
+	local part: PartState = { frame = frame, id = id, updaters = {}, built = false }
+	table.insert(partStates, part)
+	if not partsBound then
+		partsBound = true
+		State.onChange(function(s)
+			if not s.data.company then return end
+			for _, p in partStates do
+				if p.built and shown(p.frame) then
+					for _, fn in p.updaters do fn(s) end
+				end
+			end
+		end)
+	end
+	return {
+		frame = frame,
+		id = id,
+		show = function()
+			if not part.built then
+				renderPart(part)
+			elseif State.snapshot then
+				for _, fn in part.updaters do fn(State.snapshot) end
+			end
+		end,
+		rebuild = function() renderPart(part) end,
+	}
+end
+App.PARTS = PART_BUILDERS
 function App.openSection(section: string)
 	local id=if section=="contracts" then "clients" else section
 	if builders[id] then current=id;render() end

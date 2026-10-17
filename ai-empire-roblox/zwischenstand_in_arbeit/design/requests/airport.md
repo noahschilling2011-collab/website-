@@ -45,6 +45,7 @@ STATUS: already done (integrate: FYI, no change requested; the cutscene plane is
   BuildingId = "airport", Desk = A..D / lane1..3 / A1..A3 / news, cafe, tech, dutyfree, food1..3, restaurant),
   LookVector = facing; every post is reachable (tests/airport walk grid, agent radius 1).
 STATUS: deferred to guests_jet (info: BusinessLounge / LoungeEntrance / AirportPost markers are in place for terminal passengers and staff; nothing to change now)
+STATUS: done by guests_jet (terminal passengers use CityPlan.AIRPORT.walk + seats read-only: check-in serpentines and desks, security lanes, gate A1 seats east of the gate desk, A1lane / A1board, arrival -> reclaim -> doorArr; lounge / posts not used by passengers)
 
 ## 5. Metro (CityLifeController) — a light walker set inside the City Airport terminal
 The terminal reads empty because CityLifeController switches its crowd off in the "City Airport" region

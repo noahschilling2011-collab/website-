@@ -71,12 +71,19 @@ function Parts.cardColor(focusId: string, look: any): Color3
 	return Parts.focusColor(focusId)
 end
 
+-- Display form of a company logo glyph: "⦿" (U+29BF) is missing from common fallback fonts (it renders as a box
+-- in the previews), so the Studio draws "◉" (U+25C9) for it. Display only: the saved look keeps the index.
+local GLYPH_SHOWN: { [string]: string } = { ["⦿"] = "◉" }
+function Parts.glyph(glyph: string): string
+	return GLYPH_SHOWN[glyph] or glyph
+end
+
 function Parts.emblem(look: any, logo: string?): string
 	local _, index = ModelMath.parseLook(look)
 	if index then
-		return CompanyConfig.LOGOS[index]
+		return Parts.glyph(CompanyConfig.allLogos()[index] or "N") -- shop package: Kit emblems follow LOGOS (SHOP_SPEC 3.5)
 	end
-	return logo or "N"
+	return Parts.glyph(logo or "N")
 end
 
 function Parts.sizeLabel(id: string): string
@@ -312,13 +319,24 @@ function Parts.modelCard(parent: Instance, size: Vector2): ModelCard
 		Kit.corner(cell, 4)
 		cells[i] = cell
 	end
-	local meter = Kit.frame(frame, UDim2.fromOffset(8, 50))
+	-- training plan meter (step 4): three signal bars, 16 px wide and 24 / 36 / 48 px tall, with the plan's name above
+	-- (QUICK / STD / DEEP, 20 px), right of the core grid
+	local METER_W, METER_H = 64, 78
+	local meter = Kit.frame(frame, UDim2.fromOffset(METER_W, METER_H))
 	meter.Name = "PlanMeter"
+	local meterLabel = Parts.label(meter, "STD", 20, F.bold, C.muted, UDim2.new(), UDim2.fromOffset(METER_W, 24), Enum.TextXAlignment.Center)
+	meterLabel.Name = "PlanName"
+	meterLabel.TextTruncate = Enum.TextTruncate.None
 	local meterBars: { Frame } = {}
 	for i = 1, 3 do
-		local bar = Parts.box(meter, UDim2.fromOffset(0, (3 - i) * 18), UDim2.fromOffset(8, 14), C.raised, 0, 3)
+		local barH = 12 + 12 * i
+		local bar = Parts.box(meter, UDim2.fromOffset((i - 1) * 24, METER_H - barH), UDim2.fromOffset(16, barH), C.raised, 0, 4)
 		meterBars[i] = bar
 	end
+	-- a custom colour keeps a thin edge in the skill-focus colour, so the focus still shows on the card
+	local focusEdge = Parts.box(frame, UDim2.fromOffset(6, 22), UDim2.new(0, 5, 1, -44), C.raised, 0, 3)
+	focusEdge.Name = "FocusEdge"
+	focusEdge.Visible = false
 	local nameLabel = Parts.label(frame, "", 26, F.display, C.text, UDim2.new(), UDim2.new(1, -16, 0, 32), Enum.TextXAlignment.Center)
 	nameLabel.Name = "CardName"
 	local sub = Parts.label(frame, "", 20, F.medium, C.muted, UDim2.new(), UDim2.new(1, -16, 0, 24), Enum.TextXAlignment.Center)
@@ -373,10 +391,12 @@ function Parts.modelCard(parent: Instance, size: Vector2): ModelCard
 		frame.Size = UDim2.fromOffset(w, h)
 		local footerOn = footer.Visible
 		local bottom = if footerOn then 36 else 0
-		gridSide = math.floor(math.min(w - 64, h - 140 - bottom))
+		-- the grid and the plan meter column are centred together (gap 12)
+		gridSide = math.floor(math.min(w - 100, h - 140 - bottom))
+		local groupX = math.floor((w - (gridSide + 12 + METER_W)) / 2)
 		grid.Size = UDim2.fromOffset(gridSide, gridSide)
-		grid.Position = UDim2.fromOffset(math.floor((w - gridSide) / 2) - 4, 52)
-		meter.Position = UDim2.fromOffset(math.floor((w + gridSide) / 2) + 4, 52 + gridSide - 50)
+		grid.Position = UDim2.fromOffset(groupX, 52)
+		meter.Position = UDim2.fromOffset(groupX + gridSide + 12, 52 + gridSide - METER_H)
 		nameLabel.Position = UDim2.fromOffset(8, 52 + gridSide + 8)
 		sub.Position = UDim2.fromOffset(8, 52 + gridSide + 40)
 		footer.Position = UDim2.new(0, 12, 1, -34)
@@ -456,6 +476,11 @@ function Parts.modelCard(parent: Instance, size: Vector2): ModelCard
 			for i, bar in meterBars do
 				bar.BackgroundColor3 = if i <= plan then (if state.overfit then C.warn else color) else C.raised
 			end
+			meterLabel.Text = if plan == 1 then "QUICK" elseif plan == 3 then "DEEP" else "STD"
+			meterLabel.TextColor3 = if state.overfit then C.warn else color:Lerp(C.white, 0.35)
+			local focusColor = Parts.focusColor(state.focusId)
+			focusEdge.Visible = ModelMath.parseLook(state.look) ~= nil and focusColor ~= color
+			focusEdge.BackgroundColor3 = focusColor
 			beats.Visible = state.beatsBest == true and not footerOn
 			if beats.Visible then
 				sub.Visible = false
@@ -725,13 +750,35 @@ end
 
 ---------------------------------------------------------------------------- stage (podium, beams, confetti)
 
-export type Stage = { frame: Frame, podium: Frame, burst: (count: number?) -> (), clear: () -> () }
+export type Stage = { frame: Frame, podium: Frame, burst: (count: number?) -> (), clear: () -> (), setFloor: (y: number, x: number?) -> () }
 
 -- The ceremony backdrop inside `parent`: two light beams, a lit podium ellipse under a card centred at
 -- (centerX, podiumY). Beams are vertical gradients (no Rotation: guiprev and low-end devices draw them flat).
 function Parts.stage(parent: Instance, center: UDim2, podiumWidth: number): Stage
 	local frame = Kit.frame(parent, UDim2.fromScale(1, 1))
 	frame.Name = "Stage"
+	-- spotlight from above onto the podium (the reference's spotlit reveal): a wide faint shaft and a narrow
+	-- bright core, both vertical gradients that fade out towards the podium (Frames only, no Rotation)
+	local floorY = center.Y.Offset
+	local shafts: { Frame } = {}
+	for _, def in { { 1.1, 0.86 }, { 0.8, 0.76 } } do
+		local width = math.floor(podiumWidth * def[1])
+		local shaft = Kit.frame(frame, UDim2.new(0, width, center.Y.Scale, floorY), UDim2.new(center.X.Scale, center.X.Offset, 0, 0))
+		shaft.Name = "Spotlight"
+		shaft.AnchorPoint = Vector2.new(0.5, 0)
+		shaft.BackgroundTransparency = 0
+		shaft.BackgroundColor3 = C.white
+		Kit.corner(shaft, math.floor(width / 2))
+		local fade = Instance.new("UIGradient")
+		fade.Rotation = 90
+		fade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, def[2]),
+			NumberSequenceKeypoint.new(0.7, math.min(1, def[2] + 0.06)),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		fade.Parent = shaft
+		table.insert(shafts, shaft)
+	end
 	-- soft halo behind the card (an ellipse fading out downwards)
 	local halo = Kit.frame(frame, UDim2.fromOffset(math.floor(podiumWidth * 0.9), math.floor(podiumWidth * 0.9)), UDim2.new(center.X.Scale, center.X.Offset, center.Y.Scale, center.Y.Offset - math.floor(podiumWidth * 0.5)))
 	halo.Name = "Halo"
@@ -748,8 +795,10 @@ function Parts.stage(parent: Instance, center: UDim2, podiumWidth: number): Stag
 	})
 	haloFade.Parent = halo
 	-- neon pillars left and right of the podium (the reveal stage of the reference game)
+	local pillars: { { frame: Frame, dx: number } } = {}
 	for _, dx in { -0.62, -0.48, 0.48, 0.62 } do
 		local pillar = Kit.frame(frame, UDim2.new(0, 6, 1, -20), UDim2.new(center.X.Scale, center.X.Offset + math.floor(dx * podiumWidth) - 3, 0, 0))
+		table.insert(pillars, { frame = pillar, dx = dx })
 		pillar.Name = "Pillar"
 		pillar.BackgroundTransparency = 0
 		pillar.BackgroundColor3 = Theme.accent
@@ -775,7 +824,9 @@ function Parts.stage(parent: Instance, center: UDim2, podiumWidth: number): Stag
 	glow.Color = ColorSequence.new(C.raised, C.bg)
 	glow.Rotation = 90
 	glow.Parent = podium
-	local confetti = Kit.frame(frame, UDim2.fromScale(1, 1))
+	-- confetti falls behind the card and the side panels (an earlier sibling at the same ZIndex), in the two gaps
+	-- beside the card, so the name, the score footer and the panel texts stay readable for its 2 s
+	local confetti = Kit.frame(parent, UDim2.fromScale(1, 1))
 	confetti.Name = "Confetti"
 	local rng = Random.new(7)
 	local colors = { C.good, C.warn, companyColor("violet"), companyColor("blue"), C.bad, Theme.accent }
@@ -790,7 +841,8 @@ function Parts.stage(parent: Instance, center: UDim2, podiumWidth: number): Stag
 			table.clear(pieces)
 			local n = math.min(40, count or 32)
 			for i = 1, n do
-				local piece = Parts.box(confetti, UDim2.new(rng:NextNumber(0.33, 0.67), 0, rng:NextNumber(0.02, 0.5), 0), UDim2.fromOffset(rng:NextInteger(10, 16), rng:NextInteger(14, 22)), colors[(i % #colors) + 1], 0, 3)
+				local x = if i % 2 == 0 then rng:NextNumber(0.31, 0.405) else rng:NextNumber(0.595, 0.66)
+				local piece = Parts.box(confetti, UDim2.new(x, 0, rng:NextNumber(0.02, 0.5), 0), UDim2.fromOffset(rng:NextInteger(10, 16), rng:NextInteger(14, 22)), colors[(i % #colors) + 1], 0, 3)
 				table.insert(pieces, piece)
 				local fall = math.min(rng:NextNumber(0.25, 0.45), 0.86 - piece.Position.Y.Scale)
 				local target = piece.Position + UDim2.fromScale(rng:NextNumber(-0.04, 0.04), fall)
@@ -814,6 +866,19 @@ function Parts.stage(parent: Instance, center: UDim2, podiumWidth: number): Stag
 				piece:Destroy()
 			end
 			table.clear(pieces)
+		end,
+		-- move the podium (and the spotlight's end) to y = `y` (and x = `x` offset) when the card size changes
+		setFloor = function(y: number, x: number?)
+			local px = x or center.X.Offset
+			podium.Position = UDim2.new(center.X.Scale, px, center.Y.Scale, y)
+			for _, shaft in shafts do
+				shaft.Size = UDim2.new(0, shaft.Size.X.Offset, center.Y.Scale, y)
+				shaft.Position = UDim2.new(center.X.Scale, px, 0, 0)
+			end
+			halo.Position = UDim2.new(center.X.Scale, px, center.Y.Scale, y - math.floor(podiumWidth * 0.5))
+			for _, p in pillars do
+				p.frame.Position = UDim2.new(center.X.Scale, px + math.floor(p.dx * podiumWidth) - 3, 0, 0)
+			end
 		end,
 	}
 	return stage

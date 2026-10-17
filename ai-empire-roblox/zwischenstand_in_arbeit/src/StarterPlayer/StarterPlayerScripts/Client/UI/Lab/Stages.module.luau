@@ -30,6 +30,9 @@ local ModelsUI = require(UI.Apps.ModelsUI)
 local Parts = require(script.Parent.StudioParts)
 local LabPreview = require(script.Parent.LabPreview)
 local LabState = require(script.Parent.LabState)
+local ShopCore = require(UI.Shop.ShopCore) -- shop package: Last Epoch (SHOP_SPEC 5.2.5), Stage Lights (3.7)
+local ShopMath = require(Shared.ShopMath)
+local GuiService = game:GetService("GuiService")
 
 local C = Theme.colors
 local F = Theme.font
@@ -39,7 +42,6 @@ type Snapshot = Types.Snapshot
 type ModelData = Types.ModelData
 
 local LOSS_MIN, LOSS_MAX = 0.6, 5.2
-local CORE = { "reasoning", "coding", "math", "creativity", "knowledge", "reliability" }
 local ALL = { "reasoning", "coding", "math", "creativity", "knowledge", "reliability", "speed", "efficiency" }
 
 local Stages = {}
@@ -65,8 +67,13 @@ local function cardState(data: Types.PlayerData, model: ModelData, extra: { [str
 	return state
 end
 
--- The product line a trained model is meant for: planned in the Studio, saved with the model, else best fit.
+-- The product line a model belongs to: its live (or last) line once released, else the line planned in the
+-- Studio or saved with the model, else the best fit.
 function Stages.plannedTarget(data: Types.PlayerData, model: ModelData): string
+	local release = model.release
+	if release and ModelConfig.getLine(release.target) then
+		return release.target
+	end
 	local planned = LabState.plannedLine[model.id] or (model :: any).plan
 	if typeof(planned) == "string" and ModelConfig.getLine(planned) then
 		return planned
@@ -121,7 +128,11 @@ function Stages.buildTraining(Studio: any): any
 	local expectedText = Parts.label(preview, "", 22, F.medium, C.muted, UDim2.fromOffset(276, 180), UDim2.new(1, -276, 0, 56))
 	expectedText.TextWrapped = true
 	expectedText.TextYAlignment = Enum.TextYAlignment.Top
-	local paid = Parts.label(preview, "", 22, F.medium, C.muted, UDim2.fromOffset(276, 240), UDim2.new(1, -276, 0, 28))
+	local paid = Parts.label(preview, "", 22, F.medium, C.muted, UDim2.fromOffset(276, 240), UDim2.new(1, -276, 0, 56))
+	-- shop package: "Last Epoch saves 0:16" wraps to a second line in the narrower desktop column instead of "…"
+	paid.TextWrapped = true
+	paid.TextTruncate = Enum.TextTruncate.None
+	paid.TextYAlignment = Enum.TextYAlignment.Top
 	local bar = Kit.bar(preview, 18, 0)
 	bar.frame.Position = UDim2.new(0, 0, 1, -18)
 	bar.frame.Size = UDim2.new(1, 0, 0, 18)
@@ -191,7 +202,31 @@ function Stages.buildTraining(Studio: any): any
 	countdown.frame.Size = UDim2.new(1, -36, 0, 10)
 	local stroke = panel:FindFirstChildOfClass("UIStroke")
 
-	Parts.label(bottom, "Runs on the server · close any time", 22, F.medium, C.muted, UDim2.fromOffset(16, 0), UDim2.new(1, -750, 1, 0))
+	local serverNote = Parts.label(bottom, "Runs on the server · close any time", 22, F.medium, C.muted, UDim2.fromOffset(16, 0), UDim2.new(1, -750, 1, 0))
+	-- shop package (SHOP_SPEC 5.2.5): FINISH NOW · LAST EPOCH in its place while it would work (never during the
+	-- first training: the Shop opens at the first launch); the Robux state needs >= 20 s left, an owned one any time
+	-- fix round 1 (review): plain secondary and narrower than CLOSE, so it is never the most prominent button there
+	local epochOffer = ShopCore.offerButton(bottom, "FINISH NOW · LAST EPOCH", UDim2.fromOffset(350, 74), 20, true)
+	epochOffer.button.Name = "LastEpoch"
+	epochOffer.button.Position = UDim2.fromOffset(16, 0)
+	epochOffer.set(nil, "")
+	Kit.onClick(epochOffer.button, function()
+		if epochOffer.button:GetAttribute("OfferState") == "owned" then
+			ShopCore.use("lastEpoch", nil)
+		else
+			ShopCore.buy("lastEpoch", nil)
+		end
+	end)
+	local function paintEpoch()
+		local snapshot = StateController.snapshot
+		local state, eta, right = nil, 0, ""
+		if snapshot then
+			state, eta, right = ShopCore.lastEpochOffer(snapshot)
+		end
+		epochOffer.set(state, right)
+		serverNote.Visible = state == nil
+		return state, eta
+	end
 	local labBack = Parts.button(bottom, "‹ LAB", "secondary", UDim2.new(1, -702, 0, 0), UDim2.fromOffset(180, 74), 26)
 	local closeAll = Parts.button(bottom, "CLOSE · it keeps training", "ghost", UDim2.new(1, -510, 0, 0), UDim2.fromOffset(494, 74), 26)
 	closeAll.Name = "CloseKeepTraining"
@@ -223,6 +258,7 @@ function Stages.buildTraining(Studio: any): any
 		end
 		local data = snapshot.data
 		local training = data.training
+		closeAll.Text = "CLOSE · it keeps training"
 		local starting = startingId ~= nil and (not training or training.modelId ~= startingId)
 		if training and startingId and training.modelId == startingId then
 			startingId = nil
@@ -259,6 +295,10 @@ function Stages.buildTraining(Studio: any): any
 			metrics[3].value.Text = Format.tokens(model.dataUsed.total)
 		end
 		paid.Text = `{Parts.money(training.cost)} paid`
+		local epochState, epochEta = paintEpoch()
+		if epochState then
+			paid.Text = `Last Epoch saves {Format.duration(epochEta)}` -- SHOP_SPEC 5.2.5 note
+		end
 		local fleet = ModelMath.fleet(data.gpus)
 		metrics[1].value.Text = `{string.format("%g", math.round(fleet.throughput * 10) / 10)} u/s`
 		metrics[2].value.Text = Parts.money(training.cost)
@@ -319,6 +359,11 @@ function Stages.buildTraining(Studio: any): any
 		elseif not list then
 			currentEvent = ""
 		end
+		-- closing does not stop the decision clock: say what happens (frameStep keeps the seconds current)
+		if list and event and event.pending then
+			local secs = math.ceil(math.max(0, event.expiresAt - workspace:GetServerTimeNow()))
+			closeAll.Text = `CLOSE · auto-picks {defaultLabel} in {secs} s`
+		end
 	end
 
 	local function frameStep()
@@ -346,6 +391,8 @@ function Stages.buildTraining(Studio: any): any
 				eta.TextColor3 = C.warn
 				autoPick.Text = `Auto-picks <b>{Kit.escape(defaultLabel)}</b> in <font color="#{C.warn:ToHex()}">{secs} s</font>`
 				countdown.set(remaining / T.decisionTimeout)
+				-- closing does not stop the clock: say what happens
+				closeAll.Text = `CLOSE · auto-picks {defaultLabel} in {secs} s`
 			end
 		else
 			local secs = math.ceil(StateController.trainingEta())
@@ -353,6 +400,10 @@ function Stages.buildTraining(Studio: any): any
 				lastEta = secs
 				eta.Text = "ETA " .. Format.duration(secs)
 				eta.TextColor3 = C.muted
+				local epochState = paintEpoch()
+				if epochState then
+					paid.Text = `Last Epoch saves {Format.duration(secs)}`
+				end
 			end
 		end
 	end
@@ -398,7 +449,7 @@ function Stages.buildTraining(Studio: any): any
 		local cw, ch = if compact then 190 else 230, if compact then 246 else 300
 		card.resize(Vector2.new(cw, ch))
 		card.frame.Position = UDim2.fromOffset(40, if compact then 14 else 30)
-		stage.podium.Position = UDim2.fromOffset(40 + cw / 2, (if compact then 14 else 30) + ch + 8)
+		stage.setFloor((if compact then 14 else 30) + ch + 8, 40 + cw / 2)
 		local x = 40 + cw + 46
 		for _, label in { caption, percent, eta, expectedText, paid } do
 			label.Position = UDim2.fromOffset(x - (if label == percent then 4 else 0), label.Position.Y.Offset)
@@ -468,6 +519,39 @@ function Stages.buildReveal(Studio: any): any
 	refine.Name = "Refine"
 	local launch = Parts.button(bottom, "LAUNCH ›", "primary", UDim2.new(1, -412, 0, 0), UDim2.fromOffset(396, 74), 28)
 	launch.Name = "Launch"
+
+	-- shop package (SHOP_SPEC 3.7): Stage Lights pass - two light sweeps in the company colour during the count-up, a
+	-- confetti burst and a gold frame on the reveal card. UI only, only the buyer sees it; reduced motion: no sweeps
+	local sweeps: { Frame } = {}
+	for i = 1, 2 do
+		local sweep = Kit.frame(main, UDim2.new(0, 90, 1, 0), UDim2.new(-0.2, 0, 0, 0))
+		sweep.Name = "StageSweep" .. i
+		sweep.BackgroundTransparency = 0
+		Theme.bindAccent(sweep, "BackgroundColor3")
+		sweep.ZIndex = 4
+		sweep.Visible = false
+		local g = Instance.new("UIGradient")
+		g.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.55),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		g.Parent = sweep
+		sweeps[i] = sweep
+	end
+	local goldFrame = Kit.stroke(card.frame, 1, C.warn, 4)
+	goldFrame.Name = "StageLightsFrame"
+	local function stageLights(): boolean
+		local snapshot = StateController.snapshot
+		local shop = if snapshot then (snapshot.live :: any).shop else nil
+		return ShopMath.ownsPass(if typeof(shop) == "table" then shop.passes else nil, "stageLights")
+	end
+	local function reducedMotion(): boolean
+		local ok, value = pcall(function(): any
+			return (GuiService :: any).ReducedMotionEnabled
+		end)
+		return ok and value == true
+	end
 
 	local skip = Instance.new("TextButton")
 	skip.Name = "SkipCeremony"
@@ -594,8 +678,18 @@ function Stages.buildReveal(Studio: any): any
 		note.Text = if model.status == "trained" then "Saved · launch now or later" else "Live model · benchmark report"
 	end
 
+	-- the score is on screen: the model counts as revealed (not on show(): LabApp.openRelease right after
+	-- Computer.open("lab", "release") would otherwise jump past the reveal to Launch Day)
+	local function scoreShown()
+		local id = modelId
+		if id and not benchmark then
+			LabState.markRevealed(id)
+		end
+	end
+
 	finishNow = function()
 		sequence += 1
+		scoreShown()
 		skip.Visible = false
 		if cancelCount then
 			cancelCount()
@@ -622,7 +716,12 @@ function Stages.buildReveal(Studio: any): any
 		local mine = sequence
 		local payload: { [string]: any } = LabState.reveals[id] or {}
 		paint(false)
-		local from = if typeof(payload.expected) == "number" then payload.expected elseif typeof(payload.before) == "number" then payload.before else 0
+		-- a refinement counts up from its old score (its `expected` is only the server's placeholder), a new model
+		-- from its expected value
+		local from = if payload.refinement == true and typeof(payload.before) == "number" then payload.before
+			elseif typeof(payload.expected) == "number" then payload.expected
+			elseif typeof(payload.before) == "number" then payload.before
+			else 0
 		overall.Text = string.format("%.1f", from)
 		bars.fill(0)
 		pipsRow.Visible = false
@@ -646,6 +745,19 @@ function Stages.buildReveal(Studio: any): any
 				return
 			end
 			cancelCount = Parts.countUp(overall, from, model.overall, 1.1)
+			scoreShown()
+			if stageLights() and not reducedMotion() then
+				for i, sweep in sweeps do
+					sweep.Position = UDim2.new(if i == 1 then -0.2 else 1.1, 0, 0, 0)
+					sweep.Visible = true
+					Kit.tween(sweep, 1.1, { Position = UDim2.new(if i == 1 then 1.1 else -0.2, 0, 0, 0) })
+				end
+				task.delay(1.15, function()
+					for _, sweep in sweeps do
+						sweep.Visible = false
+					end
+				end)
+			end
 			task.wait(1.15)
 			if mine ~= sequence then
 				return
@@ -661,7 +773,7 @@ function Stages.buildReveal(Studio: any): any
 			for _, chip in chips do
 				chip.frame.Visible = true
 			end
-			if pill.Visible then
+			if pill.Visible or stageLights() then
 				stage.burst(36)
 			end
 			skip.Visible = false
@@ -682,8 +794,9 @@ function Stages.buildReveal(Studio: any): any
 		if not id then
 			return
 		end
+		local token = Studio.token()
 		local ok = ModelsUI.call("ImproveModel", { modelId = id })
-		if ok then
+		if ok and Studio.mode == "reveal" and Studio.token() == token then
 			Studio.open("training", {})
 		end
 	end)
@@ -691,9 +804,11 @@ function Stages.buildReveal(Studio: any): any
 	local view = { frame = frame, title = nil :: string? }
 	function view.show(opts: any)
 		modelId = if typeof(opts.modelId) == "string" then opts.modelId else nil
+		LabState.revealing = modelId
 		local id0 = modelId
 		shownPayload = if id0 and LabState.reveals[id0] then LabState.reveals[id0] else {}
 		benchmark = opts.benchmark == true
+		goldFrame.Transparency = if stageLights() then 0.1 else 1 -- Stage Lights: the gold frame on the reveal card
 		benchCaption.Text = "BENCHMARKS"
 		overallCaption.Text = "OVERALL"
 		if benchmark or opts.instant == true then
@@ -701,15 +816,12 @@ function Stages.buildReveal(Studio: any): any
 		else
 			play()
 		end
-		local id = modelId
-		if id and not benchmark then
-			LabState.markRevealed(id)
-		end
 	end
 	function view.hide()
 		sequence += 1
 		skip.Visible = false
 		stage.clear()
+		LabState.revealing = nil
 	end
 	function view.refresh(_snapshot: Snapshot)
 		if not skip.Visible then
@@ -736,7 +848,7 @@ function Stages.buildReveal(Studio: any): any
 		local w = if isCompact then 206 else 250
 		local h = if isCompact then 286 else 340
 		card.resize(Vector2.new(w, h))
-		stage.podium.Position = UDim2.new(0.5, 0, 0, h + 8)
+		stage.setFloor(h + 8)
 	end
 	function view.finish()
 		finishNow()
@@ -855,7 +967,7 @@ function Stages.buildLive(Studio: any): any
 	end
 	function view.setClass(isCompact: boolean)
 		card.resize(if isCompact then Vector2.new(206, 286) else Vector2.new(250, 340))
-		stage.podium.Position = UDim2.new(0.5, 0, 0, (if isCompact then 286 else 340) + 8)
+		stage.setFloor((if isCompact then 286 else 340) + 8)
 	end
 	Kit.onClick(market, view.primary)
 	Kit.onClick(backLab, function()
@@ -870,18 +982,15 @@ function Stages.buildLive(Studio: any): any
 		end
 		local ops: any = snapshot.live.ops
 		local saving = typeof(ops) == "table" and ops.saveMode == true
-		local focusId = if ModelConfig.getFocus(model.focusId) then model.focusId else "balanced"
 		local target = info.target or (if model.release then model.release.target else "general")
-		local preset = LabPreview.successorPick(snapshot.data, snapshot.live, target, focusId, StateController.money(), saving)
-		Studio.open("design", {
-			prefill = {
-				target = target,
-				name = model.name,
-				sizeId = if preset then preset.sizeId else model.sizeId,
-				focusId = focusId,
-				recipeId = if preset then preset.recipeId else "steady",
-			},
-		})
+		-- the line's successor suggestion with its data plan (offered on the Review before START)
+		local suggestion = LabPreview.lineSuccessor(snapshot.data, snapshot.live, target, StateController.money(), saving)
+		if suggestion then
+			Studio.open("design", { prefill = LabPreview.prefillOf(suggestion) })
+		else
+			local focusId = if ModelConfig.getFocus(model.focusId) then model.focusId else "balanced"
+			Studio.open("design", { prefill = { target = target, name = model.name, sizeId = model.sizeId, focusId = focusId, recipeId = "steady" } })
+		end
 	end)
 	return view
 end

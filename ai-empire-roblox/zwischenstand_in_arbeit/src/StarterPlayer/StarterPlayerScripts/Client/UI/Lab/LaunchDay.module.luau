@@ -82,17 +82,24 @@ function LaunchDay.build(Studio: any): any
 		label.TextTruncate = if wrap then Enum.TextTruncate.None else Enum.TextTruncate.AtEnd
 		return label
 	end
+	-- a small gap before each section caption so the three groups read apart
+	local function gap(order: number)
+		local spacer = Kit.frame(sumList, UDim2.new(1, 0, 0, 6))
+		spacer.LayoutOrder = order
+	end
 	sumLabel("PRICE", 20, F.bold, C.muted, 1)
 	local recText = sumLabel("", 22, F.bold, C.text, 2, true)
 	recText.Name = "Recommended"
 	local modeNote = sumLabel("", 20, F.medium, C.muted, 3, true)
 	modeNote.Name = "PriceMode"
-	sumLabel("AFTER 5 MIN", 20, F.bold, C.muted, 4)
-	local forecastLine = sumLabel("", 22, F.bold, C.text, 5, true)
+	gap(4)
+	sumLabel("AFTER 5 MIN", 20, F.bold, C.muted, 5)
+	local forecastLine = sumLabel("", 22, F.bold, C.text, 6, true)
 	forecastLine.RichText = true
-	local campaignLine = sumLabel("", 20, F.medium, C.muted, 6, true)
-	sumLabel("LAUNCH TOTAL", 20, F.bold, C.muted, 7)
-	local totalLine = sumLabel("", 22, F.bold, C.text, 8)
+	local campaignLine = sumLabel("", 20, F.medium, C.muted, 7, true)
+	gap(8)
+	sumLabel("LAUNCH TOTAL", 20, F.bold, C.muted, 9)
+	local totalLine = sumLabel("", 22, F.bold, C.text, 10)
 
 	---------------------------------------------------------------- right panel
 	local panel = Parts.panel(main, UDim2.new(1, -702, 0, 0), UDim2.new(0, 686, 1, 0))
@@ -148,9 +155,15 @@ function LaunchDay.build(Studio: any): any
 		local col, row = (i - 1) % 2, (i - 1) // 2
 		local option = Parts.optionTile(bodies[1], "Line_" .. line.target, UDim2.fromOffset(col * 333, row * 110), Vector2.new(321, 98), 2, 26, 24, line.short)
 		option.check.Visible = false
-		local tag = Parts.tag(option.tile.button, "NEW LINE", C.muted, UDim2.new(1, -168, 0, 10))
+		local tag = Parts.tag(option.tile.button, "NEW LINE", C.muted, UDim2.new(1, -174, 0, 10))
 		tag.AutomaticSize = Enum.AutomaticSize.None
-		tag.Size = UDim2.fromOffset(154, 28)
+		tag.Size = UDim2.fromOffset(160, 28)
+		-- "NEW VERSION" needs ~142 px at 20 px bold: narrower side padding keeps it inside the chip
+		local tagPad = tag:FindFirstChildOfClass("UIPadding")
+		if tagPad then
+			tagPad.PaddingLeft = UDim.new(0, 4)
+			tagPad.PaddingRight = UDim.new(0, 4)
+		end
 		tag.TextXAlignment = Enum.TextXAlignment.Center
 		option.title.Size = UDim2.new(1, -190, 0, 30)
 		option.right.Visible = false
@@ -463,6 +476,15 @@ function LaunchDay.build(Studio: any): any
 				local add = math.floor(f.users - f.baseUsers + 0.5)
 				campaignLine.Text = `campaign adds {if add >= 0 then "+" else "−"}{Format.int(math.abs(add))} users`
 				campaignLine.TextColor3 = C.muted
+				-- what each extra user costs: the buzz cards look big, the forecast shows what they really add
+				if marketing > 0 then
+					if add > 0 then
+						local each = marketing / add
+						campaignLine.Text ..= ` · {Parts.money(math.floor(each + 0.5))} each`
+					else
+						campaignLine.TextColor3 = C.warn
+					end
+				end
 			else
 				campaignLine.Text = ""
 			end
@@ -501,7 +523,7 @@ function LaunchDay.build(Studio: any): any
 			hint.Text = "Auto picks the best menu price and keeps adjusting it."
 			hint.TextColor3 = C.muted
 		else
-			hint.Text = `Launch buzz in {LabPreview.segmentOf(target).label}: fades over about 10 minutes.`
+			hint.Text = `Launch buzz in {LabPreview.segmentOf(target).label} fades over about 10 minutes. Left: what the picked campaign adds.`
 			hint.TextColor3 = C.muted
 		end
 		title.Text = STEP_TITLES[step]
@@ -573,7 +595,7 @@ function LaunchDay.build(Studio: any): any
 					title = def.label,
 					lines = {
 						priceText,
-						if def.id == "custom" and not selected then `up to {Parts.money(MarketConfig.MARKETING.max)}` elseif tooMuch then `Need {Parts.money(amount)}` else string.format("+%d %% buzz", math.floor(buzz * 100 + 0.5)),
+						if def.id == "custom" and not selected then `up to {Parts.money(MarketConfig.MARKETING.max)}` elseif tooMuch then `Need {Parts.money(math.ceil(amount - money))} more` else string.format("+%d %% buzz", math.floor(buzz * 100 + 0.5)),
 					},
 					colors = { C.text, if tooMuch then C.warn else C.good },
 					selected = selected,
@@ -666,6 +688,7 @@ function LaunchDay.build(Studio: any): any
 		if launch:GetAttribute("Disabled") == true then
 			return
 		end
+		local token = Studio.token()
 		local check = ModelMath.releaseCheck(snapshot.data, id, target)
 		local predecessor = check.replaced[1]
 		local moved = 0
@@ -687,6 +710,9 @@ function LaunchDay.build(Studio: any): any
 			local f = forecast
 			configuredFor = nil
 			recKey = ""
+			if Studio.mode ~= "launch" or Studio.token() ~= token then
+				return -- the player closed the Computer while LAUNCHING…: the model is live, nothing re-opens
+			end
 			Studio.open("live", {
 				modelId = id,
 				target = target,

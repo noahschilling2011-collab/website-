@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT"
 SVC=ServerScriptService/Server/Services
 LIB=ServerScriptService/Server/Lib
 APP=StarterPlayer/StarterPlayerScripts/Client/UI/Apps
+SHOPUI=StarterPlayer/StarterPlayerScripts/Client/UI/Shop # shop package (round 3): purchase hints moved to ShopCore
 total=0; detected=0
 # mutate NAME TEST FILE OLD NEW : copy work/src, replace OLD by NEW in FILE (must match), run TEST, expect failures
 mutate() {
@@ -46,7 +47,7 @@ mutate resetlive     test_shop "$SVC/DebugService.module.luau" "		local live = s
 " "		session.live = { users = 0, revenue = 0, cost = 0, perModel = {}, npcUsers = {} } :: any
 		local live = session.live
 "
-mutate clientgrant   test_client "$APP/ShopApp.module.luau" "				Toast.show(\"info\", \"Purchase received. Adding it to your company...\")" "				Action.call(\"ShopAction\", { action = \"redeem\", key = \"party\" }, true)"
-mutate clientprice   test_client "$APP/ShopApp.module.luau" "frame.Visible = id > 0 and (owned or (listed and prices[priceKey(kind, id)] ~= nil))" "frame.Visible = id > 0 and (owned or listed)"
-mutate clientsoon    test_client "$APP/ShopApp.module.luau" "soon.Visible = not listed and not anyVoucher" "soon.Visible = false"
+mutate clientgrant   test_client "$SHOPUI/ShopCore.module.luau" "				Toast.show(\"info\", \"Purchase received. Adding it to your company...\")" "				Action.call(\"ShopAction\", { action = \"redeem\", key = \"party\" }, true)"
+mutate clientprice   test_client "$APP/ShopApp.module.luau" "	return ShopCore.priceOf(item.kind, def.id) ~= nil" "	return true"
+mutate clientsoon    test_client "$APP/ShopApp.module.luau" "soon.Visible = not listed and not studio and not anyVoucher" "soon.Visible = false"
 echo "negative: $detected/$total detected"

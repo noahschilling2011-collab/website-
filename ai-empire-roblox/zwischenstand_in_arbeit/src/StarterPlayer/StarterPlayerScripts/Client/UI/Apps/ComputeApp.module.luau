@@ -271,7 +271,7 @@ function ComputeApp.mount(parent: Frame, navigation: Kit.Nav)
 	Kit.padding(scroll, 2, 14, 20, 2)
 	Kit.list(scroll, 14)
 
-	Kit.heading(scroll, "COMPUTE", "Your GPUs serve your users, carry the compute your business clients reserve and train your models. More throughput = more users and faster training, more VRAM = bigger models.", 1)
+	Kit.heading(scroll, "GPUs", "Your GPUs serve your users, carry the compute your business clients reserve and train your models. More throughput = more users and faster training, more VRAM = bigger models.", 1)
 
 	-- Servers: what the fleet does right now
 	local servers = Kit.card(scroll, 2, 10)
@@ -481,7 +481,7 @@ function ComputeApp.mount(parent: Frame, navigation: Kit.Nav)
 		local limit = HardwareConfig.thermal(e, fleet.throughput)
 		if not anyLive then
 			serverTitle.Text = "Servers idle"
-			serverText.Text = "No model is live yet. Release one in Models and users start using your GPUs."
+			serverText.Text = "No model is live yet. Release one in the Lab and users start using your GPUs."
 			serverTag.Text = "IDLE"
 			serverTag.TextColor3 = C.dim
 		else

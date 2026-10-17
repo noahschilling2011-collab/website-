@@ -3,6 +3,7 @@
 --   * party        team-party kit in front of the headquarters (balloon towers, banner, sparkles)
 --   * founderSuite brass and leather lounge with a fire bowl on the private founder terrace
 --   * vipTag       BillboardGui name tag above a VIP player's head
+--   * fireworks    Rooftop Fireworks (shop package, SHOP_SPEC 3.4): bursts in the company colour above the HQ
 -- Built once (no per-frame work), all decorative parts non-colliding unless they are furniture.
 -- Positions are building-local (cf = plot CFrame, like every generator; world = cf * at).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +21,7 @@ local ShopDecor = {}
 ShopDecor.PARTY_NAME = "TeamParty"
 ShopDecor.SUITE_NAME = "FounderSuiteDecor"
 ShopDecor.TAG_NAME = "ShopVipTag"
+ShopDecor.FIREWORKS_NAME = "RooftopFireworks"
 
 -- Party colours: bright on purpose (a party, not architecture)
 local BALLOONS = {
@@ -122,6 +124,70 @@ function ShopDecor.founderSuite(parent: Instance, cf: CFrame, tier: number): Mod
 	Kit.part(model, cf, "SuitePlaqueStand", V3(0.3, 3.2, 0.3), stand * CF(0, 1.6, 0.25), C.metal, M.metal, DETAIL)
 	local plaque = Kit.part(model, cf, "SuitePlaque", V3(2.6, 1.2, 0.12), stand * CF(0, 3.4, 0.1), C.brass, M.metal, DETAIL)
 	Kit.text(plaque, "FOUNDER SUITE", { color = C.metal, font = Enum.Font.BuilderSansExtraBold, maxDistance = 40, light = 0.3, pps = 60, pad = 0.12 })
+	return model
+end
+
+-- Rooftop Fireworks (SHOP_SPEC 3.4): 4 invisible, anchored launch points just above the top of the headquarters
+-- model (its bounding box: the same code works for every stage, garage included) and ParticleEmitter bursts via
+-- :Emit in the company colour, one burst every 1.1 s for `seconds`; ShopService destroys the model afterwards.
+-- Nothing collides, touches or blocks a raycast; everyone nearby sees it (it is world content).
+function ShopDecor.fireworks(parent: Instance, cf: CFrame, color: Color3, seconds: number): Model
+	local model = Kit.model(parent, ShopDecor.FIREWORKS_NAME)
+	local center, top = cf, 30
+	if parent:IsA("Model") then
+		local ok, boxCf, size = pcall(function(): (CFrame, Vector3)
+			return parent:GetBoundingBox()
+		end)
+		if ok and typeof(boxCf) == "CFrame" and typeof(size) == "Vector3" then
+			local localBox = cf:ToObjectSpace(boxCf)
+			center = cf * CF(localBox.Position.X, 0, localBox.Position.Z)
+			top = math.clamp(localBox.Position.Y + size.Y / 2, 12, 400)
+		end
+	end
+	model.WorldPivot = center * CF(0, top, 0)
+	local emitters: { ParticleEmitter } = {}
+	for i, offset in { V3(-14, 0, -8), V3(14, 0, -8), V3(-8, 0, 10), V3(8, 0, 10) } do
+		local p = Instance.new("Part")
+		p.Name = "FireworksLauncher" .. i
+		p.Size = V3(1, 1, 1)
+		p.Transparency = 1
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanTouch = false
+		p.CanQuery = false
+		p.CastShadow = false
+		p.CFrame = center * CF(offset.X, top + 2, offset.Z)
+		p.Parent = model
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "Burst"
+		e.Rate = 0 -- bursts only (:Emit)
+		e.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+			ColorSequenceKeypoint.new(0.25, color),
+			ColorSequenceKeypoint.new(1, color),
+		})
+		e.LightEmission = 1
+		e.Lifetime = NumberRange.new(1.4, 2.2)
+		e.Speed = NumberRange.new(26, 40)
+		e.SpreadAngle = Vector2.new(180, 180)
+		e.Acceleration = V3(0, -14, 0)
+		e.Drag = 1.6
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 0.2) })
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.7, 0.2), NumberSequenceKeypoint.new(1, 1) })
+		e.Parent = p
+		table.insert(emitters, e)
+	end
+	task.spawn(function()
+		local t, i = 0, 0
+		while model.Parent and t < seconds do
+			i += 1
+			local e = emitters[(i - 1) % #emitters + 1]
+			if e.Parent then
+				e:Emit(42)
+			end
+			t += task.wait(1.1)
+		end
+	end)
 	return model
 end
 

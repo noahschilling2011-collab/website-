@@ -11,7 +11,9 @@ LabState.lineId = "general" -- planned product line (release target)
 LabState.name = "" -- "" = pick a NAME_IDEAS name on the first open
 LabState.colorId = nil :: string? -- chosen card colour (CompanyConfig.COLORS id); nil = the skill-focus colour
 LabState.emblem = nil :: number? -- chosen emblem (index into CompanyConfig.LOGOS); nil = the company logo
-LabState.step = 1
+LabState.step = 1 -- design step to resume on the next open (DesignSteps keeps it when the Studio closes)
+LabState.firstDefaults = false -- the first-model defaults were applied in this session (once, LAB_SPEC 4.9)
+LabState.revealing = nil :: string? -- model whose reveal the Studio shows right now
 LabState.plannedLine = {} :: { [string]: string } -- modelId -> target planned in the Studio
 LabState.reveals = {} :: { [string]: { [string]: any } } -- modelId -> TRAINING_COMPLETE payload, until revealed
 
@@ -29,7 +31,9 @@ function LabState.nextName(): string
 	return LabState.NAME_IDEAS[nameIndex]
 end
 
--- A model that finished training in this session and was not revealed yet.
+-- A model that finished training in this session and was not revealed yet. The reveal marks it once its score is
+-- on screen (count-up started, or skipped to the end), not when it opens: Computer.open("lab", "release") plays the
+-- reveal from LabApp.onShow, and the HUD card's LabApp.openRelease right after must not jump past it.
 function LabState.wasRevealed(modelId: string): boolean
 	return LabState.reveals[modelId] == nil
 end

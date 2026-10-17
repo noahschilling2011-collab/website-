@@ -29,6 +29,8 @@ local Parts = require(script.Parent.StudioParts)
 local LabPreview = require(script.Parent.LabPreview)
 local LabState = require(script.Parent.LabState)
 local ModelsUI = require(UI.Apps.ModelsUI)
+local ShopMath = require(Shared.ShopMath) -- shop package: the 7B lock strip (SHOP_SPEC 5.2.4), Kit looks (5.2.6)
+local ShopCore = require(UI.Shop.ShopCore)
 
 local C = Theme.colors
 local F = Theme.font
@@ -94,7 +96,7 @@ local function focusLines(focus: ModelConfig.FocusDef): (string, string)
 		return table.concat(parts, " · ")
 	end
 	if #plus == 0 and #minus == 0 then
-		return "No bonus, no weakness", ""
+		return "No bonus, no weakness", "All skills at 100 %"
 	end
 	return "+ " .. join(plus), "− " .. join(minus)
 end
@@ -130,8 +132,15 @@ end
 
 local function logoIndex(data: PlayerData): number
 	local company = data.company
-	local index = if company then table.find(CompanyConfig.LOGOS, company.logo) else nil
+	-- shop package: an Identity Kit company logo is an index after LOGOS (CompanyConfig.allLogos)
+	local index = if company then table.find(CompanyConfig.allLogos(), company.logo) else nil
 	return index or #CompanyConfig.LOGOS
+end
+
+-- shop package (SHOP_SPEC 5.2.6): owns the Identity Kit (its pass or the Style Collection)
+local function ownsKit(snapshot: Snapshot): boolean
+	local shop = (snapshot.live :: any).shop
+	return ShopMath.ownsPass(if typeof(shop) == "table" then shop.passes else nil, CompanyConfig.KIT_PASS)
 end
 
 function DesignSteps.build(Studio: any): any
@@ -156,6 +165,11 @@ function DesignSteps.build(Studio: any): any
 	big.Name = "ExpectedValue"
 	big.TextTruncate = Enum.TextTruncate.None
 	local vsBest = Parts.label(expPanel, "", 22, F.bold, C.good, UDim2.fromOffset(14, 86), UDim2.new(1, -28, 0, 26))
+	vsBest.TextScaled = true -- "+19.9 vs best · with plan" shrinks to 20 px before it truncates
+	local vsFit = Instance.new("UITextSizeConstraint")
+	vsFit.MinTextSize = 20
+	vsFit.MaxTextSize = 22
+	vsFit.Parent = vsBest
 	local bars = Parts.statBars(expPanel, CORE, 21, 112, UDim2.fromOffset(14, 116), UDim.new(1, -28))
 	local specSheet = Parts.panel(preview, UDim2.fromOffset(0, 372), UDim2.new(1, 0, 0, 92))
 	specSheet.Name = "SpecSheet"
@@ -189,7 +203,17 @@ function DesignSteps.build(Studio: any): any
 	---------------------------------------------------------------- state
 	local step = 1
 	local done = { false, false, false, false, false, false }
-	local busy: string? = nil -- "start" | "buy"
+	local busy: string? = nil -- "start" | "buy" (a data purchase stays busy until a snapshot shows the new data)
+	local buyKey: string? = nil -- data summary before the last BUY DATA PLAN
+	local buyToken = 0
+	local buyHold = false -- the first 0.6 s after a purchase: the second tap of a double tap must not START either
+	local started = false -- START succeeded: the next DESIGN NEW MODEL starts at step 1 again
+	-- a suggestion's data plan (SUGGESTED tile, line SUCCESSOR, "Design its successor"): offered on the Review as
+	-- BUY DATA PLAN before START; `offer` is the exact plan of the suggestion while its selection and the data match
+	local planMode = false
+	local planOn = true
+	local offer: { plan: LabPreview.DataPlan, selKey: string, dataKey: string }? = nil
+	local shownPlan: LabPreview.DataPlan? = nil -- the plan BUY DATA PLAN buys (set by refresh)
 	local nameBad = false
 	local breakdownOpen = false
 	local action: string? = nil
@@ -197,6 +221,7 @@ function DesignSteps.build(Studio: any): any
 	local planCache: { key: string, plan: LabPreview.DataPlan }? = nil
 	local compact = true
 	local refresh: () -> () = function() end
+	local studioLock: (Snapshot, Sel, number, any) -> string = function(_s: Snapshot, _sel: Sel, _m: number, _st: any): string return "" end
 	local focusNow: () -> GuiObject? = function(): GuiObject? return nil end
 
 	local function sel(): Sel
@@ -207,6 +232,15 @@ function DesignSteps.build(Studio: any): any
 	local function saveMode(snapshot: Snapshot): boolean
 		local ops: any = snapshot.live.ops
 		return typeof(ops) == "table" and ops.saveMode == true
+	end
+
+	local function dataKey(data: PlayerData): string
+		local summary = ModelMath.dataSummary(data.data)
+		return `{summary.total}|{summary.quality}`
+	end
+
+	local function selKey(s: Sel): string
+		return `{s.sizeId}|{s.focusId}|{s.recipeId}`
 	end
 
 	local function dataPlan(data: PlayerData, s: Sel, money: number): LabPreview.DataPlan
@@ -230,6 +264,12 @@ function DesignSteps.build(Studio: any): any
 		local tag = Parts.tag(option.tile.button, "FREE", C.muted, UDim2.fromOffset(16, 72))
 		tag.AutomaticSize = Enum.AutomaticSize.None
 		tag.Size = UDim2.fromOffset(86, 28)
+		-- "LIVE v2" needs ~72 px at 20 px bold: narrower side padding keeps it inside the 86 px chip
+		local tagPad = tag:FindFirstChildOfClass("UIPadding")
+		if tagPad then
+			tagPad.PaddingLeft = UDim.new(0, 4)
+			tagPad.PaddingRight = UDim.new(0, 4)
+		end
 		tag.TextXAlignment = Enum.TextXAlignment.Center
 		local status = Parts.label(option.tile.button, "", 20, F.medium, C.muted, UDim2.fromOffset(110, 72), UDim2.new(1, -120, 0, 28))
 		lineTiles[line.target] = { option = option, tag = tag, status = status }
@@ -250,6 +290,31 @@ function DesignSteps.build(Studio: any): any
 		local detail = Parts.label(tile.button, "", 20, F.medium, C.muted, UDim2.fromOffset(10, 38), UDim2.new(1, -20, 0, 26), Enum.TextXAlignment.Center)
 		presets[def[1]] = { button = tile.button, stroke = tile.stroke, name = name, detail = detail }
 	end
+	-- shop package (SHOP_SPEC 5.2.4): the lock strip that replaces the presets while the picked size is locked by
+	-- Frontier Architecture: OPEN RESEARCH › (free deep link) and, only when Frontier is the ONLY lock, SKIP RESEARCH ·
+	-- EUREKA in the price-chip look (never the primary); or OPEN GPUs › when VRAM / a GPU is the other need
+	-- fix round 1 (review): the Robux button is never wider than the free action next to it (equal widths), and on the
+	-- Review (step 6) the strip has no OPEN RESEARCH › of its own (the primary is that same free deep link)
+	type LockStrip = { frame: Frame, research: TextButton, gpus: TextButton, offer: ShopCore.OfferButton, review: boolean }
+	local function lockStrip(parent: Instance, review: boolean): LockStrip
+		local f = Kit.frame(parent, UDim2.new(1, 0, 0, 74))
+		f.Name = "LockStrip"
+		f.Visible = false
+		f.ZIndex = 2
+		local research = Parts.button(f, "OPEN RESEARCH ›", "secondary", UDim2.fromOffset(0, 0), UDim2.fromOffset(228, 74), 20)
+		research.Name = "OpenResearch"
+		local gpus = Parts.button(f, "OPEN GPUs ›", "secondary", UDim2.fromOffset(238, 0), UDim2.fromOffset(200, 74), 20)
+		gpus.Name = "OpenGpus"
+		gpus.Visible = false
+		local offer = ShopCore.offerButton(f, "SKIP RESEARCH · EUREKA", UDim2.new(1, -238, 0, 74), 20)
+		offer.button.Name = "SkipResearch"
+		offer.button.Position = UDim2.fromOffset(238, 0)
+		offer.set(nil, "")
+		research.Visible = not review
+		return { frame = f, research = research, gpus = gpus, offer = offer, review = review }
+	end
+	local lockStrip2 = lockStrip(bodies[2], false)
+	local lockStrip6 = lockStrip(bodies[6], true)
 	type SizeTile = { tile: Parts.TileButton, label: TextLabel, tier: Parts.TierBar, cost: TextLabel, delta: TextLabel, time: TextLabel, warn2: TextLabel, vram: TextLabel, check: Frame }
 	local sizeTiles: { [string]: SizeTile } = {}
 	for i, size in ModelConfig.SIZES do
@@ -272,19 +337,16 @@ function DesignSteps.build(Studio: any): any
 	end
 
 	---------------------------------------------------------------- step 3: focus
-	type FocusTile = { option: Parts.OptionTile, edge: Frame, best: TextLabel }
+	type FocusTile = { option: Parts.OptionTile, edge: Frame }
 	local focusTiles: { [string]: FocusTile } = {}
 	for i, focus in ModelConfig.FOCUSES do
 		local col, row = (i - 1) % 2, (i - 1) // 2
 		local option = Parts.optionTile(bodies[3], "Focus_" .. focus.id, UDim2.fromOffset(col * 333, row * 124), Vector2.new(321, 112), 3, 22, 24)
 		option.check.Visible = false
 		local edge = Parts.box(option.tile.button, UDim2.new(), UDim2.new(0, 6, 1, 0), Parts.focusColor(focus.id), 0, 0)
-		local best = Parts.tag(option.tile.button, "BEST FIT", Theme.accent, UDim2.new(1, -108, 1, -29))
-		best.AutomaticSize = Enum.AutomaticSize.None
-		best.Size = UDim2.fromOffset(96, 24)
-		best.TextXAlignment = Enum.TextXAlignment.Center
-		best.Visible = false
-		focusTiles[focus.id] = { option = option, edge = edge, best = best }
+		-- BEST FIT is part of the fit line (rich text), so nothing overlaps the 22 px rows on a phone
+		option.lines[3].RichText = true
+		focusTiles[focus.id] = { option = option, edge = edge }
 		Kit.onClick(option.tile.button, function()
 			StateController.setSelection(StateController.ui.sizeId, focus.id)
 		end)
@@ -321,28 +383,93 @@ function DesignSteps.build(Studio: any): any
 	local nameStroke = nameBox:FindFirstChildOfClass("UIStroke")
 	local randomName = Parts.button(bodies[5], "RANDOM NAME", "secondary", UDim2.fromOffset(442, 0), UDim2.fromOffset(212, 74), 22)
 	randomName.Name = "RandomName"
-	type Swatch = { tile: Parts.TileButton, check: Frame }
+	-- shop package (SHOP_SPEC 5.2.6): colours and emblems sit in horizontal rows that scroll, so the 8 Identity Kit
+	-- colours and 6 Kit logos can follow the free ones (with a small lock for non-owners, no buy button)
+	local function lookRow(name: string, y: number): ScrollingFrame
+		local row = Instance.new("ScrollingFrame")
+		row.Name = name
+		row.BackgroundTransparency = 1
+		row.BorderSizePixel = 0
+		row.Position = UDim2.fromOffset(0, y)
+		row.Size = UDim2.new(1, 0, 0, 78)
+		row.CanvasSize = UDim2.new()
+		row.AutomaticCanvasSize = Enum.AutomaticSize.X
+		row.ScrollingDirection = Enum.ScrollingDirection.X
+		row.ScrollBarThickness = 3
+		row.ScrollBarImageTransparency = 0.6
+		row.HorizontalScrollBarInset = Enum.ScrollBarInset.None
+		row.Parent = bodies[5]
+		local list = Kit.list(row, 8, true)
+		list.VerticalAlignment = Enum.VerticalAlignment.Top
+		return row
+	end
+	local colorRow = lookRow("ColorRow", 81)
+	local emblemRow = lookRow("EmblemRow", 162)
+	local function lockBadge(parent: Instance): Frame
+		local l = Kit.frame(parent, UDim2.fromOffset(28, 28), UDim2.new(1, -4, 1, -4))
+		l.Name = "Lock"
+		l.AnchorPoint = Vector2.new(1, 1)
+		l.BackgroundTransparency = 0.1
+		l.BackgroundColor3 = C.bg
+		Kit.corner(l, 8)
+		local icon = Kit.icon(l, "lock", 16)
+		icon.frame.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.frame.Position = UDim2.fromScale(0.5, 0.5)
+		icon.setColor(C.text)
+		l.Visible = false
+		return l
+	end
+	type Swatch = { tile: Parts.TileButton, check: Frame, lock: Frame?, kit: boolean }
 	local swatches: { [string]: Swatch } = {}
-	for i, def in CompanyConfig.COLORS do
-		local tile = Parts.tileButton(bodies[5], "Color_" .. def.id, UDim2.fromOffset((i - 1) * 82, 81), UDim2.fromOffset(74, 74), def.id)
+	local allColors: { CompanyConfig.ColorDef } = table.clone(CompanyConfig.COLORS)
+	for _, def in CompanyConfig.KIT_COLORS do
+		table.insert(allColors, def)
+	end
+	for i, def in allColors do
+		local kit = i > #CompanyConfig.COLORS
+		local tile = Parts.tileButton(colorRow, "Color_" .. def.id, UDim2.fromOffset((i - 1) * 82, 0), UDim2.fromOffset(74, 74), def.id)
+		tile.button.LayoutOrder = i
 		tile.button.BackgroundColor3 = Theme.rgb(def.rgb)
 		local check = Parts.check(tile.button, UDim2.fromOffset(20, 20))
 		check.BackgroundColor3 = C.bg
+		-- the badge is dark on the colour swatch, so its glyph must be light (Parts.check draws it in C.bg)
+		local glyph = check:FindFirstChildWhichIsA("TextLabel")
+		if glyph then
+			glyph.TextColor3 = C.text
+		end
 		check.Visible = false
-		swatches[def.id] = { tile = tile, check = check }
+		local lock = if kit then lockBadge(tile.button) else nil
+		swatches[def.id] = { tile = tile, check = check, lock = lock, kit = kit }
 		Kit.onClick(tile.button, function()
+			local snapshot = StateController.snapshot
+			if kit and snapshot and not ownsKit(snapshot) then
+				Toast.show("info", "This colour comes with Identity Kit.")
+				return
+			end
 			LabState.colorId = def.id
 			refresh()
 		end)
 	end
-	local emblems: { Parts.TileButton } = {}
-	for i, glyph in CompanyConfig.LOGOS do
-		local tile = Parts.tileButton(bodies[5], "Emblem_" .. i, UDim2.fromOffset((i - 1) * 82, 162), UDim2.fromOffset(74, 74), glyph)
-		local label = Parts.label(tile.button, glyph, 30, F.bold, C.text, UDim2.new(), UDim2.fromScale(1, 1), Enum.TextXAlignment.Center)
+	local kitLine = Parts.label(colorRow, "More colours with Identity Kit (Shop)", 20, F.medium, C.dim, UDim2.new(), UDim2.fromOffset(250, 74))
+	kitLine.Name = "KitLine"
+	kitLine.TextWrapped = true
+	kitLine.LayoutOrder = 99
+	type EmblemTile = { tile: Parts.TileButton, lock: Frame?, kit: boolean }
+	local emblems: { EmblemTile } = {}
+	for i, glyph in CompanyConfig.allLogos() do
+		local kit = i > #CompanyConfig.LOGOS
+		local tile = Parts.tileButton(emblemRow, "Emblem_" .. i, UDim2.fromOffset((i - 1) * 82, 0), UDim2.fromOffset(74, 74), glyph)
+		tile.button.LayoutOrder = i
+		local label = Parts.label(tile.button, Parts.glyph(glyph), 30, F.bold, C.text, UDim2.new(), UDim2.fromScale(1, 1), Enum.TextXAlignment.Center)
 		label.TextTruncate = Enum.TextTruncate.None
-		emblems[i] = tile
+		local lock = if kit then lockBadge(tile.button) else nil
+		emblems[i] = { tile = tile, lock = lock, kit = kit }
 		Kit.onClick(tile.button, function()
 			local snapshot = StateController.snapshot
+			if kit and snapshot and not ownsKit(snapshot) then
+				Toast.show("info", "This logo comes with Identity Kit.")
+				return
+			end
 			if snapshot and LabState.colorId == nil then
 				LabState.colorId = focusColorId(snapshot.data, StateController.ui.focusId)
 			end
@@ -361,6 +488,11 @@ function DesignSteps.build(Studio: any): any
 		local value = Parts.label(f, "", 30, F.display, C.text, UDim2.fromOffset(16, 34), UDim2.new(1, -24, 0, 38))
 		moneyTiles[i] = { frame = f, caption = caption, value = value }
 	end
+	-- a suggestion's data plan: tile 2 becomes an ON/OFF toggle (skip the plan and train on today's data)
+	local planToggle = Parts.tileButton(bodies[6], "PlanToggle", UDim2.fromOffset(222, 0), UDim2.fromOffset(210, 80), "DATA PLAN")
+	planToggle.button.Visible = false
+	local toggleCaption = Parts.label(planToggle.button, "DATA PLAN", 20, F.bold, C.muted, UDim2.fromOffset(16, 8), UDim2.new(1, -24, 0, 24))
+	local toggleValue = Parts.label(planToggle.button, "", 26, F.display, C.text, UDim2.fromOffset(16, 36), UDim2.new(1, -24, 0, 34))
 	local linesTile = Parts.tileButton(bodies[6], "ReviewLines", UDim2.fromOffset(0, 92), UDim2.new(1, 0, 0, 144), "BREAKDOWN")
 	local reviewLines: { TextLabel } = {}
 	for i = 1, 4 do
@@ -404,17 +536,127 @@ function DesignSteps.build(Studio: any): any
 	local function closeTo(app: string)
 		local nav = Studio.nav
 		Studio.close()
-		if nav then
+		if nav and nav.isOpen() then
 			nav.show(app)
 		end
 	end
 
-	local function buyDataPlan(plan: LabPreview.DataPlan)
-		if busy then
+	-- shop package (SHOP_SPEC 5.2.4): OPEN RESEARCH › = Lab → Research with the Frontier card outlined (free)
+	local function openResearch()
+		local nav = Studio.nav
+		ShopCore.requestFocus("research", "frontier")
+		Studio.close()
+		if nav and nav.isOpen() then
+			if (nav :: any).route then
+				(nav :: any).route("open:empire/research")
+			else
+				nav.show("empire")
+			end
+		end
+	end
+	-- the lock strip's state (both steps) and the warn hint of step 2: Frontier is the only lock -> the Eureka offer
+	-- (ShopMath.studioEurekaOffer); another lock after it -> name it, and OPEN GPUs › for VRAM / no GPU
+	local stripActions: { [LockStrip]: boolean } = {}
+	studioLock = function(snapshot: Snapshot, sel: Sel, money: number, strip: LockStrip): string
+		local data = snapshot.data
+		local size = ModelConfig.getSize(sel.sizeId) or ModelConfig.SIZES[1]
+		local def = ModelConfig.getSize("s7b")
+		local frontier = { cost = 65000, points = 500, seconds = 120 }
+		for _, r in require(Shared.Config.EmpireConfig).RESEARCH do
+			if r.id == "frontier" then frontier = { cost = r.cost, points = r.points, seconds = r.seconds } end
+		end
+		local ui = ShopCore.offerUi(snapshot, "eureka")
+		local offer = ShopMath.studioEurekaOffer(data, sel, money, LabPreview.estimate, ui)
+		local job = data.empire.researchJob
+		local running = typeof(job) == "table" and job.id == "frontier"
+		strip.offer.set(offer.state, if offer.state then select(3, ShopCore.offer(snapshot, "eureka")) else "")
+		strip.offer.label.Text = if running then "FINISH NOW · EUREKA" else "SKIP RESEARCH · EUREKA"
+		local need = offer.need
+		strip.gpus.Visible = need == "VRAM" or need == "NO_GPU"
+		-- equal slots left to right: [OPEN RESEARCH ›] [OPEN GPUs ›] [SKIP RESEARCH · EUREKA]; the Review has no
+		-- OPEN RESEARCH › here (its primary is the same link), and its Robux button takes half the strip at most
+		local slots: { GuiObject } = {}
+		if not strip.review then
+			table.insert(slots, strip.research)
+		end
+		if strip.gpus.Visible then
+			table.insert(slots, strip.gpus)
+		end
+		if strip.offer.button.Visible then
+			table.insert(slots, strip.offer.button)
+		end
+		local count = math.max(2, #slots)
+		for i, b in slots do
+			b.Position = UDim2.new((i - 1) / count, if i > 1 then 5 else 0, 0, 0)
+			b.Size = UDim2.new(1 / count, -5, 0, 74)
+		end
+		if not stripActions[strip] then
+			stripActions[strip] = true
+			Kit.onClick(strip.research, openResearch)
+			Kit.onClick(strip.gpus, function()
+				closeTo("compute")
+			end)
+			Kit.onClick(strip.offer.button, function()
+				local snap = StateController.snapshot
+				if not snap then return end
+				local s2 = sel
+				local after = LabPreview.estimate(ShopMath.withResearch(snap.data, "frontier"), s2, nil)
+				local extra = { { caption = "Then", value = `{Parts.sizeLabel(s2.sizeId)} training costs {Parts.money(after.cost)}` } }
+				local function done(ok: boolean)
+					if ok then
+						Toast.show("success", "7B is unlocked.", 4)
+						refresh()
+					end
+				end
+				if strip.offer.button:GetAttribute("OfferState") == "owned" then
+					ShopCore.use("eureka", "frontier", { extra = extra, onDone = done })
+				else
+					ShopCore.buy("eureka", "frontier", { extra = extra, onDone = done })
+				end
+			end)
+		end
+		local label = size.label
+		local base = `<b>{label} needs Frontier Architecture</b>`
+		if running then
+			return base .. string.format(" · researching now, %s left", Format.duration(job.seconds - job.elapsed))
+		elseif need == "VRAM" then
+			local est = LabPreview.estimate(data, sel, money)
+			return base .. string.format(" + %d GB VRAM (have %d)", est.vramNeed, est.vramHave) -- one line on a phone
+		elseif need == "NO_GPU" then
+			return base .. " + a GPU"
+		elseif need == "MONEY" then
+			return base .. string.format(" + cash: %s and its training", Parts.money(frontier.cost))
+		elseif need == "MODEL_LIMIT" then
+			return base .. " + a free model slot"
+		elseif need == "NO_DATA" then
+			return base .. " + more training data"
+		elseif need == "TRAINING" then
+			return base .. " · training slot busy now"
+		end
+		local _ = def
+		-- fix round 1 (review): with a Eureka offer the line says what it saves (SHOP_SPEC 5.2.4, ShopMath.savingText)
+		local check = offer.check
+		if offer.state ~= nil and check and check.ok then
+			return base .. string.format(" · %s · %d RP · Eureka saves %s", Parts.money(frontier.cost), frontier.points, ShopMath.savingText(check.seconds))
+		end
+		return base .. string.format(" · %s · %d RP · %s", Parts.money(frontier.cost), frontier.points, Format.duration(frontier.seconds))
+	end
+
+	-- The reply of a remote call may arrive after the player left the Studio (× while STARTING…): then nothing
+	-- switches modes or routes (Studio.open would re-bind input behind a closed Computer).
+	local function stillHere(token: number): boolean
+		return Studio.mode == "design" and Studio.token() == token
+	end
+
+	local function buyDataPlan(plan: LabPreview.DataPlan?)
+		local snapshot = StateController.snapshot
+		if busy or not snapshot or not plan or plan.cost <= 0 then
 			return
 		end
 		busy = "buy"
+		local before = dataKey(snapshot.data)
 		refresh()
+		local bought = 0
 		for _, packId in plan.order do
 			local left = plan.packs[packId] or 0
 			local failed = false
@@ -425,14 +667,38 @@ function DesignSteps.build(Studio: any): any
 					failed = true
 					break
 				end
+				bought += 1
 				left -= count
 			end
 			if failed then
 				break
 			end
 		end
-		busy = nil
 		planCache = nil
+		if bought > 0 then
+			-- the suggestion's plan is used up; the button stays BUYING DATA… until a snapshot carries the new data
+			-- (a second tap before the State update must not buy the plan again), at most 3 s
+			planMode, offer = false, nil
+			buyKey = before
+			buyHold = true
+			buyToken += 1
+			local token = buyToken
+			task.delay(0.6, function()
+				if buyToken == token then
+					buyHold = false
+					refresh()
+				end
+			end)
+			task.delay(3, function()
+				if buyKey ~= nil and buyToken == token then
+					buyKey = nil
+					busy = nil
+					refresh()
+				end
+			end)
+		else
+			busy = nil
+		end
 		refresh()
 	end
 
@@ -441,6 +707,7 @@ function DesignSteps.build(Studio: any): any
 		if busy or not snapshot then
 			return
 		end
+		local token = Studio.token()
 		local data = snapshot.data
 		local s = sel()
 		local name = trim(nameBox.Text)
@@ -462,8 +729,19 @@ function DesignSteps.build(Studio: any): any
 		if ok and typeof(result.modelId) == "string" then
 			LabState.plannedLine[result.modelId] = LabState.lineId
 			LabState.name = ""
+			-- a picked look belongs to this model: the next design starts with the focus colour again
+			LabState.colorId = nil
+			LabState.emblem = nil
 			done = { false, false, false, false, false, false }
-			Studio.open("training", { starting = result.modelId })
+			started = true
+			LabState.step = 1 -- the next DESIGN NEW MODEL starts at step 1 (also when the Computer closed meanwhile)
+			planMode, offer = false, nil
+			if stillHere(token) then
+				Studio.open("training", { starting = result.modelId })
+			end
+			return
+		end
+		if not stillHere(token) then
 			return
 		end
 		local err = result.err
@@ -473,7 +751,7 @@ function DesignSteps.build(Studio: any): any
 		elseif err == "VRAM" or err == "NO_GPU" then
 			closeTo("compute")
 		elseif err == "PREREQUISITE" then
-			closeTo("empire")
+			openResearch()
 		elseif err == "NO_DATA" then
 			local plan = dataPlan(data, s, StateController.money())
 			if plan.cost > 0 then
@@ -504,12 +782,14 @@ function DesignSteps.build(Studio: any): any
 		if action == "start" then
 			startTraining()
 		elseif action == "buy" then
-			buyDataPlan(dataPlan(snapshot.data, sel(), StateController.money()))
+			buyDataPlan(shownPlan)
 		elseif action == "name" then
 			nameBad = true
 			goStep(5)
 		elseif action == "training" then
 			Studio.open("training", {})
+		elseif action == "research" then
+			openResearch()
 		elseif action == "empire" or action == "market" or action == "compute" or action == "data" then
 			closeTo(action)
 		end
@@ -523,11 +803,16 @@ function DesignSteps.build(Studio: any): any
 			goStep(step - 1)
 		end
 	end)
+	local stripPlan: LabPreview.DataPlan? = nil -- the step-4 strip's plan (set by refresh)
 	Kit.onClick(buyPlan, function()
-		local snapshot = StateController.snapshot
-		if snapshot then
-			buyDataPlan(dataPlan(snapshot.data, sel(), StateController.money()))
+		buyDataPlan(stripPlan)
+	end)
+	Kit.onClick(planToggle.button, function()
+		if busy then
+			return
 		end
+		planOn = not planOn
+		refresh()
 	end)
 	Kit.onClick(addData, function()
 		LabState.step = step
@@ -599,18 +884,29 @@ function DesignSteps.build(Studio: any): any
 			return
 		end
 		local data = snapshot.data
+		if busy == "buy" and buyKey ~= nil and dataKey(data) ~= buyKey and not buyHold then
+			busy, buyKey = nil, nil -- the snapshot carries the bought data
+		end
 		local money = StateController.money()
 		local s = sel()
 		local est = LabPreview.estimate(data, s, money)
 		lastEstimate = est
 		local noData = est.lock == "NO_DATA"
-		local plan = if noData then dataPlan(data, s, money) else nil
-		local shown = est
-		local afterPlan = false
-		if plan and plan.cost > 0 then
-			shown = LabPreview.estimate(LabPreview.withStock(data, plan.stock), s, nil)
-			afterPlan = true
+		-- the data plan the Review shows: forced with no usable data (first model), offered for a suggestion
+		local plan: LabPreview.DataPlan? = nil
+		if noData then
+			plan = dataPlan(data, s, money)
+		elseif planMode and planOn then
+			local o = offer
+			plan = if o and o.selKey == selKey(s) and o.dataKey == dataKey(data) then o.plan else dataPlan(data, s, money)
 		end
+		local afterPlan = plan ~= nil and plan.cost > 0
+		local planCost = if plan and afterPlan then plan.cost else 0
+		-- every number of every step describes the same data: after the plan when one is shown
+		local dview = if plan and afterPlan then LabPreview.withStock(data, plan.stock) else data
+		local viewMoney = money - planCost
+		local shown = if afterPlan then LabPreview.estimate(dview, s, nil) else est
+		shownPlan = if afterPlan then plan else nil
 		local line = ModelConfig.getLine(LabState.lineId) or ModelConfig.LINES[1]
 		local segment = LabPreview.segmentOf(line.target)
 		local best = LabPreview.bestOverall(data, nil)
@@ -618,6 +914,7 @@ function DesignSteps.build(Studio: any): any
 		local name = trim(nameBox.Text)
 		local version = LabPreview.nextVersion(data, if name ~= "" then name else "?")
 		local company = data.company
+		local reserve = LabPreview.reserve(data)
 
 		-- cost badge + card + expected panel
 		badge.set(est.cost, est.seconds, est.vramNeed, est.vramHave, est.rate > 0)
@@ -631,9 +928,9 @@ function DesignSteps.build(Studio: any): any
 			lineShort = line.short,
 			logo = if company then company.logo else "N",
 			look = look,
-			lit = if noData then 0 else LabPreview.litCores(s.sizeId, est.readiness),
+			lit = if noData then 0 else LabPreview.litCores(s.sizeId, shown.readiness),
 			recipeId = s.recipeId,
-			overfit = est.overfit,
+			overfit = shown.overfit,
 			beatsBest = beats,
 		})
 		local lo, hi = LabPreview.range(shown.overall)
@@ -641,7 +938,11 @@ function DesignSteps.build(Studio: any): any
 		big.TextColor3 = card.color
 		expCaption.Text = "EXPECTED"
 		rangeLabel.Text = string.format("final %.1f–%.1f", lo, hi)
-		if afterPlan then
+		if afterPlan and best > 0 then
+			local d = shown.overall - best
+			vsBest.Text = `{Parts.signed(d)} vs best · with plan`
+			vsBest.TextColor3 = if d >= 0 then C.good else C.bad
+		elseif afterPlan then
 			vsBest.Text = "After the data plan"
 			vsBest.TextColor3 = C.warn
 		elseif best > 0 then
@@ -654,8 +955,12 @@ function DesignSteps.build(Studio: any): any
 		end
 		bars.set(shown.stats, LabPreview.bestStats(data), card.color)
 		local size = ModelConfig.getSize(s.sizeId) or ModelConfig.SIZES[1]
-		spec1.Text = `Max score {size.potential} with perfect data · full at {Format.tokens(size.dataNeed)} tokens`
-		spec2.Text = `Serving {(MarketConfig.SERVE_UNITS or {})[size.id] or 1} units/user · {Format.price(size.serveCost)}/1M · speed {size.speed}`
+		if not compact then
+			-- the real ceiling of this design (data mix, focus, plan, spec, research and Lab level included)
+			local ideal = size.dataNeed * ModelConfig.DATA.maxFill
+			spec1.Text = string.format("Ceiling ~%.1f with ideal data · %s tokens at 100%%", LabPreview.ceiling(data, s), Format.tokens(ideal))
+			spec2.Text = `Serving {(MarketConfig.SERVE_UNITS or {})[size.id] or 1} units/user · {Format.price(size.serveCost)}/1M · speed {size.speed}`
+		end
 
 		-- panel header
 		for i, f in bodies do
@@ -711,21 +1016,13 @@ function DesignSteps.build(Studio: any): any
 				Parts.setDisabled(refs.option.tile.button, status.kind == "FULL")
 			end
 		elseif step == 2 then
-			local deltas = LabPreview.deltas(data, s, "sizeId", money)
+			local deltas = LabPreview.deltas(dview, s, "sizeId", viewMoney)
 			for _, sz in ModelConfig.SIZES do
 				local refs = sizeTiles[sz.id]
 				local d = deltas[sz.id]
 				local e = d.estimate
 				local selected = sz.id == s.sizeId
 				Parts.paintTile(refs.tile, selected, e.lock ~= nil and e.lock ~= "NO_DATA")
-				refs.cost.Text = Parts.money(e.cost)
-				if selected then
-					refs.delta.Text = "picked"
-					refs.delta.TextColor3 = Theme.accent
-				else
-					refs.delta.Text = Parts.signed(d.dOverall)
-					refs.delta.TextColor3 = if d.dOverall >= 0 then C.good else C.bad
-				end
 				local lockLine1, lockLine2 = "", ""
 				if e.lock == "FRONTIER" then
 					lockLine1, lockLine2 = "Needs", "research"
@@ -737,15 +1034,39 @@ function DesignSteps.build(Studio: any): any
 					lockLine1, lockLine2 = "Needs", "a GPU"
 				end
 				local locked = lockLine1 ~= ""
+				refs.cost.Text = Parts.money(e.cost)
+				refs.cost.TextColor3 = if locked then C.dim else C.text
+				if selected then
+					refs.delta.Text = "picked"
+					refs.delta.TextColor3 = if locked then C.dim else Theme.accent
+				else
+					refs.delta.Text = Parts.signed(d.dOverall)
+					refs.delta.TextColor3 = if locked then C.dim elseif d.dOverall >= 0 then C.good else C.bad
+				end
 				refs.time.Text = if locked then lockLine1 elseif e.rate > 0 then Format.duration(e.seconds) else "--"
 				refs.time.TextColor3 = if locked then C.warn else C.muted
 				refs.time.Font = if locked then F.bold else F.medium
 				refs.warn2.Text = lockLine2
-				refs.warn2.Position = UDim2.fromOffset(12, 130)
-				refs.label.TextColor3 = if locked then C.muted else C.text
+				-- shop package (SHOP_SPEC 9 T18): a locked tile's lines sit tighter so "research" ends >= 4 px above the border
+				refs.delta.Position = UDim2.fromOffset(12, if locked then 79 else 84)
+				refs.time.Position = UDim2.fromOffset(12, if locked then 102 else 110)
+				refs.warn2.Position = UDim2.fromOffset(12, if locked then 122 else 130)
+				-- locked tiles read greyed out (the reference greys locked parts); the reason stays in warn
+				refs.label.TextColor3 = if locked then C.dim else C.text
 				refs.check.Visible = selected and not locked
 				refs.vram.Visible = not compact
 				refs.tier.set(table.find(ModelConfig.SIZES, sz) or 1, if locked then C.dim else card.color)
+			end
+			-- shop package (SHOP_SPEC 5.2.4): 7B (any size) picked and locked by Frontier Architecture -> the lock strip
+			local frontierLock = est.lock == "FRONTIER"
+			for _, p in presets do
+				p.button.Visible = not frontierLock
+			end
+			lockStrip2.frame.Visible = frontierLock
+			if frontierLock then
+				local hintText = studioLock(snapshot, s, money, lockStrip2)
+				hint.Text = hintText
+				hint.TextColor3 = C.warn
 			end
 			-- presets: what each picks, outlined when it matches the current pick
 			local cheapestOn = s.sizeId == "s100m" and s.recipeId == "rapid"
@@ -767,31 +1088,37 @@ function DesignSteps.build(Studio: any): any
 				p.stroke.Thickness = if on then 3 else 1
 			end
 		elseif step == 3 then
-			local bestFocus = LabPreview.bestFocus(data, s.sizeId, s.recipeId, line.target)
-			local deltas = LabPreview.deltas(data, s, "focusId", money)
-			local baseFit = MarketMath.fit(est.stats, segment)
+			local bestFocus = LabPreview.bestFocus(dview, s.sizeId, s.recipeId, line.target)
+			local deltas = LabPreview.deltas(dview, s, "focusId", viewMoney)
+			local baseFit = MarketMath.fit(shown.stats, segment)
 			for _, focus in ModelConfig.FOCUSES do
 				local refs = focusTiles[focus.id]
 				local d = deltas[focus.id]
 				local selected = focus.id == s.focusId
 				local plus, minus = focusLines(focus)
 				local fit = MarketMath.fit(d.estimate.stats, segment)
-				-- the BEST FIT tag sits at the end of line 3, so that tile drops the (+x) suffix
-				local fitText = string.format("%s fit %.1f", line.short, fit) .. (if selected or focus.id == bestFocus then "" else string.format(" (%s)", Parts.signed(fit - baseFit)))
+				local fitText = string.format("%s fit %.1f", line.short, fit)
+				if focus.id == bestFocus then
+					fitText ..= ` · <font color="#{Theme.accent:ToHex()}"><b>BEST FIT</b></font>`
+				elseif not selected then
+					fitText ..= string.format(" (%s)", Parts.signed(fit - baseFit))
+				end
 				refs.option.set({
 					title = (if selected then "✓ " else "") .. focus.label,
 					right = if selected then "picked" else Parts.signed(d.dOverall),
 					rightColor = if selected then Theme.accent elseif d.dOverall >= 0 then C.good else C.bad,
 					lines = { plus, minus, fitText },
-					colors = { if minus == "" then C.muted else C.good, C.bad, C.text },
+					-- Balanced has neither a bonus nor a weakness: both lines muted
+					colors = if string.sub(plus, 1, 1) == "+" then { C.good, C.bad, C.text } else { C.muted, C.muted, C.text },
 					selected = selected,
 					color = Parts.focusColor(focus.id),
 				})
 				refs.edge.BackgroundColor3 = Parts.focusColor(focus.id)
-				refs.best.Visible = focus.id == bestFocus
 			end
 		elseif step == 4 then
-			local deltas = LabPreview.deltas(data, s, "recipeId", money)
+			local deltas = LabPreview.deltas(dview, s, "recipeId", viewMoney)
+			local viewSummary = ModelMath.dataSummary(dview.data)
+			local deepWhy = LabPreview.deepShort(s.sizeId, viewSummary)
 			for recipeId, option in recipeTiles do
 				local d = deltas[recipeId]
 				local e = d.estimate
@@ -803,7 +1130,8 @@ function DesignSteps.build(Studio: any): any
 				elseif recipeId == "steady" then
 					last = "Normal run"
 				elseif e.overfit then
-					last = "Too little data"
+					-- the condition that actually fails (ModelMath.recipeFactor: data amount or quality)
+					last = deepWhy or "Overfits now"
 					lastColor = C.warn
 				else
 					last = "Data check ✓"
@@ -813,11 +1141,11 @@ function DesignSteps.build(Studio: any): any
 					title = Parts.RECIPE_LABEL[recipeId],
 					lines = {
 						`{if e.rate > 0 then Format.duration(e.seconds) else "--"} · {Parts.money(e.cost)}`,
-						string.format("Quality ×%.2f", e.recipeFactor),
+						if e.overfit then string.format("Overfits ×%.2f", e.recipeFactor) else string.format("Quality ×%.2f", e.recipeFactor),
 						if selected then "picked" else Parts.signed(d.dOverall),
 						last,
 					},
-					colors = { C.text, C.muted, if selected then Theme.accent elseif d.dOverall >= 0 then C.good else C.bad, lastColor },
+					colors = { C.text, if e.overfit then C.warn else C.muted, if selected then Theme.accent elseif d.dOverall >= 0 then C.good else C.bad, lastColor },
 					selected = selected,
 				})
 				option.lines[1].Font = F.bold
@@ -825,18 +1153,31 @@ function DesignSteps.build(Studio: any): any
 				option.check.Visible = selected
 			end
 			local summary = ModelMath.dataSummary(data.data)
-			local stripPlan = dataPlan(data, s, money)
-			local enough = summary.total >= size.dataNeed * 0.5 and summary.quality >= 0.6
+			local sp = if afterPlan then plan else dataPlan(data, s, money)
+			stripPlan = sp
+			local stripCost = if sp then sp.cost else 0
+			local nowWhy = LabPreview.deepShort(s.sizeId, summary)
 			footnote.Visible = not compact
-			footnote.Text = `Deep needs at least half of the data this size wants and 60 % quality: you have {Format.tokens(summary.total)} of {Format.tokens(size.dataNeed * 0.5)} and {Format.percent(summary.quality)} {if enough then "✓" else "✗"}`
+			footnote.Text = `Deep needs at least half of the data this size wants and 60 % quality: you have {Format.tokens(summary.total)} of {Format.tokens(size.dataNeed * 0.5)} and {Format.percent(summary.quality)} {if nowWhy == nil then "✓" else "✗"}`
 			strip1.Text = `Data {Format.tokens(summary.total)} · {Format.percent(summary.quality)}`
-			strip2.Text = `{size.label} wants {Format.tokens(size.dataNeed)}` .. (if stripPlan.cost <= 0 then " · enough ✓" else "")
-			strip2.TextColor3 = if stripPlan.cost <= 0 then C.good else C.muted
+			if stripCost > 0 then
+				strip2.Text = `{size.label} wants {Format.tokens(size.dataNeed)}`
+				strip2.TextColor3 = C.muted
+			elseif nowWhy then
+				-- enough for Standard, but Deep would overfit: say which condition fails
+				strip2.Text = `{size.label} wants {Format.tokens(size.dataNeed)} ✓ · Deep {string.lower(string.sub(nowWhy, 1, 1))}{string.sub(nowWhy, 2)}`
+				strip2.TextColor3 = C.warn
+			else
+				strip2.Text = `{size.label} wants {Format.tokens(size.dataNeed)} · enough ✓`
+				strip2.TextColor3 = C.good
+			end
 			stripBar.set(LabPreview.dataBenefit(est.readiness))
-			buyPlan.Visible = stripPlan.cost > 0
-			buyPlan.Text = string.format("BUY DATA PLAN\n%s · %s", Parts.money(stripPlan.cost), Parts.signed(stripPlan.after - stripPlan.before))
-			Kit.setDisabled(buyPlan, busy ~= nil or stripPlan.cost > money)
-			local labelWidth = if stripPlan.cost > 0 then -350 else -160
+			buyPlan.Visible = stripCost > 0
+			if sp then
+				buyPlan.Text = string.format("BUY DATA PLAN\n%s · %s", Parts.money(sp.cost), Parts.signed(sp.after - sp.before))
+			end
+			Kit.setDisabled(buyPlan, busy ~= nil or stripCost > money)
+			local labelWidth = if stripCost > 0 then -350 else -160
 			strip1.Size = UDim2.new(1, labelWidth, 0, 28)
 			strip2.Size = UDim2.new(1, labelWidth, 0, 24)
 			stripBar.frame.Size = UDim2.new(1, labelWidth, 0, 8)
@@ -858,59 +1199,115 @@ function DesignSteps.build(Studio: any): any
 			end
 			local colorId = LabState.colorId or focusColorId(data, s.focusId)
 			local emblem = LabState.emblem or logoIndex(data)
+			-- Identity Kit tiles (shop package): shown once the Shop is open (guide over, first launch), locked for
+			-- non-owners; a saved Kit choice stays visible after a refund (it is the current pick)
+			local kitShown = ShopMath.gateOpen(data)
+			local owns = ownsKit(snapshot)
 			for id, sw in swatches do
 				local on = id == colorId
 				sw.tile.stroke.Color = if on then C.white else C.line
 				sw.tile.stroke.Transparency = if on then 0 else 0.7
 				sw.tile.stroke.Thickness = if on then 3 else 1
 				sw.check.Visible = on
+				if sw.kit then
+					sw.tile.button.Visible = kitShown or on
+					local lock = sw.lock
+					if lock then lock.Visible = not owns and not on end
+				end
 			end
-			for i, tile in emblems do
-				Parts.paintTile(tile, i == emblem, false, card.color)
+			for i, et in emblems do
+				Parts.paintTile(et.tile, i == emblem, false, card.color)
+				if et.kit then
+					et.tile.button.Visible = kitShown or i == emblem
+					local lock = et.lock
+					if lock then lock.Visible = not owns and i ~= emblem end
+				end
 			end
+			kitLine.Visible = kitShown and not owns
 			lookNote.Visible = not compact
 		elseif step == 6 then
-			local cash = money
-			local planCost = if plan then plan.cost else 0
+			-- shop package (SHOP_SPEC 5.2.4): the same lock strip at the top of the Final-review box
+			local frontierLock = est.lock == "FRONTIER"
+			local reviewLock = if frontierLock then studioLock(snapshot, s, money, lockStrip6) else nil
+			-- the Review's strip has no OPEN RESEARCH › (the primary): shown only with OPEN GPUs › or a Eureka offer
+			local stripShown = frontierLock and (lockStrip6.offer.button.Visible or lockStrip6.gpus.Visible)
+			lockStrip6.frame.Visible = stripShown
+			for _, t in moneyTiles do
+				t.frame.Visible = not stripShown
+			end
+			local offered = planMode and not noData
 			moneyTiles[1].caption.Text = "TRAINING COST"
 			moneyTiles[1].value.Text = Parts.money(est.cost)
+			moneyTiles[2].frame.Visible = not offered and not stripShown
+			planToggle.button.Visible = offered and not stripShown
 			moneyTiles[2].caption.Text = "TIME"
 			moneyTiles[2].value.Text = if est.rate > 0 then "~" .. Format.duration(est.seconds) else "--"
-			local after = cash - planCost - est.cost
+			if offered then
+				local cost = if plan then plan.cost else (if offer then offer.plan.cost else 0)
+				toggleCaption.Text = "DATA PLAN"
+				toggleValue.Text = if planOn then `ON · {Parts.money(cost)}` else "OFF · skip"
+				toggleValue.TextColor3 = if planOn then C.good else C.muted
+				Parts.paintTile(planToggle, planOn, false, C.good)
+			end
+			local after = money - planCost - est.cost
 			moneyTiles[3].caption.Text = if planCost > 0 then "CASH AFTER ALL" else "CASH AFTER"
 			moneyTiles[3].value.Text = Parts.money(after)
-			moneyTiles[3].value.TextColor3 = if after >= 0 then C.good else C.bad
-			if first then
-				hint.Text = if plan and plan.cost > 0 then "<b>FIRST MODEL</b> · buy the data plan, then press START." else "<b>FIRST MODEL</b> · a good starter is ready. Just press START."
+			moneyTiles[3].value.TextColor3 = if after < 0 then C.bad elseif after < reserve then C.warn else C.good
+			if reviewLock then
+				-- fix round 1 (review): START is impossible here, so the hint names the lock (not "Check it, then start.")
+				hint.Text = reviewLock
+				hint.TextColor3 = C.warn
+			elseif first then
+				hint.Text = if noData and afterPlan then "<b>FIRST MODEL</b> · buy the data plan, then press START." else "<b>FIRST MODEL</b> · a good starter is ready. Just press START."
+				hint.TextColor3 = C.good
+			elseif offered and afterPlan then
+				hint.Text = "<b>SUGGESTED</b> · buy its data plan, then press START."
 				hint.TextColor3 = C.good
 			end
-			if plan and plan.cost > 0 then
+			-- the fit line: does it beat the line's live model, and by how much (the suggestions need +3)
+			local function fitLine(): string
+				local status = LabPreview.lineStatus(data, line.target)
+				local fit = MarketMath.fit(shown.stats, segment)
+				local model = status.model
+				if status.kind == "LIVE" and model then
+					local aged = status.agedFit or 0
+					local gain = fit - aged
+					local color = if gain >= 3 then C.good elseif gain > 0 then C.warn else C.bad
+					local verdict = if gain >= 3 then "beats" elseif gain > 0 then `only {Parts.signed(gain)} over` else "below"
+					return string.format("%s fit %.1f · <font color=\"#%s\">%s %s v%d (%.1f after age)</font>", line.label, fit, color:ToHex(), verdict, model.name, model.version, aged)
+				end
+				return string.format("%s fit %.1f · new product line", line.label, fit)
+			end
+			local rank = LabPreview.rank(snapshot, shown.stats, line.target)
+			local rankLine = `Likely rank <b>#{rank.rank} of {rank.total}</b> · {segment.label}`
+			local lastLine = LabPreview.oddsText(if company then company.spec else "general")
+			if after >= 0 and after < reserve then
+				lastLine = `<font color="#{C.warn:ToHex()}">Leaves {Parts.money(after)}: below your {Parts.money(reserve)} safety reserve</font>`
+			end
+			if noData and plan and afterPlan then
 				local plo, phi = LabPreview.range(plan.after)
 				reviewLines[1].Text = `<font color="#{C.warn:ToHex()}">No training data yet</font> · every AI learns from data`
 				reviewLines[2].Text = `Data plan: <b>{LabPreview.planText(plan)}</b>`
 				reviewLines[3].Text = `= {Format.tokens(plan.tokens)} tokens · {Format.percent(plan.quality)} quality · {Parts.money(plan.cost)}`
 				reviewLines[4].Text = string.format("Then expected <b>~%.1f</b> · final %.1f–%.1f without events", shown.overall, plo, phi)
+			elseif plan and afterPlan then
+				reviewLines[1].Text = string.format("Expected <b>~%.1f</b> after the data plan · final %.1f–%.1f", shown.overall, lo, hi)
+				reviewLines[2].Text = `Data plan: <b>{LabPreview.planText(plan)}</b> · {Parts.money(plan.cost)}`
+				-- line 3 shares its row with BREAKDOWN › on a phone: the short rank line there, the long fit line below
+				reviewLines[3].Text = rankLine
+				reviewLines[4].Text = if after >= 0 and after < reserve then lastLine else fitLine()
 			else
 				reviewLines[1].Text = string.format("Expected <b>~%.1f</b> · final %.1f–%.1f without events", shown.overall, lo, hi)
-				local status = LabPreview.lineStatus(data, line.target)
-				local fit = MarketMath.fit(shown.stats, segment)
-				local model = status.model
-				if status.kind == "LIVE" and model then
-					local beatsOld = fit > (status.agedFit or 0)
-					reviewLines[2].Text = string.format("%s fit %.1f · <font color=\"#%s\">%s %s v%d (%.1f after age)</font>", line.label, fit, (if beatsOld then C.good else C.bad):ToHex(), if beatsOld then "beats" else "below", model.name, model.version, status.agedFit or 0)
-				else
-					reviewLines[2].Text = string.format("%s fit %.1f · new product line", line.label, fit)
-				end
-				local rank = LabPreview.rank(snapshot, shown.stats, line.target)
-				local segName = segment.label
-				reviewLines[3].Text = `Quality rank <b>#{rank.rank} of {rank.total}</b> · {segName}`
-				reviewLines[4].Text = LabPreview.oddsText(if company then company.spec else "general")
+				reviewLines[2].Text = fitLine()
+				reviewLines[3].Text = rankLine
+				reviewLines[4].Text = lastLine
 			end
 			breakdownCue.Visible = compact
-			local bd = LabPreview.breakdown(data, s)
-			breakdownLines[1].Text = string.format("Size max %d × data (%.2f amount × %.2f quality)", bd.potential, bd.quantity, bd.quality)
-			breakdownLines[2].Text = string.format("Plan ×%.2f (%s) · focus %s", bd.recipeFactor, Parts.RECIPE_LABEL[s.recipeId] or "", Parts.focusLabel(bd.focusId))
-			breakdownLines[3].Text = string.format("Bonuses: spec +%d · research + Lab +%s per skill · cap %d", bd.specBonus, string.format("%g", bd.core), bd.cap)
+			-- with a data plan the breakdown explains the shown (after-plan) number, not today's data
+			local bd = LabPreview.breakdown(dview, s)
+			breakdownLines[1].Text = string.format("Size max %d × %s: amount %.2f × quality factor %.2f", bd.potential, if afterPlan then "plan data" else "data", bd.quantity, bd.quality)
+			breakdownLines[2].Text = string.format("Data %s quality · Plan ×%.2f (%s) · focus %s", Format.percent(ModelMath.dataSummary(dview.data).quality), bd.recipeFactor, Parts.RECIPE_LABEL[s.recipeId] or "", Parts.focusLabel(bd.focusId))
+			breakdownLines[3].Text = string.format("Bonuses: %s · research + Lab +%s per skill · cap %d", LabPreview.specBonusText(bd.spec), string.format("%g", bd.core), bd.cap)
 			if compact then
 				breakdownLines[4].Text = if bd.reliabilityBonus > 0 then `Alignment research: +{bd.reliabilityBonus} Reliability` else "Training events can change the result."
 				breakdownLines[5].Text = "The server adds a random ±2.5 to every skill at the end."
@@ -921,8 +1318,9 @@ function DesignSteps.build(Studio: any): any
 				breakdownLines[5].Text = ""
 				breakdownLines[6].Text = ""
 			end
-			for i, line in breakdownLines do
-				line.Position = UDim2.fromOffset(18, if compact then 8 + (i - 1) * 30 else 6 + (i - 1) * 24)
+			for i, row in breakdownLines do
+				row.Position = UDim2.fromOffset(18, if compact then 8 + (i - 1) * 30 else 6 + (i - 1) * 24)
+				row.Visible = row.Text ~= ""
 			end
 			breakdown.button.Visible = breakdownOpen or not compact
 			if not compact then
@@ -961,25 +1359,24 @@ function DesignSteps.build(Studio: any): any
 				label = `NAME NEEDS {GameConfig.MODEL_NAME_MIN}-{GameConfig.MODEL_NAME_MAX} CHARACTERS`
 				action = "name"
 			elseif est.lock == "FRONTIER" then
-				label = "RESEARCH FRONTIER ARCHITECTURE · COMPANY"
-				action = "empire"
+				label = "OPEN RESEARCH › FRONTIER ARCHITECTURE" -- shop package (SHOP_SPEC 5.2.4): free deep link
+				action = "research"
 			elseif est.lock == "MODEL_LIMIT" then
 				label = "MODEL LIMIT · RETIRE OLD MODELS"
 				action = "market"
 			elseif est.lock == "NO_GPU" then
-				label = "NO GPU · OPEN COMPUTE"
+				label = "NO GPU · OPEN GPUs" -- ONBOARDING_SPEC B7 (request onboarding #5)
 				action = "compute"
 			elseif est.lock == "VRAM" then
-				label = `NEEDS {est.vramNeed - est.vramHave} GB MORE VRAM · OPEN COMPUTE`
+				label = `NEEDS {est.vramNeed - est.vramHave} GB MORE VRAM · OPEN GPUs`
 				action = "compute"
+			elseif plan and afterPlan and plan.cost <= money then
+				-- the shown plan first (no data yet, or a suggestion's plan), then START with the bought data
+				label = `BUY DATA PLAN · {Parts.money(plan.cost)}`
+				action = "buy"
 			elseif est.lock == "NO_DATA" then
-				if plan and plan.cost > 0 and plan.cost <= money then
-					label = `BUY DATA PLAN · {Parts.money(plan.cost)}`
-					action = "buy"
-				else
-					label = "NEED TRAINING DATA · OPEN DATA"
-					action = "data"
-				end
+				label = "NEED TRAINING DATA · OPEN DATA"
+				action = "data"
 			elseif est.lock == "MONEY" then
 				label = `NEED {Parts.money(est.cost)}`
 				enabled = false
@@ -1002,11 +1399,16 @@ function DesignSteps.build(Studio: any): any
 	function view.show(opts: any)
 		local snapshot = StateController.snapshot
 		busy = nil
+		buyKey = nil
+		buyHold = false
+		started = false
 		nameBad = false
 		breakdownOpen = false
 		planCache = nil
+		planMode, planOn, offer = false, true, nil
 		if snapshot then
 			local data = snapshot.data
+			local firstOpen = false
 			if typeof(opts.prefill) == "table" then
 				local p = opts.prefill
 				if typeof(p.target) == "string" and ModelConfig.getLine(p.target) then
@@ -1021,8 +1423,17 @@ function DesignSteps.build(Studio: any): any
 				if typeof(p.recipeId) == "string" then
 					StateController.setRecipe(p.recipeId)
 				end
-			elseif LabPreview.isFirstModel(data) and not data.training then
-				-- first model (LAB_SPEC 4.9): 100M · best fit for Consumer Chat · Standard, opened at the Review
+				-- a suggestion's data plan (LabPreview.prefillOf): offered on the Review as BUY DATA PLAN
+				local plan = p.plan
+				if typeof(plan) == "table" and typeof(plan.cost) == "number" and plan.cost > 0 and typeof(plan.order) == "table" then
+					planMode = true
+					offer = { plan = plan, selKey = selKey(sel()), dataKey = dataKey(data) }
+				end
+			elseif LabPreview.isFirstModel(data) and not data.training and not LabState.firstDefaults then
+				-- first model (LAB_SPEC 4.9): 100M · best fit for Consumer Chat · Standard, opened at the Review; once
+				-- per session, so the player's own picks survive a trip to Hardware or Data (LAB_SPEC 2: keeps every choice)
+				LabState.firstDefaults = true
+				firstOpen = true
 				LabState.lineId = "general"
 				local focusId = LabPreview.bestFocus(data, "s100m", "steady", "general")
 				StateController.setSelection("s100m", focusId)
@@ -1034,20 +1445,25 @@ function DesignSteps.build(Studio: any): any
 			nameBox.Text = LabState.name
 			if typeof(opts.step) == "number" then
 				step = math.clamp(opts.step, 1, 6)
-			elseif LabPreview.isFirstModel(data) or typeof(opts.prefill) == "table" then
+			elseif typeof(opts.prefill) == "table" or firstOpen then
 				step = 6
 			elseif LabState.step > 1 then
 				step = LabState.step
-				LabState.step = 1
+			elseif LabPreview.isFirstModel(data) then
+				step = 6
 			else
 				step = 1
 			end
+			LabState.step = 1
 		end
 		refresh()
 	end
 
 	function view.hide()
+		-- leaving keeps the step (‹ LAB, a fix in Hardware or Data, a training decision): the next open resumes it
+		LabState.step = if started then 1 else step
 		busy = nil
+		buyKey = nil
 	end
 
 	function view.refresh(_snapshot: Snapshot)
@@ -1093,17 +1509,48 @@ function DesignSteps.build(Studio: any): any
 
 	function view.setClass(isCompact: boolean)
 		compact = isCompact
-		local cardSize = if compact then Vector2.new(190, 246) else Vector2.new(220, 270)
+		-- regular layout: the card grows with the preview zone (taller main area, wider canvas on big screens) while
+		-- the Expected panel keeps 300 px for its bars and the spec sheet fits below; compact keeps 190 x 246
+		local cardSize = Vector2.new(190, 246)
+		if not compact then
+			local canvas: Vector2 = Studio.canvas
+			local h = math.clamp(math.floor(canvas.Y - 184 - 90 - 12 - 92 - 8), 270, 440)
+			local w = math.floor(h * 220 / 270)
+			local maxW = math.floor(canvas.X - 734 - 16 - 300)
+			if w > maxW then
+				w = math.max(220, maxW)
+				h = math.floor(w * 270 / 220)
+			end
+			cardSize = Vector2.new(w, h)
+		end
 		card.resize(cardSize)
 		local x = cardSize.X + 16
 		expPanel.Position = UDim2.fromOffset(x, 90)
 		expPanel.Size = UDim2.new(1, -x, 0, cardSize.Y)
 		specSheet.Visible = not compact
 		specSheet.Position = UDim2.fromOffset(0, 90 + cardSize.Y + 12)
-		bars.layout(if compact then 21 else 25)
+		bars.layout(if compact then 21 else math.clamp(math.floor((cardSize.Y - 120) / 6), 21, 34))
 		for _, refs in sizeTiles do
 			local b = refs.tile.button
 			b.Size = UDim2.fromOffset(122, if compact then 152 else 190)
+		end
+		-- regular (desktop): taller 2x2 tiles on steps 1 and 3 use the panel's height (LAB_SPEC 4.3: 321x168 max;
+		-- 140 keeps the desktop footnote free); the tag row of a line tile stays on the tile's bottom edge
+		local tileH, rowH = if compact then 108 else 140, if compact then 120 else 152
+		for i, line in ModelConfig.LINES do
+			local refs = lineTiles[line.target]
+			local col, row = (i - 1) % 2, (i - 1) // 2
+			refs.option.tile.button.Size = UDim2.fromOffset(321, tileH)
+			refs.option.tile.button.Position = UDim2.fromOffset(col * 333, row * rowH)
+			refs.tag.Position = UDim2.new(0, 16, 1, -36)
+			refs.status.Position = UDim2.new(0, 110, 1, -36)
+		end
+		local focusH, focusRow = if compact then 112 else 140, if compact then 124 else 152
+		for i, focus in ModelConfig.FOCUSES do
+			local col, row = (i - 1) % 2, (i - 1) // 2
+			local button = focusTiles[focus.id].option.tile.button
+			button.Size = UDim2.fromOffset(321, focusH)
+			button.Position = UDim2.fromOffset(col * 333, row * focusRow)
 		end
 		refresh()
 	end

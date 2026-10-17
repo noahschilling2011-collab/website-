@@ -96,6 +96,9 @@ return function(M, genDir, state, vw, vh, insets)
 		ui.LabState.emblem = nil
 		ui.LabState.lineId = "general"
 		ui.LabState.step = 1
+		ui.LabState.firstDefaults = false
+		ui.LabState.revealing = nil
+		ui.Studio.setBanner(nil, nil)
 		if ui.Studio.isOpen() then ui.Studio.close() end
 		ui.push()
 		return s, s.data

@@ -1,16 +1,22 @@
-# Zwischenstand in Arbeit (10.10., ca. 17:25 UTC)
+# Zwischenstand in Arbeit (17.10., ca. 12:10 UTC)
 
 Sicherung des Arbeitsstands, damit nichts verloren geht, falls der Cloud-Rechner gelöscht wird oder ein Nutzungslimit die Arbeit stoppt.
 
-**Nicht spielen, nicht in Studio laden.** Hier sind halbfertige Änderungen drin:
-- das neue KI-Studio im Stil von „Build a Phone Empire“ (Paket `lab`, im Bau),
-- der Integrationsschritt von Runde 2b (offene Querverweise zwischen den Paketen).
+## Spielbare Datei
+`AIEmpire_Zwischenstand_2026-10-17_runde2b_geprueft.rbxlx` – Runde 2b ist fertig und in der Testumgebung geprüft:
+145 Test-Suites grün, Harness grün, End-to-End-Test mit zwei Spielern (Geschäftsreise komplett) 113/0, Roundtrip OK.
+Enthalten: Fahrer + VIP-Limo, Hotelgäste + Firmenjet, Geschäftsreise-Planer, neues Menü + Tutorial, Robux-Shop (Stand vor dem Shop-Fix).
 
-Die spielbare, geprüfte Datei ist `../AIEmpire_Stand_2026-10-10_abend.rbxlx`.
+Noch nicht drin bzw. noch offen:
+- Shop-Fix (Cash-Packs „einmal pro Büro“ jetzt auch serverseitig, Gamepad-Bedienung, zu kleine alte Tabs) – läuft gerade.
+- Speicher-Fixes aus der Profi-Prüfung (`pruefberichte/`) – kommen im Fix-Paket.
+- Nichts davon ist in Roblox Studio getestet. Studio-Testliste: `pruefberichte/runde2b_STUDIO_TESTS.md`.
+- Alle Produkt- und Gamepass-IDs sind 0, im Shop kann man also noch nichts wirklich kaufen.
 
-Inhalt:
-- `src/`, `tests/`, `design/`, `LOGIC_BRIEF.md`, `notes_integration.md`: Arbeitsstand
-- `plaene/`: die Bau-Pläne (Workflow-Skripte für Runde 2b, das KI-Studio und frühere Runden, dazu die Paket-Briefings)
-- `recherche/`: die Recherche zu „Build a Phone Empire“ und die Design-Entwürfe
+## Ordner
+- `src/`, `tests/`, `design/`, `notes_integration.md`: Arbeitsstand (src ist mitten im Shop-Fix, nicht spielen)
+- `design/airports/`, `design/logic2/`: Planung neue Flughäfen + bessere Spiel-Logik (in Arbeit)
+- `pruefberichte/`: Profi-Prüfung, Plugin-Review (geprüft), Fix-Pläne, Studio-Testliste
+- `plaene/`: Bau-Pläne (Workflow-Skripte)
 
-Die Blender-3D-Modelle (Flugzeuge, Auto) liegen in `../assets/vehicles/`, die Import-Anleitung in `IMPORT_IN_ROBLOX.md`.
+Die Executive-Limo (Blender) liegt in `../assets/vehicles/executivelimo/`.

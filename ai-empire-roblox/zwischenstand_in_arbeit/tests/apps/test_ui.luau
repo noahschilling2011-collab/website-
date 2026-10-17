@@ -114,11 +114,13 @@ local function body()
 	local hint = card and card:FindFirstChild("Hint")
 	if STATE == "garage" then
 		check("garage: Train your first AI", goal.id == "train" and titleLabel.Text == "Train your first AI")
-		check("garage: journey step progress", have and have.Text == "Step 1 of 7", have and have.Text)
-		check("garage: hint from the journey (Datasets)", hint and string.find(hint.Text, "Datasets", 1, true) ~= nil, hint and hint.Text)
+		-- menu package (ONBOARDING_SPEC 0.2 #3): these three checks encoded the old bug (the goal opened Datasets)
+		check("garage: progress 'Open the Lab' (no 'Step 1 of 7')", have and have.Text == "Open the Lab", have and have.Text)
+		check("garage: hint names the Model Studio quick start", hint and string.find(hint.Text, "Model Studio", 1, true) ~= nil and string.find(hint.Text, "Datasets", 1, true) == nil, hint and hint.Text)
 		check("garage: milestone reward nudge (company founded quest open)", find("RewardReady", hud) ~= nil)
 		click(card)
-		check("garage: tap opens the Datasets app", ui.Computer.isOpen() and find("data") ~= nil)
+		local Studio = M.require(Client.UI.Lab.Studio)
+		check("garage: tap opens the Model Studio design view", ui.Computer.isOpen() and Studio.mode == "design", Studio.mode)
 		ui.Computer.close(); M.settle(0.5)
 	elseif STATE == "client" then
 		check("client: Sign your first client", goal.id == "client" and titleLabel.Text == "Sign your first client (CloudDesk)")
@@ -190,11 +192,14 @@ local function body()
 	if STATE == "phone" then return end
 
 	------------------------------------------------------------------ Company app: tabs
+	-- menu package (ONBOARDING_SPEC B): the 9 Company tabs became Menu pages; Company → Overview is Home
 	openTab("overview")
-	local tabs = {}
-	for _, x in pg:GetDescendants() do if x:IsA("TextButton") and string.sub(x.Name, 1, 4) == "Tab_" then table.insert(tabs, x.Text) end end
-	check("9 Company tabs incl. Clients, Money, Settings; no Contracts tab", #tabs == 9 and table.find(tabs, "Clients") and table.find(tabs, "Money") and table.find(tabs, "Settings") and not table.find(tabs, "Contracts"), table.concat(tabs, ","))
-	check("overview shows the next goal and profit per game day", has("Next goal: " .. goal.text) ~= nil and has("Profit per game day") ~= nil)
+	local rail = {}
+	for _, x in pg:GetDescendants() do if x:IsA("TextButton") and string.sub(x.Name, 1, 5) == "Rail_" then table.insert(rail, x.Name) end end
+	check("Menu: 6 rail entries (Home, Lab, Market, Clients, Team, Shop); no Contracts page", #rail == 6 and table.find(rail, "Rail_clients") and table.find(rail, "Rail_team") and table.find(rail, "Rail_shop") and has("Contracts") == nil, table.concat(rail, ","))
+	check("Home shows the next goal card", has(goal.text) ~= nil, goal.text)
+	openTab("money")
+	check("Home → Money shows profit per game day", has("Profit per game day") ~= nil)
 	check("no lease-auction texts (Business MRR / monthly business customers)", has("Business MRR") == nil and has("Monthly business customers") == nil)
 
 	------------------------------------------------------------------ Clients

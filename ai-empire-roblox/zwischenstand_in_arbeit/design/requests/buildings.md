@@ -101,3 +101,4 @@ STATUS: done by integrate (GarageStage / HotelRooms are set at build, HotelGuest
 - Entrance: automatic door H0_LOBBY_D1 on the east facade (x -98, z 90) facing the WestPath; apron + canopy;
   wayfinding post where the colonnade ends (x -93, z 70); terrace exit H0_CORRIDOR_D1 to the garden.
 STATUS: deferred to guests_jet (info for the hotel-guest NPCs: GuestBed activities, lobby / breakfast seats, posts 13 / 14, annex navigation)
+STATUS: done by guests_jet (GuestPlan/GuestController use the guest-house rooms + doors of Plan.rooms, the lobby Wait1..4 / breakfast Dining seats and the room doors of H0_R01..H1_R12 on their own waypoint graph incl. the switchback stair; posts 13/14 untouched - guests stand on the guest side of the counter; tests/guests_jet: walls / furniture / floors on tiers 2-4)

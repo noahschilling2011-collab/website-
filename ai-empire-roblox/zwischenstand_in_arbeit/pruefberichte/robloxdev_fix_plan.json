@@ -1,0 +1,66 @@
+[
+ {
+  "id": "R2",
+  "severity": "medium",
+  "owner": "separate fix package (SaveService, SessionService, ServerTypes); the one ShopService hunk (deps.save token + saveNow) goes to the shop package. Hotfix fixS = SaveService only.",
+  "files": [
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/ServerScriptService/Server/Services/SaveService.module.luau",
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/ServerScriptService/Server/Services/SessionService.module.luau",
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/ServerScriptService/Server/Lib/ServerTypes.module.luau",
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/ServerScriptService/Server/Services/ShopService.module.luau"
+  ],
+  "fix": "Recommended fixR (/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r2_save/fixR.diff): SaveService.load makes a per-session token SESSION_ID..'/'..HttpService:GenerateGUID(false), uses it as lock owner and returns it as 3rd value; save(userId,data,release,token) and releaseLock(userId,token) take it (nil token -> save returns (false,true), releaseLock writes nothing); the transform check becomes strict `if meta.lockJobId ~= token then lostLock = true; return nil end` (also refuses a released nil lock, replaces SaveService:155); SessionService stores session.lockToken and passes it; ServerTypes.Session gets lockToken: string?; ShopService deps.save gets a 4th param and saveNow passes session.lockToken; saveSession and saveNow skip the 'opened on another server' kick when session.released. Keep the 15 s cap in closeSession; do NOT adopt an uncapped wait or per-session queue (release then lands 40.7 s after BindToClose). meta.lockJobId stays a string: DATA_VERSION stays 6, no cleaner. Minimal hotfix if only R2 is wanted: fixS (/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r2_save/fixS.diff), SaveService:155 -> `if meta.lockJobId ~= jobId then`. Apply pro-review DS-1 (BindToClose closing counter, still open) in the same package. Duplicate of pro review security.md F1 = datastores.md #3 (DS-3/F1); fixR also closes DS-2.",
+  "probe": "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r2_save/probe_r2.luau (matrix: /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r2_save/run_matrix.sh [gen fixR/gen ...]; single: cd /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r2_save && ../../../tools/luau probe_r2.luau -a <scenario> <gendir>). 10:14 tree: control+shutdown_long PASS, queued/inflight/retry/shutdown2/stale_rejoin/fork_rejoin FAIL; fixR 8/8 PASS. Suites on fixR: shop 146/146, shop2_server 141/141, econ_service 92/92, econ_migration 95/95."
+ },
+ {
+  "id": "R3",
+  "severity": "medium",
+  "owner": "round 2b (Itinerary* frozen until round 2b is released)",
+  "files": [
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/ServerScriptService/Server/Services/ItineraryService.module.luau",
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/tests/itinerary/test_service.luau"
+  ],
+  "fix": "(1) Required: in ItineraryService go() (line 1118), after the rec.it checks (1125-1128): `if rec.declined[k] then return { ok = false, err = \"DECLINED\", text = \"The team is handling that visit without you.\" } end`. Patch /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/final_check/r3_fixA_declined_only.patch (applies to the 10:14 tree with no offset; all 24 tests/itinerary suites 0 failed). (2) Optional, round 2b decides: in cancel() (line 1488) set `rec.declined[it.key] = true` before finish(); patch /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r3_itin_flood/fix_ItineraryService.patch (-p1, offsets +193/+241). It closes the loop fully (0 rebuilds) but contradicts round 2b's re-join after cancel and breaks 2 checks in tests/itinerary/test_service.luau scenario remote (30/2), which they would update. No save, economy or DATA_VERSION change. Severity may drop to low if a 2-client Studio test shows the bystander under ~10 KB/s (expected with round 2b's GO_GAP). tests/itinerary/test_service.luau changes only if hunk (2) is adopted.",
+  "probe": "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r3_itin_flood/probe_flood.luau (cd /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r3_itin_flood && ../../../tools/luau probe_flood.luau -a <gendir>; gen from harness/make_manifest.py). 10:14 tree: 14 passed / 4 failed (declined key starts a trip; 47.5 replicated instances/s added and destroyed at 3 go+3 cancel per s); fixA 15/3 (only the by-design '<=1 build per key' checks remain); both hunks 18/0. The re-use check must wait longer than GO_GAP (2 s)."
+ },
+ {
+  "id": "R7",
+  "severity": "low",
+  "owner": "round 2b (Jet* frozen until round 2b is released)",
+  "files": [
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/StarterPlayer/StarterPlayerScripts/Client/Controllers/JetController.module.luau"
+  ],
+  "fix": "JetController only (hunks @@-61, @@-395, @@-433 of /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r7_r8_r11_client/fix_r7_r8_r11.patch; the @@-795 hunk is optional R11 hardening): (1) hidePart (397) always re-applies LocalTransparencyModifier=1, CanCollide=false, CanQuery=false and records the original CanCollide only on first sight; (2) replace setHidden (436) with applyDecor(d, m, hide) keeping one record per decor model {model, live, hide, conn}: on instance/liveness/state change disconnect, prune hiddenDecor entries of dead or replaced parts, then hide + connect DescendantAdded or restore; updateDecor (448) calls applyDecor for PrivateJet and PM2. Client-local, no server/save change.",
+  "probe": "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r7_r8_r11_client/probe_r7_decor_stream.luau (all client probes: /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r7_r8_r11_client/run_probes.sh [src]). 09:41/10:14 tree: 2 passed / 3 failed (A 287/330 hidden + 43 invisible-but-colliding; A2 0/330; B 0/330); fixed 5/5; guests_jet test_jet 210/0 on both."
+ },
+ {
+  "id": "R6",
+  "severity": "low",
+  "owner": "separate fix package (Funnel)",
+  "files": [
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/ServerScriptService/Server/Lib/Funnel.module.luau"
+  ],
+  "fix": "Funnel.module.luau only (/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r6_r10_tutorial/fix_r6_funnel.diff): add `local sentCustom: { [Player]: { [string]: boolean } } = setmetatable({}, { __mode = \"k\" }) :: any`; in Funnel.custom (63-71) get/create memo = sentCustom[player], return if memo[name], set memo[name] = true, then log as now; add `table.clear(sentCustom :: any)` to Funnel._reset (74). EmpireService, save format and DATA_VERSION unchanged. If product wants re-skips at different steps counted, memo name..'|'..value (max 6 per session).",
+  "probe": "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r6_r10_tutorial/probe_r6_skip_spam.luau (cd /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r6_r10_tutorial && ../../../tools/luau probe_r6_skip_spam.luau -a gen|gen_fixed). 09:41/10:14 tree: 120 accepted calls, 0 RATE_LIMIT, 61 TutorialSkipped in 60 s (6 passed / 1 failed); fixed 1 event (7/0); menu_server 111/0, menu_client_guide 83/0, menu_client_menu 45/0."
+ },
+ {
+  "id": "R10",
+  "severity": "low",
+  "owner": "separate fix package (Guide*)",
+  "files": [
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/StarterPlayer/StarterPlayerScripts/Client/Controllers/GuideController.module.luau"
+  ],
+  "fix": "GuideController.module.luau only (/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r6_r10_tutorial/fix_r10_guide.diff): in updateBeam (293), right after the HRP guard (297-299), insert `local oldBeam, oldA0 = pointer.beam, pointer.a0; if oldBeam and (not oldA0 or oldA0.Parent ~= hrp or oldBeam.Parent ~= hrp) then oldBeam:Destroy(); if oldA0 then oldA0:Destroy() end; pointer.beam = nil; pointer.a0 = nil end`. The existing far branch rebuilds the beam on the new HRP within one 0.2 s update. No CharacterAdded hook, no server or save change.",
+  "probe": "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r6_r10_tutorial/probe_r10_respawn_beam.luau (cd /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r6_r10_tutorial && ../../../tools/luau probe_r10_respawn_beam.luau -a gen|gen_fixed). 09:41/10:14 tree: 6 passed / 4 failed ('GuideBeam on new HRP: false' after Destroy and after parent-to-nil respawn); fixed 10/0; menu suites unchanged."
+ },
+ {
+  "id": "R8",
+  "severity": "low",
+  "owner": "round 2b (Guest* frozen until round 2b is released)",
+  "files": [
+   "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/work/src/StarterPlayer/StarterPlayerScripts/Client/Controllers/GuestController.module.luau"
+  ],
+  "fix": "GuestController only (GuestController hunks of /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r7_r8_r11_client/fix_r7_r8_r11.patch): add Guests.FORGET = 120 (next to Guests.STALE at 37); at the end of findPlots (236-287) add `for seed, rec in plotCache do if now - rec.seen > Guests.FORGET then plotCache[seed] = nil end end`. Only behaviour change: arrival/departure overrides of a plot unseen for >2 min are forgotten, same outcome as the existing STALE path.",
+  "probe": "/tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r7_r8_r11_client/probe_r8_plotcache.luau (+ probe_r8_size.luau for entry size; run via /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/robloxdev_review/r7_r8_r11_client/run_probes.sh [src]). 09:41/10:14 tree: +101.5 KB heap per departed owner, 204 destroyed offices still referenced (1 passed / 2 failed); fixed -0.4 KB, 0 referenced (3/3); guests_jet test_guests 205/0 on both."
+ }
+]

@@ -418,7 +418,8 @@ function ModelMath.parseLook(look: any): (string?, number?)
 	end
 	local colorId, index = string.match(look, "^([%a]+):(%d+)$")
 	local n = tonumber(index)
-	if not colorId or not n or not CompanyConfig.getColor(colorId) or n < 1 or n > #CompanyConfig.LOGOS or n % 1 ~= 0 then
+	-- emblem n indexes CompanyConfig.allLogos() (free LOGOS, then the Identity Kit logos: SHOP_SPEC 3.5)
+	if not colorId or not n or not CompanyConfig.getColor(colorId) or n < 1 or n > #CompanyConfig.LOGOS + #CompanyConfig.KIT_LOGOS or n % 1 ~= 0 then
 		return nil, nil
 	end
 	return colorId, n

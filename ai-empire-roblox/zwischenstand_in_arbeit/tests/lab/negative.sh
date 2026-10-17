@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Lab package: proves the lab checks FAIL when a rule is broken. Each mutation is applied to a private copy of
 # work/src (agents/lab/neg/src); the named suite (preview | studio | models_rich | models_full) must then report failures.
-# Usage: tests/lab/negative.sh
+# Usage: tests/lab/negative.sh   (NEG_ONLY=<substring> runs only the matching mutations)
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT"
 NEG="$ROOT/agents/lab/neg"
 detected=0; total=0
 mutate() { # name suite file find replace [find replace ...]
   local name="$1" suite="$2" file="$3"
+  if [ -n "${NEG_ONLY:-}" ] && [[ "$name" != *$NEG_ONLY* ]]; then return; fi
   rm -rf "$NEG/src"; mkdir -p "$NEG"; cp -r work/src "$NEG/src"
   python3 - "$NEG/src/$file" "${@:4}" <<'PYEOF' || { echo "MUTATION ANCHOR MISSING: $name"; total=$((total+1)); return; }
 import sys
@@ -74,9 +75,13 @@ mutate "first model defaults to Quick pass" studio "$DS" '				StateController.se
 			if LabState.name == "" then' '				StateController.setRecipe("rapid")
 			end
 			if LabState.name == "" then'
-mutate "first model opens at step 1" studio "$DS" '			elseif LabPreview.isFirstModel(data) or typeof(opts.prefill) == "table" then
+mutate "first model opens at step 1" studio "$DS" '			elseif typeof(opts.prefill) == "table" or firstOpen then
 				step = 6' '			elseif typeof(opts.prefill) == "table" then
-				step = 6'
+				step = 6' '			elseif LabPreview.isFirstModel(data) then
+				step = 6
+' '			elseif false then
+				step = 6
+'
 mutate "touch controls not restored" studio "$ST" '		touchSaved = nil
 		GuiService.TouchControlsEnabled = saved' '		touchSaved = nil'
 mutate "input stays bound after close" studio "$ST" '		ContextActionService:UnbindAction(Studio.ACTION)' ''
@@ -96,5 +101,45 @@ mutate "Lab home drops the stat-cap line" models_rich "$LA" '		capNote.Text = `E
 mutate "disabled tiles reveal their hidden Text" studio "$SP" '	if button:GetAttribute("HiddenText") == true then' '	if false then'
 mutate "phone Review breakdown never opens" studio "$DS" '			breakdownOpen = true
 			refresh()' '			refresh()'
+mutate "line successor drops the bot rule (keeps the live size, Standard)" preview "$LP" '	local pick = LabPreview.successorPick(data, live, target, focusId, money, saveMode)
+	local sizeId = if pick then pick.sizeId elseif ModelConfig.getSize(model.sizeId)' '	local pick = nil
+	local sizeId = if pick then pick.sizeId elseif ModelConfig.getSize(model.sizeId)'
+mutate "server forgets the model's training plan (recipeId)" preview "$AI" '	extra.recipeId = recipeId' ''
+mutate "breakdown explains today's empty data instead of the plan" studio "$DS" '		local bd = LabPreview.breakdown(dview, s)' '		local bd = LabPreview.breakdown(data, s)'
+# fix round 1 (review: function + UX)
+mutate "suggestion prefill drops its data plan (2-tap path trains on today's data)" studio "$LP" '		plan = if pick and pick.plan.cost > 0 then pick.plan else nil,' '		plan = nil,'
+mutate "reveal marks the model revealed when it opens (HUD path skips to Launch Day)" studio "$SG" '		LabState.revealing = modelId
+		local id0 = modelId' '		LabState.revealing = modelId
+		if modelId then LabState.markRevealed(modelId) end
+		local id0 = modelId'
+mutate "Studio opens behind a closed Computer" studio "$ST" '	if not hostReady() then
+		return
+	end' ''
+mutate "refined live model ranked by its old plan" studio "$SG" '	local release = model.release
+	if release and ModelConfig.getLine(release.target) then
+		return release.target
+	end' ''
+mutate "ceiling = the size's raw potential (old 'Max score')" preview "$LP" '	ceilingKey, ceilingValue = key, best
+	return best' '	return size.potential'
+mutate "BUY DATA PLAN re-enabled before the snapshot (double tap buys twice / starts)" studio "$DS" '		if bought > 0 then
+			-- the suggestion' '		busy = nil
+		if false then
+			-- the suggestion'
+mutate "first-model defaults on every open (player's pick lost)" studio "$DS" '			elseif LabPreview.isFirstModel(data) and not data.training and not LabState.firstDefaults then' '			elseif LabPreview.isFirstModel(data) and not data.training then'
+mutate "TRAINING_COMPLETE switches modes while designing" studio "$LA" '				offerReveal(id) -- busy elsewhere in the Studio: a banner, no mode switch' '				LabApp.openReveal(id)'
+mutate "Deep tile says 'Too little data' whatever fails" studio "$DS" '					last = deepWhy or "Overfits now"' '					last = "Too little data"'
+mutate "refinement counts up from the server placeholder" studio "$SG" '		local from = if payload.refinement == true and typeof(payload.before) == "number" then payload.before
+			elseif' '		local from = if false then 0
+			elseif'
+mutate "gamepad selection can leave the Studio" studio "$ST" '	root.SelectionGroup = true' '	root.SelectionGroup = false'
+mutate "cash below the reserve still green" studio "$DS" '			moneyTiles[3].value.TextColor3 = if after < 0 then C.bad elseif after < reserve then C.warn else C.good' '			moneyTiles[3].value.TextColor3 = if after < 0 then C.bad else C.good'
+mutate "Lab home re-renders under the open Studio" studio "$LA" '		-- the opaque Studio covers the Lab home: it re-renders when the Studio closes (onClosed above)
+		if parent.Visible and navigation.isOpen() and not Studio.isOpen() then' '		if parent.Visible and navigation.isOpen() then'
+mutate "picked look survives START" studio "$DS" '			LabState.colorId = nil
+			LabState.emblem = nil
+			done =' '			done ='
+mutate "suggest skips the free product line" preview "$LP" '	if #lives < ModelMath.productSlots(data.empire.office) then' '	if false then'
+mutate "ceremony title back in the toast lane" studio "$ST" '	local ct = Parts.label(root, "", 44, F.display, C.text, UDim2.fromOffset(172, 32), UDim2.fromOffset(330, 54))' '	local ct = Parts.label(root, "", 44, F.display, C.text, UDim2.new(0.5, -165, 0, 32), UDim2.fromOffset(330, 54), Enum.TextXAlignment.Center)'
+mutate "NO_DATA steps use today's empty data" studio "$DS" '			local deltas = LabPreview.deltas(dview, s, "focusId", viewMoney)' '			local deltas = LabPreview.deltas(data, s, "focusId", money)'
 echo "lab negative checks: $detected of $total mutations detected"
 [ "$detected" -eq "$total" ]

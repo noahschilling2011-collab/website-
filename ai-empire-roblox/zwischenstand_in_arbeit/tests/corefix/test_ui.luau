@@ -38,7 +38,9 @@ local function body()
 		for _, t in list do if string.find(t, needle, 1, true) then return t end end
 		return nil
 	end
-	ui.Computer.open("campus")
+	-- menu package (ONBOARDING_SPEC B9): campus/building ("Your headquarters", directory, getting around) is part of
+	-- Team → Office now (campus/nil opens Team → Campus: cards & guests, stores & snacks)
+	ui.Computer.open("campus", "building")
 	M.settle(0.5)
 	ui.push()
 	local t = texts()

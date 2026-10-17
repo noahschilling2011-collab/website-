@@ -29,6 +29,21 @@ local SCAN_STEP = 0.5
 local HINGE_TIME, SLIDE_TIME = 0.45, 0.8
 local PAPER_EVERY = 1.6
 local BREATH_PERIOD, BREATH_DEPTH = 3.2, 0.35
+-- shop package (SHOP_SPEC 3.6): the Server Glow pass sets the office attribute ServerGlow; lit GPU blades then run a
+-- slow light wave (company colour -> white -> colour, 6 s) instead of the breathing; reduced motion keeps breathing
+local GLOW_PERIOD, GLOW_MIX = 6, 0.55
+local GuiService = game:GetService("GuiService")
+local reducedAt, reducedValue = -math.huge, false
+local function reducedMotion(now: number): boolean
+	if now - reducedAt > 2 then
+		reducedAt = now
+		local ok, value = pcall(function(): any
+			return (GuiService :: any).ReducedMotionEnabled
+		end)
+		reducedValue = ok and value == true
+	end
+	return reducedValue
+end
 local BROKEN_TEXT = "FAULT · IT NOTIFIED"
 local FAULT_RED = Color3.fromRGB(235, 52, 44)
 local FAULT_DIM = Color3.fromRGB(96, 20, 18)
@@ -49,6 +64,7 @@ export type Prop = {
 	glow: { Look },
 	show: { Look },
 	breathe: Look?,
+	glowing: boolean?, -- shop package: the Server Glow wave is painting this blade
 	emitters: { ParticleEmitter },
 	fires: { Fire },
 	gui: SurfaceGui?,
@@ -960,12 +976,29 @@ function Controller.animate(p: Prop, now: number, dt: number, parts: { BasePart 
 	if kinds.breathe and p.breathe then
 		local part = p.breathe.part
 		if part.Parent then
-			if p.working then
+			local office = p.office
+			local glow = p.working and not p.fault and office ~= nil and office:GetAttribute("ServerGlow") == true and not reducedMotion(now)
+			if glow then
+				-- Server Glow: a colour wave along the racks (shop package), steady transparency
 				local index = num(part:GetAttribute("RackIndex"), 1)
-				local phase = (now / BREATH_PERIOD + index * 0.04) * 2 * math.pi
-				part.Transparency = BREATH_DEPTH * (0.5 - 0.5 * math.cos(phase))
-			elseif part.Transparency ~= p.breathe.transparency then
+				local phase = (now / GLOW_PERIOD + index * 0.08) * 2 * math.pi
+				part.Color = p.breathe.color:Lerp(Color3.new(1, 1, 1), GLOW_MIX * (0.5 - 0.5 * math.cos(phase)))
 				part.Transparency = p.breathe.transparency
+				p.glowing = true
+			else
+				if p.glowing then
+					p.glowing = false
+					if not p.fault then
+						part.Color = p.breathe.color
+					end
+				end
+				if p.working then
+					local index = num(part:GetAttribute("RackIndex"), 1)
+					local phase = (now / BREATH_PERIOD + index * 0.04) * 2 * math.pi
+					part.Transparency = BREATH_DEPTH * (0.5 - 0.5 * math.cos(phase))
+				elseif part.Transparency ~= p.breathe.transparency then
+					part.Transparency = p.breathe.transparency
+				end
 			end
 		end
 	end

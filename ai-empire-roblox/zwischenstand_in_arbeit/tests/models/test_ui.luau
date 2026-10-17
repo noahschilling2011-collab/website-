@@ -83,11 +83,18 @@ local function body()
 	local function disabled(b) return b ~= nil and b:GetAttribute("Disabled") == true end
 
 	------------------------------------------------------------------ Market
-	ui.Computer.open("market")
-	M.settle(0.5)
-	ui.push()
-	local t = texts()
-	check("market: heading", has(t, "MARKET") ~= nil)
+	-- menu package (ONBOARDING_SPEC B9): the Market app is split into Menu pages: Market → My AIs (metrics, serving,
+	-- live models with their prices), Market → Lines, Clients → Receipts. The checks read the three pages together.
+	local t = {}
+	for _, section in { "lines", "receipts", "myais" } do
+		ui.Computer.open("market", section)
+		M.settle(0.5)
+		ui.push()
+		for _, line in texts() do table.insert(t, line) end
+	end
+	local menuTitle = nil
+	for _, x in ui.playerGui:GetDescendants() do if x.Name == "MenuTitle" and visible(x) then menuTitle = x end end
+	check("market: heading (Menu title)", menuTitle ~= nil and menuTitle.Text == "Market", menuTitle and menuTitle.Text)
 	local slots = ({ empty = "0 / 1 live at Garage Lab", rich = "2 / 3 live at Startup Campus", full = "3 / 3 live at Startup Campus" })[STATE]
 	check("market: product lines with the office's slots", has(t, "Product lines · " .. slots) ~= nil, has(t, "Product lines"))
 	for _, label in { "Consumer Chat", "Study App", "Developer API", "Business API" } do
@@ -105,7 +112,7 @@ local function body()
 		check("market: manual-price note", has(t, "Manual price.") ~= nil)
 		check("market: refinements x/3", has(t, "REFINE 1/3") ~= nil and has(t, "REFINE 2/3") ~= nil and has(t, "refined 1/3") ~= nil)
 		check("market: stat cap shown", has(t, "Overall 61.5 / 99") ~= nil)
-		local mt = appTexts("ScrollingFrame")
+		local mt = appTexts("PageScroll")
 		check("market: money per game day", has(mt, "/day") ~= nil and has(mt, "/min") == nil, has(mt, "/min"))
 		check("market: stays-live note on refinement", has(t, "keeps serving with the current version") ~= nil)
 		check("market: business clients", has(t, "2 business clients · $18K/day in retainers") ~= nil, has(t, "business client"))
@@ -203,7 +210,7 @@ local function body()
 			check("release: successor live, predecessor retired with replacedBy", m.status == "live" and m.release.target == "general" and d.models.nova2.status == "retired" and d.models.nova2.replacedBy == "study",
 				m.status .. " " .. d.models.nova2.status)
 			check("release: 90 % of the users moved", math.abs((m.market.users.consumers or 0) - users * 0.9) < 1e-6, m.market.users.consumers)
-			ui.Computer.open("market"); M.settle(0.5); ui.push()
+			ui.Computer.open("market", "lines"); M.settle(0.5); ui.push()
 			check("market after the release: Sage v1 holds the chat line as line v3", has(texts(), "Sage v1 · line v3") ~= nil, has(texts(), "Sage v1"))
 		end
 	end

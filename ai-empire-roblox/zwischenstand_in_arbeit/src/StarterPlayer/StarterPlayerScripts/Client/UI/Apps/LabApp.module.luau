@@ -33,6 +33,8 @@ local LabState = require(Lab.LabState)
 local DesignSteps = require(Lab.DesignSteps)
 local Stages = require(Lab.Stages)
 local LaunchDay = require(Lab.LaunchDay)
+local ShopCore = require(UI.Shop.ShopCore) -- shop package: LEVEL UP · EUREKA (SHOP_SPEC 5.2.3)
+local ShopMath = require(Shared.ShopMath) -- fix round 1: "Eureka saves about …"
 
 local C = Theme.colors
 local F = Theme.font
@@ -90,6 +92,7 @@ function LabApp.openStudio(mode: string, opts: { [string]: any }?)
 end
 
 function LabApp.openReveal(modelId: string)
+	Studio.setBanner(nil, nil)
 	Studio.open("reveal", { modelId = modelId })
 end
 
@@ -100,6 +103,9 @@ end
 -- From outside (HUD "Release it", Journey LAUNCH, tests): Launch Day of a trained model. A model that finished
 -- training in this session and was not revealed yet shows its reveal first (the score stays a surprise).
 function LabApp.openRelease(modelId: string)
+	if Studio.mode == "reveal" and LabState.revealing == modelId and not LabState.wasRevealed(modelId) then
+		return -- its reveal is playing (Computer.open("lab", "release") started it; the HUD card calls this right after)
+	end
 	if not LabState.wasRevealed(modelId) then
 		LabApp.openReveal(modelId)
 		return
@@ -107,30 +113,34 @@ function LabApp.openRelease(modelId: string)
 	Studio.open("launch", { modelId = modelId })
 end
 
-local function openSuccessor(snapshot: Snapshot, target: string?)
-	local data = snapshot.data
-	local pick: LabPreview.Successor? = nil
+-- The suggestion a tap opens: the Lab home's SUGGESTED tile (target nil) or a product line's SUCCESSOR button.
+-- The Review then offers its data plan (BUY DATA PLAN) before START.
+local function suggestionFor(snapshot: Snapshot, target: string?): LabPreview.Suggestion?
+	local money = StateController.money()
 	if target then
-		local status = LabPreview.lineStatus(data, target)
-		local model = status.model
-		if model then
-			local focusId = if ModelConfig.getFocus(model.focusId) then model.focusId else "balanced"
-			local preset = LabPreview.successorPick(data, snapshot.live, target, focusId, StateController.money(), saving(snapshot))
-			pick = {
-				target = target,
-				name = model.name,
-				focusId = focusId,
-				sizeId = if preset then preset.sizeId else model.sizeId,
-				recipeId = if preset then preset.recipeId else "steady",
-				model = model,
-			}
-		end
-	else
-		pick = LabPreview.successor(data, StateController.money(), saving(snapshot), snapshot.live)
+		return LabPreview.lineSuccessor(snapshot.data, snapshot.live, target, money, saving(snapshot))
 	end
-	if pick then
-		Studio.open("design", { prefill = { target = pick.target, name = pick.name, sizeId = pick.sizeId, focusId = pick.focusId, recipeId = pick.recipeId } })
+	return LabPreview.suggest(snapshot.data, snapshot.live, money, saving(snapshot))
+end
+
+local function openSuccessor(snapshot: Snapshot, target: string?)
+	local suggestion = suggestionFor(snapshot, target)
+	if suggestion then
+		Studio.open("design", { prefill = LabPreview.prefillOf(suggestion) })
 	end
+end
+
+-- A model that finished while the player designs or launches something else: a "ready" banner in the Studio's top
+-- bar instead of switching modes under the player's finger (the reveal waits; LabApp.onShow plays it later too).
+local function offerReveal(modelId: string)
+	local snapshot = StateController.snapshot
+	local model = if snapshot then snapshot.data.models[modelId] else nil
+	if not model then
+		return
+	end
+	Studio.setBanner(`★ {model.name} v{model.version} READY · REVEAL ›`, function()
+		LabApp.openReveal(modelId)
+	end)
 end
 
 ---------------------------------------------------------------------------- Lab home
@@ -200,6 +210,8 @@ local function buildHome(parent: Frame, T: Tokens)
 	designTitle.Position = UDim2.new(0, T.pad, 1, if T == COMPACT then -150 else -66)
 	designTitle.TextYAlignment = Enum.TextYAlignment.Bottom
 	local designSub = text(design, "6 steps · all prefilled", T.caption, F.bold, C.bg)
+	local suggestKey = ""
+	local suggestValue: LabPreview.Suggestion? = nil
 	designSub.Position = UDim2.new(0, T.pad, 1, if T == COMPACT then -46 else -30)
 	Kit.onClick(design, function()
 		Studio.open("design", {})
@@ -223,7 +235,8 @@ local function buildHome(parent: Frame, T: Tokens)
 		return b, stroke
 	end
 	local successorTile, _ = sideTile("SuccessorTile", UDim.new(0.45, 4), UDim.new(0.27, -8))
-	text(successorTile, "SUCCESSOR", T.caption, F.bold, C.muted, 1)
+	-- SUGGESTED = LabPreview.suggest (the economy bot's next model: a free line first, else the weakest live line)
+	local succCaption = text(successorTile, "SUGGESTED", T.caption, F.bold, C.muted, 1)
 	local succName = text(successorTile, "", T.rowTitle, F.display, C.text, 2)
 	local succLine = para(successorTile, "", T.caption, C.muted, 3)
 	succLine.Font = F.medium
@@ -310,9 +323,30 @@ local function buildHome(parent: Frame, T: Tokens)
 	para(labCard, "Every level adds +1 to every core stat of the models you train next. Your researchers unlock levels after the whole research tree.", T.body, C.dim, 3)
 	local capNote = para(labCard, "", T.body, C.muted, 4)
 	local labCost = para(labCard, "", T.body, C.muted, 5)
-	local labBuy = Kit.button(labCard, "UPGRADE LAB", "secondary", UDim2.new(1, 0, 0, T.button))
-	labBuy.LayoutOrder = 6
+	-- the button row: UPGRADE LAB (free) and, when a Eureka would work right now, LEVEL UP · EUREKA (shop package)
+	local labRow = Kit.frame(labCard, UDim2.new(1, 0, 0, T.button))
+	labRow.Name = "LabButtons"
+	labRow.LayoutOrder = 6
+	Kit.list(labRow, 12, true)
+	local labBuy = Kit.button(labRow, "UPGRADE LAB", "secondary", UDim2.new(1, 0, 0, T.button))
+	labBuy.Name = "UpgradeLab"
+	labBuy.LayoutOrder = 1
 	labBuy.TextSize = if T == COMPACT then 30 else 15
+	labBuy.TextWrapped = true
+	local labOffer = ShopCore.offerButton(labRow, "LEVEL UP · EUREKA", UDim2.new(0.5, -6, 1, 0), if T == COMPACT then 28 else 15)
+	labOffer.button.Name = "LabEureka"
+	labOffer.button.LayoutOrder = 2
+	labOffer.set(nil, "")
+	local labNote = para(labCard, "", T.body, C.muted, 7)
+	labNote.Name = "LabEurekaNote"
+	labNote.Visible = false
+	Kit.onClick(labOffer.button, function()
+		if labOffer.button:GetAttribute("OfferState") == "owned" then
+			ShopCore.use("eureka", "lab")
+		else
+			ShopCore.buy("eureka", "lab")
+		end
+	end)
 	local labCanBuy = false
 	Kit.onClick(labBuy, function()
 		if not labCanBuy then
@@ -394,7 +428,8 @@ local function buildHome(parent: Frame, T: Tokens)
 			Kit.setDisabled(refine, not check.ok)
 			Kit.onClick(refine, function()
 				local ok = ModelsUI.call("ImproveModel", { modelId = id })
-				if ok then
+				-- the reply may come after the player moved on: open the training stage only from the Lab home
+				if ok and not Studio.isOpen() then
 					Studio.open("training", {})
 				end
 			end)
@@ -492,21 +527,54 @@ local function buildHome(parent: Frame, T: Tokens)
 		local data = snapshot.data
 		local money = StateController.money()
 		local first = LabPreview.isFirstModel(data)
-		designSub.Text = if first then "Your first model · 6 steps" else "6 steps · all prefilled"
+		designSub.Text = if first then "First model · ready to start" else "6 steps · all prefilled"
 
-		-- successor hero
-		local succ = LabPreview.successor(data, money, saving(snapshot), snapshot.live)
+		-- SUGGESTED hero (cached: the suggestion runs up to five data plans; recomputed when its inputs change)
+		local summary = ModelMath.dataSummary(data.data)
+		local liveParts: { string } = {}
+		for _, id in data.modelOrder do
+			local m = data.models[id]
+			if m and m.status == "live" then
+				table.insert(liveParts, `{id}:{m.version}:{math.floor(ModelMath.versionAge(m) / 10)}`)
+			end
+		end
+		local live: any = snapshot.live
+		local key = string.format("%s|%s|%d|%s|%s|%s|%s|%s", tostring(summary.total), tostring(summary.quality), math.floor(money / 250), tostring(data.empire.office),
+			table.concat(liveParts, ","), tostring(saving(snapshot)), tostring(live.capacity), tostring(math.floor((tonumber(live.load) or 0) / 100)))
+		if key ~= suggestKey then
+			suggestKey = key
+			suggestValue = LabPreview.suggest(data, snapshot.live, money, saving(snapshot))
+		end
+		local succ = suggestValue
 		if succ then
-			local status = LabPreview.lineStatus(data, succ.target)
-			local est = LabPreview.estimate(data, { sizeId = succ.sizeId, focusId = succ.focusId, recipeId = succ.recipeId }, nil)
-			succName.Text = `{succ.name} v{ModelMath.nextVersion(data, succ.name)}`
-			local age = ModelMath.ageFit(ModelMath.versionAge(succ.model))
-			succLine.Text = `{StudioParts.lineShort(succ.target)} · −{string.format("%.0f", age)} fit`
-			succPlan.Text = string.format("%s %s · ~%.0f", sizeLabel(succ.sizeId), StudioParts.RECIPE_LABEL[succ.recipeId] or "", est.overall)
+			local pick = succ.pick
+			local lineDef = ModelConfig.getLine(succ.target)
+			local model = succ.model
+			if succ.kind == "successor" and model and succ.name then
+				succCaption.Text = "SUGGESTED"
+				succName.Text = `{succ.name} v{ModelMath.nextVersion(data, succ.name)}`
+				local age = ModelMath.ageFit(ModelMath.versionAge(model))
+				succLine.Text = `{StudioParts.lineShort(succ.target)} · −{string.format("%.0f", age)} fit`
+			else
+				succCaption.Text = "SUGGESTED"
+				succName.Text = if lineDef then lineDef.label else "New line"
+				local status = LabPreview.lineStatus(data, succ.target)
+				succLine.Text = if status.slots == math.huge then "new product line" else `new line · {status.usedLines + 1} of {status.slots}`
+			end
+			if pick then
+				local planCost = pick.plan.cost
+				succPlan.Text = string.format("%s %s · ~%.0f", sizeLabel(succ.sizeId), StudioParts.RECIPE_LABEL[succ.recipeId] or "", succ.expected)
+					.. (if planCost > 0 then ` · +data {StudioParts.money(planCost)}` else "")
+				succPlan.TextColor3 = C.muted
+			else
+				local cheapest = LabPreview.estimate(data, { sizeId = "s100m", focusId = succ.focusId, recipeId = "steady" }, nil)
+				succPlan.Text = if money - LabPreview.reserve(data) < cheapest.cost then "Not yet · needs more cash" else "Not yet · nothing beats it by +3"
+				succPlan.TextColor3 = C.warn
+			end
 			succCue.Visible = true
-			local _ = status
 			Kit.setDisabled(successorTile :: any, false)
 		else
+			succCaption.Text = "SUGGESTED"
 			succName.Text = "None yet"
 			succLine.Text = "Launch a model first"
 			succPlan.Text = ""
@@ -572,6 +640,17 @@ local function buildHome(parent: Frame, T: Tokens)
 		labCanBuy = lab.canBuy
 		labBuy.Text = if lab.level >= lab.max then "LAB AT MAX LEVEL" else `UPGRADE LAB · {Format.int(lab.points)} RP + {Format.money(lab.cash)}`
 		Kit.setDisabled(labBuy, not lab.canBuy)
+		-- shop package (SHOP_SPEC 5.2.3): the Robux state only while research points are short of the level (a Lab
+		-- level has no timer); an owned Eureka shows either way, so it is never stranded
+		local offerState, offerCheck, offerRight = ShopCore.eurekaOffer(snapshot, "lab", money)
+		labOffer.set(offerState, offerRight)
+		labBuy.Size = UDim2.new(if offerState then 0.5 else 1, if offerState then -6 else 0, 1, 0)
+		labNote.Visible = offerState ~= nil
+		if offerState and offerCheck then
+			labNote.Text = if offerCheck.have >= offerCheck.points
+				then `No time saved: your {Format.int(offerCheck.points)} RP stay yours for the next level. You still pay {Format.money(offerCheck.cost)}.`
+				else `Eureka saves {ShopMath.savingText(offerCheck.seconds)}: covers the {Format.int(offerCheck.points)} RP. You still pay {Format.money(offerCheck.cost)}.`
+		end
 
 		rebuildReady(snapshot)
 		rebuildFame(snapshot)
@@ -610,7 +689,8 @@ function LabApp.mount(parent: Frame, navigation: Kit.Nav)
 	end)
 
 	StateController.onChange(function(_snapshot)
-		if parent.Visible and navigation.isOpen() then
+		-- the opaque Studio covers the Lab home: it re-renders when the Studio closes (onClosed above)
+		if parent.Visible and navigation.isOpen() and not Studio.isOpen() then
 			render()
 		end
 	end)
@@ -627,10 +707,18 @@ function LabApp.mount(parent: Frame, navigation: Kit.Nav)
 	StateController.onNotify(function(kind: string, payload: { [string]: any })
 		if kind == "TRAINING_COMPLETE" then
 			LabState.storeReveal(payload)
-			if navigation.isOpen() then
-				navigation.show("lab") -- onShow plays the reveal
+			if not navigation.isOpen() then
+				return -- the HUD card and the next Computer → Models play the reveal
+			end
+			local mode = Studio.mode
+			local id = payload.modelId
+			if (mode == "design" or mode == "launch" or mode == "live" or mode == "reveal") and typeof(id) == "string" then
+				offerReveal(id) -- busy elsewhere in the Studio: a banner, no mode switch
+			else
+				navigation.show("lab") -- watching the training or on the Lab home: onShow plays the reveal
 			end
 		elseif kind == "TRAINING_EVENT" then
+			-- a decision has a real 25 s timeout: it may take over (a design keeps its step, LabState.step)
 			if navigation.isOpen() then
 				navigation.show("lab")
 				Studio.open("training", {})
@@ -657,7 +745,10 @@ function LabApp.onShow()
 	for _, id in data.modelOrder do
 		local model = data.models[id]
 		if model and model.status ~= "training" and not LabState.wasRevealed(id) then
-			if Studio.mode ~= "reveal" then
+			local mode = Studio.mode
+			if mode == "design" or mode == "launch" or mode == "live" then
+				offerReveal(id)
+			elseif mode ~= "reveal" then
 				LabApp.openReveal(id)
 			end
 			return

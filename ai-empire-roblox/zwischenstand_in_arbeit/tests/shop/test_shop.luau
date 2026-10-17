@@ -57,9 +57,10 @@ local function body()
 		EmpireConfig.OFFICES = { { price = 0 }, { price = 18000 }, { price = 90000 }, { price = 350000 } }
 		local expect = {
 			-- econ: at the last stage the base is the last office price x CASH.topFactor = 1.0 (CORE_SPEC 11.7, was 3.5)
-			seed = { 4500, 22500, 87500, 87500 },
-			seriesA = { 13500, 67500, 262500, 262500 },
-			seriesB = { 36000, 180000, 700000, 700000 },
+			-- shop package (owner decision S1, 2026-10-12): shares 0.10 / 0.20 / 0.30 (were 0.25 / 0.75 / 2.0), minimum $2,000
+			seed = { 2000, 9000, 35000, 35000 },
+			seriesA = { 3600, 18000, 70000, 70000 },
+			seriesB = { 5400, 27000, 105000, 105000 },
 		}
 		for key, values in expect do
 			local def = ShopConfig.product(key)
@@ -67,7 +68,7 @@ local function body()
 				check(`cash {key} at stage {office} = {v}`, ShopConfig.cashFor(def, office) == v, ShopConfig.cashFor(def, office))
 			end
 		end
-		check("cash: stage out of range clamps", ShopConfig.cashFor(ShopConfig.product("seed"), 99) == 87500 and ShopConfig.cashFor(ShopConfig.product("seed"), 0) == 4500 and ShopConfig.cashFor(ShopConfig.product("seed"), 0 / 0) == 4500)
+		check("cash: stage out of range clamps", ShopConfig.cashFor(ShopConfig.product("seriesA"), 99) == 70000 and ShopConfig.cashFor(ShopConfig.product("seriesA"), 0) == 3600 and ShopConfig.cashFor(ShopConfig.product("seriesA"), 0 / 0) == 3600)
 		-- a new first stage whose next office is free still gives the minimum
 		EmpireConfig.OFFICES = { { price = 0 }, { price = 0 }, { price = 18000 } }
 		check("cash: free next office -> minimum", ShopConfig.cashFor(ShopConfig.product("seed"), 1) == ShopConfig.CASH.minimum)

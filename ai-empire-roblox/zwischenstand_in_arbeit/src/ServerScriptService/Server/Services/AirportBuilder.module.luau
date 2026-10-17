@@ -1816,6 +1816,83 @@ local function carPark(m: Instance)
 	for i,x in {-420,-560,-700,-800} do kit.lamp(park,x,2470,i<=2,G+.3) end
 end
 
+------------------------------------------------------------------------------------------------ hangar interior (guests_jet)
+-- Package "guests_jet" (additive): Hangar 1 is where a company's jet waits (JetPlan.HOME_PARK, client-side - each
+-- client shows its own company's jet in place of the decorative PrivateJet). Dressing: parking markings for the jet
+-- (lead-in line, stop bar at its nose gear, box, "COMPANY JET" floor plate), the crew corner in the south-west
+-- where the two company pilots wait (JetPlan.CREW: carpet, sofa - the captain sits at its north end -, coffee
+-- table, coffee counter with a machine - the first officer stands at it -, lockers, a flight planning screen, a
+-- hanging "FLIGHT CREW" board, a plant), a workbench with a pegboard and tool cabinets on the north wall, a ground
+-- power cart, a light lining on the upper walls, neon ceiling strips (no real lights: the airport zone's light budget
+-- is full) and a "HANGAR 1" banner on the back wall. Only the sofa, counter, lockers, bench and cabinets collide; every hop of the pilots' and
+-- companions' walks stays clear (tests/guests_jet).
+local function hangarDressing(hangar: Instance)
+	local hg=A.hangar;local HY=A.apronTop
+	local d=folder(hangar,"HangarInterior")
+	local cz=(hg.z1+hg.z2)/2
+	local paint=function(name: string,x1: number,x2: number,z1: number,z2: number,color: Color3): Part return box(d,name,x1,x2,HY,HY+.03,z1,z2,color,SM,true) end
+	-- jet parking: lead-in line from the door, stop bar at the nose gear (x -946.3), box round the footprint
+	paint("JetLeadIn",-955,hg.x2-1,cz-.2,cz+.2,YELLOW)
+	paint("JetStopBar",-946.6,-946,cz-4,cz+4,YELLOW)
+	for _,s in {{-956,-904,2616.4,2617},{-956,-904,2663,2663.6},{-956,-955.4,2617,2663},{-904.6,-904,2617,2663}} do paint("JetBox",s[1],s[2],s[3],s[4],YELLOW) end
+	local plate=paint("JetFloorText",-900,-878,2634,2646,rgb(60,62,64))
+	label(plate,"COMPANY JET",Enum.NormalId.Top,{ink=YELLOW,far=true})
+	-- crew corner (south-west)
+	box(d,"CrewCarpet",-996,-962,HY,HY+.05,2692,2716,rgb(46,58,86),M.Carpet,true)
+	local leather=rgb(70,46,36)
+	box(d,"CrewSofaSeat",-995,-991,HY,HY+1.6,2698,2708,leather,M.Leather)
+	box(d,"CrewSofaBack",-996,-995,HY,HY+3.8,2698,2708,leather,M.Leather)
+	for _,z in {2697.4,2708} do box(d,"CrewSofaArm",-995,-991,HY,HY+2.4,z,z+.6,leather,M.Leather) end
+	box(d,"CrewTable",-988,-985,HY+1.15,HY+1.3,2702.5,2707.5,rgb(96,62,40),M.Wood,true)
+	box(d,"CrewTableBase",-987,-986,HY,HY+1.15,2704,2706,C.metal,M.Metal,true)
+	box(d,"CrewCounter",-992,-980,HY,HY+3.5,2713,2716,rgb(120,86,58),M.Wood)
+	box(d,"CrewCounterTop",-992.2,-979.8,HY+3.5,HY+3.65,2712.8,2716,C.stone,M.Marble,true)
+	local machine=box(d,"CrewCoffee",-986,-984.8,HY+3.65,HY+5,2714.2,2715.6,C.metal,M.Metal,true)
+	box(d,"CrewCoffeeLight",-985.8,-985,HY+4.6,HY+4.75,2714.15,2714.2,rgb(250,180,80),M.Neon,true)
+	fx(machine,"steam",{FxSeconds=4})
+	for k,x in {-989,-988.2,-982.6} do box(d,"CrewCup",x-.25,x+.25,HY+3.65,HY+4.15,2713.8+k*.1,2714.3+k*.1,C.white,SM,true) end
+	box(d,"CrewLockers",-978,-966,HY,HY+7,2714.6,2716,rgb(96,112,128),M.Metal)
+	for _,x in {-974,-970} do box(d,"LockerSeam",x-.05,x+.05,HY+.2,HY+6.8,2714.55,2714.6,rgb(40,44,50),SM,true) end
+	for k,x in {-976,-972,-968} do
+		local tag=box(d,"LockerTag",x-1.2,x+1.2,HY+5.4,HY+6,2714.5,2714.55,C.white,SM,true)
+		label(tag,if k==1 then "CAPTAIN" elseif k==2 then "FIRST OFFICER" else "CREW",Enum.NormalId.Front,{ink=rgb(40,44,50)})
+	end
+	local screen=box(d,"FlightPlanScreen",-995.9,-995.7,HY+5,HY+8.6,2688.5,2696.5,C.screen,SM,true)
+	label(screen,"FLIGHT PLAN\nCITY AIRPORT  →  PORT MERIDIAN\nRWY 09 · FL 060 · 3 MIN",Enum.NormalId.Right,{ink=SCREEN_INK,screen=true,font=Enum.Font.RobotoMono})
+	local board=box(d,"CrewBoard",-986,-972,HY+9.5,HY+11.5,2690.8,2691.2,NAVY,SM,true)
+	label(board,"FLIGHT CREW",Enum.NormalId.Front,{ink=SIGN_INK,far=true})
+	label(board,"FLIGHT CREW",Enum.NormalId.Back,{ink=SIGN_INK})
+	for _,x in {-984,-974} do box(d,"CrewBoardRod",x-.08,x+.08,HY+11.5,G+46,2690.92,2691.08,C.metal,M.Metal,true) end
+	post(d,"CrewPlantPot",-963.5,2713.5,HY,HY+1.6,1.6,C.stone,M.Concrete,true)
+	ball(d,"CrewPlant",Vector3.new(-963.5,HY+2.8,2713.5),2.8,C.foliageLight,M.LeafyGrass,true)
+	-- north wall: workbench, pegboard with tools, tool cabinets
+	box(d,"Workbench",-990,-962,HY,HY+3.2,2564,2567,rgb(120,124,128),M.Metal)
+	box(d,"WorkbenchTop",-990.2,-961.8,HY+3.2,HY+3.4,2564,2567.2,rgb(150,110,70),M.Wood,true)
+	box(d,"Pegboard",-990,-962,HY+4,HY+8,2564,2564.2,rgb(200,196,186),SM,true)
+	for k=0,8 do
+		local x=-988+k*3
+		box(d,"Tool",x-.15,x+.15,HY+5,HY+5+(k%3)*.6+1,2564.2,2564.4,GOODS[k%#GOODS+1],M.Metal,true)
+	end
+	for k,x in {-958,-952} do box(d,"ToolCabinet",x-2.6,x+2.6,HY,HY+4.5,2564,2566.6,if k==1 then RED else rgb(40,44,50),M.Metal) end
+	-- ground power cart (clear of the right wingtip at z 2619.7)
+	box(d,"PowerCart",-912,-906,HY+.6,HY+3,2598,2602,YELLOW,SM,true)
+	for _,x in {-911,-907} do for _,z in {2598.2,2601.8} do post(d,"PowerCartWheel",x,z,HY,HY+1.2,1.2,rgb(30,30,32),M.Rubber,true) end end
+	-- light insulated lining on the upper walls (the shell's corroded metal stays as a 9-stud dado below it, so the
+	-- hangar reads bright and lit from the door without extra lights) with a trim along its lower edge
+	local lining,trim=rgb(206,210,212),rgb(92,98,104)
+	local ly=HY+9
+	box(d,"HangarLining",hg.x1+4,hg.x1+4.1,ly,G+45.9,hg.z1+4,hg.z2-4,lining,M.Metal,true)
+	box(d,"HangarLining",hg.x1+4,hg.x2-4,ly,G+45.9,hg.z1+4,hg.z1+4.1,lining,M.Metal,true)
+	box(d,"HangarLining",hg.x1+4,hg.x2-4,ly,G+45.9,hg.z2-4.1,hg.z2-4,lining,M.Metal,true)
+	box(d,"LiningTrim",hg.x1+4,hg.x1+4.25,ly-.3,ly,hg.z1+4,hg.z2-4,trim,M.Metal,true)
+	box(d,"LiningTrim",hg.x1+4,hg.x2-4,ly-.3,ly,hg.z1+4,hg.z1+4.25,trim,M.Metal,true)
+	box(d,"LiningTrim",hg.x1+4,hg.x2-4,ly-.3,ly,hg.z2-4.25,hg.z2-4,trim,M.Metal,true)
+	-- neon ceiling strips and the back-wall banner (in front of the lining)
+	for _,z in {2605,2675} do box(d,"HangarStrip",hg.x1+10,hg.x2-10,G+44.2,G+44.5,z-1,z+1,C.lightNeutral,M.Neon,true) end
+	local banner=box(d,"HangarBanner",hg.x1+4.1,hg.x1+4.3,G+18,G+28,cz-25,cz+25,NAVY,SM,true)
+	label(banner,"HANGAR 1  ·  BUSINESS AVIATION",Enum.NormalId.Right,{ink=INK,far=true})
+end
+
 ------------------------------------------------------------------------------------------------ tower, hangar
 local function towerAndHangar(m: Instance)
 	local tp=A.tower
@@ -1863,6 +1940,7 @@ local function towerAndHangar(m: Instance)
 	local marker=invisible(mk(jf,"CompanyJetStand",Vector3.new(46,.2,60),js,C.white,SM,true))
 	marker:SetAttribute("Purpose","CompanyJet");marker:SetAttribute("Scale",.9)
 	local _=y
+	hangarDressing(hangar)
 	-- fuel farm east of the tower
 	for _,z in {2600,2660} do
 		local tank=mk(m,"FuelTank",Vector3.new(16,24,24),CFrame.new(980,G+8,z)*CFrame.Angles(0,0,math.pi/2),C.white,M.Metal)

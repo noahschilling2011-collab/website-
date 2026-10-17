@@ -10,10 +10,25 @@ local function body()
 	local RS = M.game.ReplicatedStorage
 	local Drive = M.require(RS.Shared.DrivePlan)
 	local HS = M.game:GetService("HttpService")
-	local function out(leg, plot)
+	local function r2(v) return math.floor(v * 100 + 0.5) / 100 end
+	local function out(leg, plot, mesh)
 		local pts = {}
-		for i, p in leg.pts do pts[i] = { math.floor(p.X * 100) / 100, math.floor(p.Y * 100) / 100, math.floor(p.Z * 100) / 100 } end
-		rprint("@@LEG " .. HS:JSONEncode({ key = leg.key, from = leg.from, to = leg.to, plot = plot, len = leg.len, dur = leg.dur, pts = pts }))
+		for i, p in leg.pts do pts[i] = { r2(p.X), r2(p.Y), r2(p.Z) } end
+		-- playback poses (what DriveController shows): every 2 studs with the look's wheelbase (mesh = the imported
+		-- ExecutiveLimo: wheelbase 18.10, 25.76 x 7.36)
+		local limo = string.sub(leg.from, 1, 3) == "pm_" or string.sub(leg.to, 1, 3) == "pm_"
+		local wb = if mesh then 18.10 elseif limo then Drive.WHEELBASE.limo else Drive.WHEELBASE.fleet
+		local cfs = {}
+		local s = 0
+		while true do
+			local cf = Drive.poseAtDist(leg, math.min(s, leg.len), wb)
+			local l, u = cf.LookVector, cf.UpVector
+			table.insert(cfs, { r2(cf.X), r2(cf.Y), r2(cf.Z), r2(l.X * 1000) / 1000, r2(l.Y * 1000) / 1000, r2(l.Z * 1000) / 1000, r2(u.X * 1000) / 1000, r2(u.Y * 1000) / 1000, r2(u.Z * 1000) / 1000 })
+			if s >= leg.len then break end
+			s += 2
+		end
+		rprint("@@LEG " .. HS:JSONEncode({ key = leg.key .. (if mesh then "#mesh" else ""), from = leg.from, to = leg.to, plot = plot, len = leg.len, dur = leg.dur, pts = pts, cfs = cfs, limo = limo,
+			length = if mesh then 25.76 else nil, width = if mesh then 7.36 else nil }))
 	end
 	local bad = 0
 	for _, plot in { tonumber(args[2]) or 1, tonumber(args[3]) or 7 } do
@@ -33,7 +48,7 @@ local function body()
 		for _, b in pm do
 			if a.id ~= b.id then
 				local leg, err = Drive.leg(a.id, b.id)
-				if leg then out(leg, nil) else rprint("NOLEG", a.id, b.id, err); bad += 1 end
+				if leg then out(leg, nil); out(leg, nil, true) else rprint("NOLEG", a.id, b.id, err); bad += 1 end
 			end
 		end
 	end

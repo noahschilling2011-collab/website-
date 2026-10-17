@@ -6,6 +6,7 @@ local EmpireConfig=require(ReplicatedStorage.Shared.Config.EmpireConfig)
 local Math=require(ReplicatedStorage.Shared.EmpireMath)
 local Format=require(ReplicatedStorage.Shared.Format)
 local Ops=require(ReplicatedStorage.Shared.CompanyOps)
+local ShopConfigC=require(ReplicatedStorage.Shared.Config.ShopConfig) -- shop package (ONBOARDING_SPEC C4)
 local UI=script.Parent.Parent
 local State=require(UI.Parent.Controllers.StateController)
 local Action=require(UI.Parent.Controllers.ActionController)
@@ -19,14 +20,18 @@ local watchers={}
 local scroll: ScrollingFrame?=nil
 local navigator: any=nil
 local current="building"
-local function watch(fn: (any)->())table.insert(watchers,fn);if State.snapshot then fn(State.snapshot) end end
+-- Menu pages (ONBOARDING_SPEC B9, menu package): App.mountPart renders one builder into a Menu page frame with its own
+-- watcher list; `filling` is the list watch() fills right now
+local filling: {(any)->()}=watchers
+local function watch(fn: (any)->())table.insert(filling,fn);if State.snapshot then fn(State.snapshot) end end
 local function title(p: Instance,text: string)local t=Kit.para(p,text,19,C.text,1);t.Font=F.bold;return t end
 local function para(p: Instance,text: string,order: number?)return Kit.para(p,text,14,C.muted,order or 2)end
 local function call(name: string,p: any,message: string)
 	task.spawn(function()local ok=Action.call(name,p);if ok then Toast.show("success",message) end end)
 end
 local function button(p: Instance,text: string,fn: ()->(),order: number?)
-	local b=Kit.button(p,text,"primary",UDim2.new(1,0,0,40));b.LayoutOrder=order or 5;Kit.onClick(b,fn);return b
+	-- fix round 1 (review): 56 px on touch = 44.8 pt on an iPhone (legacy page x 0.80); 40 px with a mouse
+	local b=Kit.button(p,text,"primary",UDim2.new(1,0,0,Kit.tap(40,56)));b.LayoutOrder=order or 5;Kit.onClick(b,fn);return b
 end
 -- Building texts are generated from the shared BuildingPlan, so they always describe the
 -- headquarters this tier actually builds (levels, pavilion, founder services, roof, garage).
@@ -42,7 +47,7 @@ local function directory(tier: number): string
 	return table.concat(lines,"\n")
 end
 local GETTING_AROUND="The automatic doors in the front portal open for everyone into the double-height reception hall. Visitors need no card for the hall, the café, the showroom and the visitor lounge. Badge speed gates at the back of the hall lead into the staff atrium; walk straight through it to the lift lobby. The lift stops at every level from B1 to the roof: call it at a landing, step inside and choose your floor on the cabin panel.\nThe stairs are right of the lift (as you face it), the restrooms left of it. Every lift lobby has a floor directory; nameplates beside each door show who may enter.\nTeam areas need a company or guest card, labs and technical rooms are reserved for their staff, and founder rooms open only for you."
-local GETTING_AROUND_GARAGE="The Garage Lab has one level and no lift: the shared lab with 5 team desks, the glazed founder corner, your assistant's desk by the door, a WC and the porch where applicants wait. Your car is parked in front of the garage. The fenced site around it is where your first headquarters will stand: sign your first business client and save the price, then move up from the Office tab."
+local GETTING_AROUND_GARAGE="The Garage Lab has one level and no lift: the shared lab with 5 team desks, the glazed founder corner, your assistant's desk by the door, a WC and the porch where applicants wait. Your car is parked in front of the garage. The fenced site around it is where your first headquarters will stand: sign your first business client and save the price, then move up from Team → Office."
 local SHARED_FOUNDER_FLOOR={boardroom=true,meeting=true,hr=true,lounge=true,team=true}
 -- office index (stage 1..5) -> the building's plan tier (0 = Garage Lab)
 local function tierOf(s: any): number return Plan.tierForOffice(s.data.empire.office) end
@@ -112,9 +117,9 @@ local function fleet(p: Instance)
 	for i,def in Config.CARS do
 		local pass=(def :: any).pass -- game pass car (Executive Limo): ownership comes from the pass (ShopService)
 		local card=Kit.card(p,i+1);title(card,def.name);para(card,string.format("%s · top speed %d studs/s · reverse %d studs/s",if pass then "Game pass car" elseif def.price==0 then "Included with your company" else Format.money(def.price),def.speed,def.reverse))
-		local owned,hasPass=false,false
+		local owned,hasPass,sellable=false,false,false
 		local b=button(card,"",function()
-			if pass and not hasPass then if navigator then navigator.show("shop") end;return end
+			if pass and not hasPass then if navigator and sellable then navigator.show("shop") end;return end
 			if pass and not owned then call("BuyCar",{carId=def.id},"Added to your fleet. Collect it below.");return end
 			call(if owned then "SpawnCar" else "BuyCar",{carId=def.id},if owned then "Car ready to collect." else "Car purchased. Collect it below.")
 		end)
@@ -122,8 +127,12 @@ local function fleet(p: Instance)
 			owned=s.data.empire.campus.cars[def.id]==true
 			local shop=(s.live :: any).shop
 			hasPass=pass~=nil and typeof(shop)=="table" and typeof(shop.passes)=="table" and shop.passes[pass]==true
+			-- ONBOARDING_SPEC C4 (shop package): no "Get the pass" while the pass has no id or is not sold
+			local passDef=if pass then ShopConfigC.pass(pass) else nil
+			sellable=passDef~=nil and passDef.id>0 and typeof(shop)=="table" and typeof(shop.available)=="table" and shop.available[pass]==true
 			if pass then
-				b.Text=if not hasPass then "Get the pass" elseif owned then "Collect" else "Add to fleet";Kit.setDisabled(b,false)
+				b.Text=if not hasPass then (if sellable then "Get the pass" else "Not available yet") elseif owned then "Collect" else "Add to fleet"
+				Kit.setDisabled(b,not hasPass and not sellable)
 			else
 				b.Text=if owned then "Collect" else "Buy · "..Format.money(def.price);Kit.setDisabled(b,not owned and s.data.money<def.price)
 			end
@@ -148,7 +157,7 @@ local function shops(p: Instance)
 end
 local builders={building=building,access=access,fleet=fleet,shops=shops}
 local function render()
-	if not scroll then return end;watchers={}
+	if not scroll then return end;watchers={};filling=watchers
 	for _,child in scroll:GetChildren() do if child:IsA("GuiObject") then child:Destroy() end end
 	local stack=Kit.stack(scroll,12);Kit.padding(stack,0,8,24,0);builders[current](stack);scroll.CanvasPosition=Vector2.zero
 end
@@ -163,6 +172,57 @@ function App.mount(parent: Frame,nav: any)
 	State.onChange(function(s)if not s.data.company then return end;if #watchers==0 then render()end;for _,fn in watchers do fn(s)end end)
 end
 function App.onShow()if #watchers==0 and State.snapshot and State.snapshot.data.company then render() end end
+-- Team → Campus (ONBOARDING_SPEC B9): one page, two stacked sections "Cards & guests" and "Stores & snacks"
+local function section(p: Instance,text: string,order: number,name: string): Frame
+	local head=Kit.text(p,text,22,F.display,C.text);head.LayoutOrder=order;head.Name=name.."Head"
+	local stack=Kit.stack(p,12,order+1);stack.Name=name
+	return stack
+end
+local PARTS: {[string]:(Instance)->()}={building=building,access=access,fleet=fleet,shops=shops,
+	campus=function(p: Instance) access(section(p,"Cards & guests",1,"CardsGuests"));shops(section(p,"Stores & snacks",3,"StoresSnacks")) end}
+export type Part={frame: Frame,id: string,show: ()->(),rebuild: ()->()}
+type PartState={frame: Frame,id: string,watchers: {(any)->()},built: boolean}
+local partStates: {PartState}={}
+local partsBound=false
+local function shown(inst: Instance): boolean
+	local node: Instance?=inst
+	while node do
+		if node:IsA("GuiObject") and not (node :: GuiObject).Visible then return false end
+		if node:IsA("LayerCollector") then return true end
+		node=node.Parent
+	end
+	return true
+end
+local function renderPart(part: PartState)
+	local snapshot=State.snapshot
+	if not snapshot or not snapshot.data.company then return end
+	for _,child in part.frame:GetChildren() do if child:IsA("GuiObject") then child:Destroy() end end
+	part.watchers={}
+	local before=filling;filling=part.watchers
+	local stack=Kit.stack(part.frame,12);stack.Name="Campus_"..part.id
+	local builder=PARTS[part.id]
+	local ok,err=pcall(function() builder(stack) end)
+	filling=before
+	if not ok then warn("[CampusApp] part "..part.id..": "..tostring(err)) end
+	part.built=true
+end
+function App.mountPart(frame: Frame,id: string,nav: any): Part
+	assert(PARTS[id],"unknown CampusApp part "..id)
+	navigator=navigator or nav
+	frame.AutomaticSize=Enum.AutomaticSize.Y
+	local part: PartState={frame=frame,id=id,watchers={},built=false}
+	table.insert(partStates,part)
+	if not partsBound then
+		partsBound=true
+		State.onChange(function(s)
+			if not s.data.company then return end
+			for _,p in partStates do if p.built and shown(p.frame) then for _,fn in p.watchers do fn(s) end end end
+		end)
+	end
+	return {frame=frame,id=id,show=function()
+		if not part.built then renderPart(part) elseif State.snapshot then for _,fn in part.watchers do fn(State.snapshot) end end
+	end,rebuild=function() renderPart(part) end}
+end
 -- Prompts and the HUD can open a tab directly (building, access, fleet, shops).
 function App.openSection(section: string)
 	if builders[section] then current=section;render() end

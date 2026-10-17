@@ -88,6 +88,21 @@ local function priceText(sub: number, api: number): string
 	return (if sub == 0 then "Free" else `${sub}/mo`) .. ` · {Format.price(api)}`
 end
 
+-- the frame and every GuiObject ancestor are visible (a Menu page part refreshes only while shown)
+local function shownChain(inst: Instance): boolean
+	local node: Instance? = inst
+	while node do
+		if node:IsA("GuiObject") and not (node :: GuiObject).Visible then
+			return false
+		end
+		if node:IsA("LayerCollector") then
+			return true
+		end
+		node = node.Parent
+	end
+	return true
+end
+
 local function nextRank(peak: number): string
 	for _, rank in CompanyConfig.RANKS do
 		if rank.minUsers > peak then
@@ -97,17 +112,39 @@ local function nextRank(peak: number): string
 	return "Top rank reached"
 end
 
-function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
-	root = parent
-
-	local scroll = Kit.scroll(parent)
+-- One Market view. keep = nil: the whole Market in its own scroll (legacy app); keep = a set of section names: only
+-- those sections, built into `parent` without a scroll (a Menu page part, ONBOARDING_SPEC B9, menu package).
+-- Sections: head, summary (metrics + serving capacity), lines, access (API subscription), exchange (provider
+-- exchange), receipts (business clients), live (your live models), board (intelligence leaderboard).
+local function build(parent: Frame, navigation: Kit.Nav, keep: { [string]: boolean }?): (Snapshot) -> ()
+	local scroll: GuiObject
+	if keep then
+		local stack = Kit.frame(parent, UDim2.fromScale(1, 0))
+		stack.AutomaticSize = Enum.AutomaticSize.Y
+		stack.Name = "MarketPart"
+		scroll = stack
+	else
+		scroll = Kit.scroll(parent)
+	end
 	Kit.padding(scroll, 2, 14, 20, 2)
 	Kit.list(scroll, 14)
+	local function show(name: string): boolean
+		return keep == nil or keep[name] == true
+	end
 
-	Kit.heading(scroll, "MARKET", "A shared market for this server: your models, the AI labs and other companies compete for users in four product lines. Prices are per month (1 month = 3 game days = 1 hour); money is shown per game day.", 1)
+	local headingLabel = Kit.heading(scroll, "MARKET", "A shared market for this server: your models, the AI labs and other companies compete for users in four product lines. Prices are per month (1 month = 3 game days = 1 hour); money is shown per game day.", 1)
 
 	-- Kennzahlen
+	if headingLabel.Parent and not show("head") then
+		(headingLabel.Parent :: GuiObject).Visible = false
+	end
 	local summary = Kit.stack(scroll, 10, 2) -- Kennzahlen ohne Karte: reine Information
+	summary.Visible = show("summary")
+	if keep and keep.live and keep.summary and not keep.board then
+		-- Menu → Market → My AIs (fix round 1, B9 "price chips first"): the live models with their price rows come
+		-- first, the market numbers and the serving capacity under them
+		summary.LayoutOrder = 12
+	end
 	local grid = Kit.grid(summary, 3, 48, 12, 1)
 	local mUsers = Kit.metric(grid, "Users", 1, 22)
 	local mNet = Kit.metric(grid, "Net income", 2, 22)
@@ -130,6 +167,7 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 
 	-- Produktlinien (CORE_SPEC 7.1): welches Modell welche Linie hält, freie Plätze der Bürostufe
 	local linesCard = Kit.card(scroll, 2, 8)
+	linesCard.Visible = show("lines")
 	local linesCaption = Kit.caption(linesCard, "Product lines", 1)
 	local lineUi: { [string]: LineUi } = {}
 	for index, line in ModelConfig.LINES do
@@ -153,17 +191,20 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 	local linesNote = Kit.para(linesCard, "", 13, C.dim, 9)
 
 	local accessCard = Kit.card(scroll, 3, 10)
+	accessCard.Visible = show("access")
 	Kit.caption(accessCard, "Your API subscription", 1)
 	local accessInfo = Kit.para(accessCard, "", 14, C.muted, 2)
 	local cancelAccess = Kit.button(accessCard, "STOP AUTO-RENEW", "secondary", UDim2.fromOffset(190,34))
 	cancelAccess.LayoutOrder = 3
 	Kit.onClick(cancelAccess,function() ActionController.call("CancelModelAccess",{}) end)
 	Kit.para(accessCard,"API access adds research points while active. You keep training your own model. The provider receives your payment; access never copies their model or leaderboard score.",13,C.dim,4)
-	Kit.caption(scroll,"Provider exchange · player companies",4)
+	Kit.caption(scroll,"Provider exchange · player companies",4).Visible = show("exchange")
 	local exchange = Kit.stack(scroll,10,5)
+	exchange.Visible = show("exchange")
 	local providerRows: {[string]:any} = {}
 	local providerKey = ""
 	local customerCard = Kit.card(scroll,6,10)
+	customerCard.Visible = show("receipts")
 	Kit.caption(customerCard,"Business clients · receipts",1)
 	local businessInfo = Kit.para(customerCard,"",14,C.muted,2)
 	local businessRows = {}
@@ -173,15 +214,18 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 	local ledger = Kit.para(customerCard,"",13,C.dim,15)
 
 	-- Eigene Live-Modelle
-	Kit.caption(scroll, "Your live models", 7)
+	Kit.caption(scroll, "Your live models", 7).Visible = show("live")
 	local cardList = Kit.stack(scroll, 12, 8)
+	cardList.Visible = show("live")
 	local emptyNote = Kit.para(scroll, "No live models yet. Train one in the Lab and launch it.", 14, C.dim, 9)
+	local liveShown = show("live")
 	local cards: { [string]: Card } = {}
 	local cardKey = ""
 
 	-- Rangliste
-	Kit.caption(scroll, "Intelligence leaderboard · live models", 10)
+	Kit.caption(scroll, "Intelligence leaderboard · live models", 10).Visible = show("board")
 	local board = Kit.card(scroll, 11, 2)
+	board.Visible = show("board")
 	local headerRow = Kit.frame(board, UDim2.new(1, 0, 0, 22))
 	headerRow.LayoutOrder = 0
 	local function headerCell(text: string, width: UDim, x: UDim, right: boolean?)
@@ -249,17 +293,20 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 		overall.AnchorPoint = Vector2.new(1, 0.5)
 		overall.Position = UDim2.fromScale(1, 0.5)
 
-		local metrics = Kit.grid(frame, 4, 44, 10, 2)
+		-- fix round 1 (review, B9 "price chips first"): the price row (Auto / Manual, Sub chips, API -/+) comes right
+		-- under the name, before the numbers; on touch every control is 56 px tall (44.8 pt at the legacy x 0.80)
+		local TAP = Kit.tap(34, 56)
+		local metrics = Kit.grid(frame, 4, 44, 10, 4)
 		local users = Kit.metric(metrics, "Users", 1, 18)
 		local revenue = Kit.metric(metrics, "Revenue", 2, 18)
 		local serving = Kit.metric(metrics, "Serving", 3, 18)
 		local net = Kit.metric(metrics, "Net", 4, 18)
-		local segments = Kit.para(frame, "", 13, C.dim, 3)
-		local lineInfo = Kit.para(frame, "", 13, C.muted, 4)
+		local segments = Kit.para(frame, "", 13, C.dim, 5)
+		local lineInfo = Kit.para(frame, "", 13, C.muted, 6)
 
 		-- Preismodus (CORE_SPEC 7.7): Auto price hält den Empfohlenen Preis, jede manuelle Änderung schaltet ihn ab
-		local modeRow = Kit.frame(frame, UDim2.new(1, 0, 0, 36))
-		modeRow.LayoutOrder = 5
+		local modeRow = Kit.frame(frame, UDim2.new(1, 0, 0, TAP + 2))
+		modeRow.LayoutOrder = 2
 		local card: Card
 		local modeSeg = Kit.segmented(modeRow, {
 			{ id = "auto", label = "Auto price" },
@@ -267,8 +314,8 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 		}, if model.release and (model.release :: any).auto == false then "manual" else "auto", function(id: string)
 			card.touchedAt = os.clock()
 			ModelsUI.setAutoPrice(model.id, id == "auto")
-		end, 34)
-		modeSeg.frame.Size = UDim2.fromOffset(230, 34)
+		end, TAP + 6)
+		modeSeg.frame.Size = UDim2.fromOffset(230, TAP + 6)
 		local priceNote = Kit.text(modeRow, "", 13, F.medium, C.dim)
 		priceNote.AutomaticSize = Enum.AutomaticSize.None
 		priceNote.Size = UDim2.new(1, -244, 1, 0)
@@ -276,8 +323,8 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 		priceNote.TextWrapped = true
 		priceNote.TextTruncate = Enum.TextTruncate.AtEnd
 
-		local controls = Kit.frame(frame, UDim2.new(1, 0, 0, 38))
-		controls.LayoutOrder = 6
+		local controls = Kit.frame(frame, UDim2.new(1, 0, 0, TAP + 10))
+		controls.LayoutOrder = 3
 		local subCaption = Kit.caption(controls, "Sub")
 		subCaption.Position = UDim2.new(0, 0, 0.5, 0)
 		subCaption.AnchorPoint = Vector2.new(0, 0.5)
@@ -294,23 +341,25 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 				subPrice = tonumber(id) or 0,
 				apiPrice = card.apiLocal,
 			})
-		end, 36)
-		subSeg.frame.Size = UDim2.fromOffset(230, 36)
+		end, TAP + 8)
+		local subW = if TAP > 34 then 4 * (TAP + 2) + 18 else 230 -- 4 chips of >= 56 px on touch
+		subSeg.frame.Size = UDim2.fromOffset(subW, TAP + 8)
 		subSeg.frame.Position = UDim2.fromOffset(38, 1)
+		local apiX = 38 + subW + 16
 
 		local apiCaption = Kit.caption(controls, "API")
-		apiCaption.Position = UDim2.new(0, 284, 0.5, 0)
+		apiCaption.Position = UDim2.new(0, apiX, 0.5, 0)
 		apiCaption.AnchorPoint = Vector2.new(0, 0.5)
-		local minus = Kit.button(controls, "-", "secondary", UDim2.fromOffset(34, 34))
-		minus.Position = UDim2.fromOffset(316, 2)
+		local minus = Kit.button(controls, "-", "secondary", UDim2.fromOffset(TAP, TAP))
+		minus.Position = UDim2.fromOffset(apiX + 32, 2)
 		local apiValue = Kit.text(controls, "", 15, F.bold, C.text)
 		apiValue.AutomaticSize = Enum.AutomaticSize.None
-		apiValue.Size = UDim2.fromOffset(64, 38)
-		apiValue.Position = UDim2.fromOffset(354, 0)
+		apiValue.Size = UDim2.fromOffset(64, TAP + 4)
+		apiValue.Position = UDim2.fromOffset(apiX + 32 + TAP + 4, 0)
 		apiValue.TextXAlignment = Enum.TextXAlignment.Center
-		local plus = Kit.button(controls, "+", "secondary", UDim2.fromOffset(34, 34))
-		plus.Position = UDim2.fromOffset(422, 2)
-		local retire = Kit.button(controls, "RETIRE", "danger", UDim2.fromOffset(110, 34))
+		local plus = Kit.button(controls, "+", "secondary", UDim2.fromOffset(TAP, TAP))
+		plus.Position = UDim2.fromOffset(apiX + 32 + TAP + 72, 2)
+		local retire = Kit.button(controls, "RETIRE", "danger", UDim2.fromOffset(110, TAP))
 		retire.AnchorPoint = Vector2.new(1, 0)
 		retire.Position = UDim2.new(1, 0, 0, 2)
 		retire.TextSize = 13
@@ -396,7 +445,7 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 		return card
 	end
 
-	refresh = function(snapshot: Snapshot)
+	local function refreshThis(snapshot: Snapshot)
 		local data = snapshot.data
 		local live = snapshot.live
 		local company = data.company
@@ -526,7 +575,7 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 				cards[id] = buildCard(index, data.models[id])
 			end
 		end
-		emptyNote.Visible = #liveIds == 0
+		emptyNote.Visible = liveShown and #liveIds == 0
 
 		for id, card in cards do
 			local model: ModelData? = data.models[id]
@@ -630,10 +679,44 @@ function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
 	end
 
 	StateController.onChange(function(snapshot: Snapshot)
-		if parent.Visible and navigation.isOpen() then
-			refresh(snapshot)
+		if navigation.isOpen() and shownChain(parent) then
+			refreshThis(snapshot)
 		end
 	end)
+	return refreshThis
+end
+
+function MarketApp.mount(parent: Frame, navigation: Kit.Nav)
+	root = parent
+	refresh = build(parent, navigation, nil)
+end
+
+-- Menu page parts (ONBOARDING_SPEC B9): My AIs (metrics, serving capacity, live models with their price chips),
+-- Lines, Leaderboard, API access (Lab → Research), Receipts (Clients → Receipts)
+local PART_SECTIONS: { [string]: { [string]: boolean } } = {
+	myais = { summary = true, live = true },
+	lines = { lines = true },
+	leaderboard = { board = true },
+	access = { access = true, exchange = true },
+	receipts = { receipts = true },
+}
+export type Part = { frame: Frame, id: string, show: () -> (), rebuild: () -> () }
+function MarketApp.mountPart(frame: Frame, id: string, navigation: Kit.Nav): Part
+	local keep = PART_SECTIONS[id]
+	assert(keep, "unknown MarketApp part " .. id)
+	frame.AutomaticSize = Enum.AutomaticSize.Y
+	local refreshPart = build(frame, navigation, keep)
+	return {
+		frame = frame,
+		id = id,
+		show = function()
+			local snapshot = StateController.snapshot
+			if snapshot then
+				refreshPart(snapshot)
+			end
+		end,
+		rebuild = function() end,
+	}
 end
 
 function MarketApp.onShow()

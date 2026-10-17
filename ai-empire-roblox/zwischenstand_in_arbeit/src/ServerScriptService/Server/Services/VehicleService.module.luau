@@ -180,6 +180,32 @@ function Vehicles.tick(dt: number)
 		end
 	end
 end
+-- Package "drivers" (additive): the chauffeur may take the founder's own company car for a ride when it stands
+-- unoccupied on his site (B1 pick-up bay or anywhere on the plot). parkedOnSite -> its CampusConfig.CARS id or nil.
+function Vehicles.parkedOnSite(player: Player): string?
+	local record=Vehicles.cars[player.UserId]
+	if not record or not record.model.Parent or record.seat.Occupant then return nil end
+	local plot=Plot.get(player)
+	if not plot or typeof(plot.cframe)~="CFrame" or not onSite(plot.cframe,record.root.Position) then return nil end
+	return record.definition.id
+end
+-- The chauffeur takes the parked car: it leaves the garage (cleared here, the ride shows its look). Returns the id.
+function Vehicles.lend(player: Player): string?
+	local id=Vehicles.parkedOnSite(player)
+	if not id then return nil end
+	clear(player.UserId)
+	return id
+end
+-- ... and parks it in the garage again after the ride (only when the founder has no other car out by then).
+function Vehicles.giveBack(s: any,carId: string): boolean
+	if Vehicles.cars[s.userId] or not s.data or not s.data.company then return false end
+	local def=Config.find(Config.CARS,carId)
+	if not def or not available(s,def) then return false end
+	local plot=Plot.get(s.player)
+	if not plot or not plot.office then return false end
+	local record=build(s,def,garageSpawn(plot));record.spawnedAt=os.clock()
+	return true
+end
 function Vehicles.init()
 	Remote.bind("BuyCar",{burst=2,perSecond=.5,company=true},function(s,p)
 		local def=Config.find(Config.CARS,p.carId);if not def then return {ok=false,err="BAD_INPUT"} end
@@ -198,7 +224,7 @@ function Vehicles.init()
 	Prompts.PromptTriggered:Connect(function(q,player)
 		local s=Session.get(player);if not s or s.closed or not s.data.company or not q.Parent then return end
 		local character=player.Character;local root=if character then character:FindFirstChild("HumanoidRootPart") else nil
-		if not root or not q.Parent:IsA("BasePart") or (root.Position-q.Parent.Position).Magnitude>14 then return end
+		if not root or not q.Parent:IsA("BasePart") or ((root :: BasePart).Position-(q.Parent :: BasePart).Position).Magnitude>14 then return end
 		if q:GetAttribute("CampusAction")=="spawnCar" and q:GetAttribute("OwnerUserId")==player.UserId then
 			-- the garage stage has no B1: its GarageSpawn marker carries the PickupText (buildings package)
 			local plot=Plot.get(player);local marker=if plot and plot.office then plot.office:FindFirstChild("GarageSpawn",true) else nil

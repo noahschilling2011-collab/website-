@@ -230,7 +230,7 @@ local function withArticle(label: string): string
 end
 -- short form for the briefing ("rack full (12 / 12): move to the Innovation Campus (24 slots) ...")
 local function adviceText(a: any): string
- if a.kind=="cooling" then return string.format("cooling is the limit: upgrade cooling first (level %d / %d, %s) in Hardware",a.cooling,COOLING_MAX,Format.money(a.cost))
+ if a.kind=="cooling" then return string.format("cooling is the limit: upgrade cooling first (level %d / %d, %s) in Lab → GPUs",a.cooling,COOLING_MAX,Format.money(a.cost))
  elseif a.kind=="maxed" then
   if a.nextOffice then return string.format("cooling is maxed (%d / %d), more GPUs add no capacity here: move to the %s (cools %s units) or raise prices",a.cooling,COOLING_MAX,a.nextOffice,Format.int(a.nextCools or 0)) end
   return string.format("cooling is maxed (%d / %d) in your largest office: raise prices so demand fits your servers",a.cooling,COOLING_MAX)
@@ -243,8 +243,8 @@ local function adviceText(a: any): string
   local list=if #options==1 then options[1] else table.concat(options,", ",1,#options-1).." or "..options[#options]
   return string.format("rack full (%d / %d): %s",a.used,a.slots,list)
  end
- if a.gpu and a.extra>=1 then return string.format("buy GPUs in Hardware: one more %s serves %s more users",gpuName(a.gpu),Format.int(a.extra*a.perUnit)) end
- return "business clients reserve your compute right now: buy GPUs in Hardware"
+ if a.gpu and a.extra>=1 then return string.format("buy GPUs in Lab → GPUs: one more %s serves %s more users",gpuName(a.gpu),Format.int(a.extra*a.perUnit)) end
+ return "business clients reserve your compute right now: buy GPUs in Lab → GPUs"
 end
 -- the goal of the HUD bar as a recommendation with its concrete next step
 local function goalRecommendation(s: any,goal: any,stock: any,journey: any,unreleased: any): (string,string?,string?)
@@ -253,7 +253,7 @@ local function goalRecommendation(s: any,goal: any,stock: any,journey: any,unrel
  if id=="train" then
   if data.training then return goal.text..": the first training run is under way in the Lab.","lab",nil end
   if stock.total<ModelConfig.TRAINING.minTokens then return goal.text..": collect at least "..Format.tokens(ModelConfig.TRAINING.minTokens).." tokens in Data first.","data",nil end
-  if journey.missingVram>0 then return goal.text..": buy GPUs in Hardware or pick a smaller size ("..journey.hint..").","compute",nil end
+  if journey.missingVram>0 then return goal.text..": buy GPUs in Lab → GPUs or pick a smaller size ("..journey.hint..").","compute",nil end
   return goal.text..": design and train it in the Lab.","lab",nil
  elseif id=="release" then
   return if unreleased then "Release "..unreleased.name.." in Deployment: it isn't earning anything yet." else goal.text..": release your trained model in Deployment.","lab","release"
@@ -278,7 +278,7 @@ local function goalRecommendation(s: any,goal: any,stock: any,journey: any,unrel
   return string.format("%s: %d of %d lines are there. Train stronger versions (bigger size, better data) in the Lab.",goal.text,math.floor(tonumber(goal.have) or 0),math.floor(tonumber(goal.need) or 4)),"lab",nil
  elseif id=="lab" then
   local level=math.floor(tonumber(goal.have) or 0);local pts,cost=Ops.labCost(level)
-  return string.format("%s: level %d now, the next one costs %s research points + %s in Models.",goal.text,level,Format.int(pts),dollars(cost)),"lab",nil
+  return string.format("%s: level %d now, the next one costs %s research points + %s in Lab → Models.",goal.text,level,Format.int(pts),dollars(cost)),"lab",nil
  end
  return string.format("%s (%d / %d).",goal.text,math.floor(tonumber(goal.have) or 0),math.floor(tonumber(goal.need) or 0)),"lab",nil
 end
@@ -333,6 +333,13 @@ function Assistant.briefing(s: any,name: string?): any
   for i=1,math.min(3,#trips) do table.insert(lines,tripLine(e,trips[i],clock)) end
   table.insert(todayRows,row("Trips",table.concat(lines,"; ")..(if #trips>3 then string.format(" and %d more",#trips-3) else "")))
  else table.insert(todayRows,row("Trips","Nobody is travelling right now.")) end
+ -- the founder's own business trip (package "itinerary": the booking she made for him)
+ local okTrip,tripText=pcall(function(): string?
+  local mod=script.Parent:FindFirstChild("ItineraryService")
+  local Itin=if mod then (require :: any)(mod) else nil
+  return if Itin and typeof(Itin.summary)=="function" then Itin.summary(s) else nil
+ end)
+ if okTrip and typeof(tripText)=="string" then table.insert(todayRows,row("Your trip",tripText)) end
  local moved=movedAt[s]
  if moved and (tonumber(e.seconds) or 0)-moved<MOVE_NOTE_SECONDS then
   table.insert(todayRows,row("New HQ","Profit dips for about 15 minutes while new people start."))
@@ -481,7 +488,7 @@ function Assistant.briefing(s: any,name: string?): any
   table.insert(researchRows,row("Next project",nextDef.name.." · needs "..table.concat(missing," and ").." more"))
  else
   local level=math.floor(tonumber(e.labLevel) or 0)
-  table.insert(researchRows,row("Next project",if level<Ops.LAB_MAX then string.format("Every project is complete · Lab level %d / %d in Models",level,Ops.LAB_MAX) else "Every project and Lab level is complete"))
+  table.insert(researchRows,row("Next project",if level<Ops.LAB_MAX then string.format("Every project is complete · Lab level %d / %d in Lab → Models",level,Ops.LAB_MAX) else "Every project and Lab level is complete"))
  end
  table.insert(sections,{title="Research",rows=researchRows})
  -- Team
@@ -501,7 +508,7 @@ function Assistant.briefing(s: any,name: string?): any
  else table.insert(teamRows,row("In the building now","Activity appears once your headquarters is open")) end
  table.insert(teamRows,row("Applications",string.format("%d open · %d candidate%s in the visitor lounge",counts.open,counts.waiting,if counts.waiting==1 then "" else "s")))
  local hrAuto=Ops.hrSettings(e)
- table.insert(teamRows,row("HR",if hrAuto then "Automatic hiring is on (Company → Settings)" else "Automatic hiring is off: hire in Company → Team"))
+ table.insert(teamRows,row("HR",if hrAuto then "Automatic hiring is on (Team → Settings)" else "Automatic hiring is off: hire in Team → Staff"))
  table.insert(sections,{title="Team",rows=teamRows})
  -- Recommendations: a pending training decision, then the Next goal, then simple rules over the same numbers.
  if pending then recommend("Decide the training event in the Lab: "..pending.title..".","lab") end
@@ -513,7 +520,7 @@ function Assistant.briefing(s: any,name: string?): any
  -- the safety rules come right after the goal (CORE_SPEC 8.2 keeps the goal first)
  if paused or leaveN>0 or data.money<0 then
   local net=((tonumber(live.revenue) or 0)-(tonumber(live.cost) or 0))*Ops.DAY
-  recommend(string.format("Cash is %s%s: raise prices in Models, lower the HR budget or pause HR in Company → Settings.",Format.money(data.money),
+  recommend(string.format("Cash is %s%s: raise prices in Market → My AIs, lower the HR budget or pause HR in Team → Settings.",Format.money(data.money),
    if net<0 then string.format(" and falling by %s/day",Format.money(-net)) else ""),"empire","settings")
  end
  if unreleased and not (goal and goal.id=="release") then recommend("Release "..unreleased.name.." in Deployment. It isn't earning anything yet.","lab","release") end
@@ -522,7 +529,7 @@ function Assistant.briefing(s: any,name: string?): any
   local advice=computeAdvice(data,data.money,live)
   recommend(string.format("%s users are waiting for server capacity: %s.",Format.int(waiting),adviceText(advice)),if advice.kind=="rack" and advice.extra<1 and advice.nextOffice then "empire" else "compute",if advice.kind=="rack" and advice.extra<1 and advice.nextOffice then "office" else nil)
  end
- if not training and journey.missingVram>0 and (data.stats.modelsReleased or 0)==0 then recommend("Buy GPUs in Hardware or pick a smaller size: "..journey.hint..".","compute") end
+ if not training and journey.missingVram>0 and (data.stats.modelsReleased or 0)==0 then recommend("Buy GPUs in Lab → GPUs or pick a smaller size: "..journey.hint..".","compute") end
  if counts.waiting>0 then recommend(string.format("%d candidate%s waiting in the visitor lounge.",counts.waiting,if counts.waiting==1 then " is" else "s are"),"empire","team") end
  if not job and ready and live.ops and live.ops.saveMode~=true then recommend("Start research: "..ready.name..".","empire","research") end
  if counts.open>0 then recommend(string.format("%d new application%s. Invite promising people for an interview.",counts.open,if counts.open==1 then "" else "s"),"empire","team") end

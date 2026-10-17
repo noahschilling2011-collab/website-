@@ -26,13 +26,22 @@ shots=(
   "16_rich_review_breakdown|rich|view=design step=6 breakdown=1 $RICH"
   "17_training|rich|view=training"
   "18_training_decision|rich|view=training event=1"
-  "19_reveal_record|rich|view=reveal"
+  "19_reveal_record|rich|view=reveal wait=3"
   "20_reveal_first_model|starter|view=reveal"
   "21_launch_day_line|rich|view=launch ls=1"
   "22_launch_day_price|rich|view=launch ls=2"
   "23_launch_day_campaign|rich|view=launch ls=3"
   "24_now_live_successor|rich|view=live"
   "25_market_chat|rich|view=market"
+  "26_suggested_review_buy_plan|full|view=suggest scale=0.25"
+  "27_design_reveal_ready_banner|rich|view=banner step=3 $RICH"
+)
+# extra viewports: a big desktop (the regular card grows with the preview zone) and a small phone (iPhone SE/8
+# landscape 667x375, documented limit: the Studio scale drops to 0.532 there)
+viewports=(
+  "hd|1920x1080|58,0,0,0|1|15_hq_step6_review|hq|view=design step=6 $HQ"
+  "se|667x375|58,0,0,0|2|15_hq_step6_review|hq|view=design step=6 $HQ"
+  "se|667x375|58,0,0,0|2|06_garage_step4_plan|starter|view=design step=4"
 )
 for shot in "${shots[@]}"; do
   IFS='|' read -r name state extra <<< "$shot"
@@ -44,4 +53,11 @@ for shot in "${shots[@]}"; do
       --viewport $vp --dpr $dpr --out "$OUT/${vp}_${name}.png" "${strip[@]}" $extra >/dev/null 2>"$OUT/.err_${vp}_${name}.txt" \
       && echo "ok   ${vp}_${name}" || { echo "FAIL ${vp}_${name}"; tail -5 "$OUT/.err_${vp}_${name}.txt"; }
   done
+done
+for e in "${viewports[@]}"; do
+  IFS='|' read -r tag vp ins dpr name state rest <<< "$e"
+  if [ -n "${1:-}" ] && [[ "$name" != *$1* ]] && [[ "$tag" != *$1* ]]; then continue; fi
+  python3 tools/guiprev/guiprev.py --scene tests/lab/scene_lab.luau --gen harness/.gen_labprev --no-manifest --state "$state" \
+    --viewport "$vp" --insets "$ins" --dpr "$dpr" --out "$OUT/${tag}_${name}.png" $rest >/dev/null 2>"$OUT/.err_${tag}_${name}.txt" \
+    && echo "ok   ${tag}_${name}" || { echo "FAIL ${tag}_${name}"; tail -5 "$OUT/.err_${tag}_${name}.txt"; }
 done

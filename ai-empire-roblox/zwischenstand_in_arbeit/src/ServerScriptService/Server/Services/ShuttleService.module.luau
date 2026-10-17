@@ -39,6 +39,16 @@
 --     service answers HELI_UNAVAILABLE if they are missing). Free with the "limo" game pass
 --     (ShopService.owns via pcall), else HELI_FEE. Same hold/stream/arrive pattern; the ride is published as
 --     HeliStart/HeliFrom/HeliTo/HeliRider so every client sees the helicopter fly.
+--   * Company bookings (package "itinerary", additive): Shuttle.book(session, {to, companions, trip}) gives the founder a
+--     prepaid ticket for his business trip (no counter, price 0: CompanyOps already books the trip's flights) that boards
+--     like any ticket (gate prompt / auto-board) and is valid for the next departures until used; the companions (the
+--     trip's field rep + engineer) board with him and join that leg's Passengers (walked off at the destination like
+--     the field staff). While a booking holds a trip - or ItineraryService.holds(owner, tripKey) says the founder will
+--     take them (his offer is open, he said Go and is on his way to the airport, or they fly home with him) - the
+--     field-staff rule above does not fly those travellers on another leg; once boarded they count as flown in that
+--     direction. A ticket he paid for at the counter that becomes the company booking is refunded (the company books
+--     the seat; the existing refund path). Shuttle.unbook drops it, Shuttle.booking reads it, Shuttle.flownAhead /
+--     Shuttle.travellersLeg tell whether / on which leg a trip's travellers flew.
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local CityPlan=require(ReplicatedStorage.Shared.Config.CityPlan)
 local FP=require(ReplicatedStorage.Shared.FlightPlan)
@@ -58,7 +68,7 @@ Shuttle.RETURN_CYCLES=2 -- a traveller flies home at the latest this many cycles
 -- (Tom Nakamura, Sana Okafor; indices far apart so the surnames differ)
 
 export type Api={trips: {[number]: any},setState: (Player,string)->(),rootOf: (Player)->(Model?,BasePart?,Humanoid?)}
-type Ticket={to: string,price: number,session: any,at: number}
+type Ticket={to: string,price: number,session: any,at: number,prepaid: boolean?,companions: {any}?,trip: string?}
 local api: Api?=nil
 local folder: Folder?=nil
 local tickets: {[number]: Ticket}={}
@@ -196,11 +206,38 @@ local function abroadTrips(e: any): {{key: string,profiles: {{p: any,role: strin
 	end
 	return out
 end
+-- ItineraryService.holds(owner, tripKey) (package "itinerary", optional, required lazily - it requires this module):
+-- the founder's itinerary will take this trip's travellers on his own flight
+local itinMod: any=nil
+local itinTried=false
+local function itinHolds(userId: number,tripKey: string): boolean
+	if not itinTried then
+		itinTried=true
+		local mod=script.Parent:FindFirstChild("ItineraryService")
+		if mod and mod:IsA("ModuleScript") then
+			local ok,res=pcall(require,mod)
+			if ok and typeof(res)=="table" then itinMod=res end
+		end
+	end
+	local fn=if itinMod then itinMod.holds else nil
+	if typeof(fn)~="function" then return false end
+	local ok,res=pcall(fn,userId,tripKey)
+	return ok and res==true
+end
+-- trip keys ("<owner>:<client>:<left>") of open company bookings in direction `to` (their travellers fly with the founder)
+local function heldTrips(to: string?): {[string]: boolean}
+	local out: {[string]: boolean}={}
+	for userId,t in tickets do
+		if t.trip and (to==nil or t.to==to) then out[userId..":"..t.trip]=true end
+	end
+	return out
+end
 -- Who flies on leg st (called once when its boarding starts): out = travellers of new abroad trips, back =
 -- travellers whose trip ended (or flew out RETURN_CYCLES cycles ago). Returns {owner, profile, role, company}.
 function Shuttle.passengersFor(st: FP.State): {Flown}
 	local list: {Flown}={}
 	local current: {[string]: boolean}={}
+	local held=heldTrips(if st.dir=="out" then "abroad" else "home")
 	for _,s in Session.all() do
 		local player: Player?=s.player
 		local data=s.data
@@ -210,7 +247,7 @@ function Shuttle.passengersFor(st: FP.State): {Flown}
 		for _,t in abroadTrips(e) do
 			local key=player.UserId..":"..t.key
 			current[key]=true
-			if st.dir=="out" and not flown[key] then
+			if st.dir=="out" and not flown[key] and not held[key] and not itinHolds(player.UserId,t.key) then
 				for _,who in t.profiles do
 					if #list>=Shuttle.MAX_PAX then break end
 					local f: Flown={dir="out",cycle=st.cycle,owner=player.UserId,profile=who.p,role=who.role,company=company}
@@ -225,6 +262,9 @@ function Shuttle.passengersFor(st: FP.State): {Flown}
 		for key,f in flown do
 			if f.dir~="out" or f.profile==nil or #list>=Shuttle.MAX_PAX then continue end
 			local tripKey=string.match(key,"^(.*):[^:]+$") or key
+			if held[tripKey] then continue end -- they fly home with the founder's company booking
+			local owner,tk=string.match(tripKey,"^(%d+):(.+)$")
+			if owner and tk and itinHolds(tonumber(owner) or 0,tk) then continue end -- ... or will (his itinerary)
 			if not current[tripKey] or st.cycle-f.cycle>=Shuttle.RETURN_CYCLES then
 				f.dir="back";f.cycle=st.cycle
 				table.insert(list,f)
@@ -321,6 +361,149 @@ function Shuttle.restoreTicket(player: Player,ticket: Ticket)
 	if tickets[player.UserId]==nil then tickets[player.UserId]=ticket end
 end
 
+------------------------------------------------------------------------------------------------ company bookings
+local ROLES: {[string]: boolean}={marketer=true,engineer=true,researcher=true,curator=true}
+local function cleanCompanions(list: any): {any}
+	local out: {any}={}
+	if typeof(list)~="table" then return out end
+	for _,c in list do
+		if #out>=2 then break end
+		if typeof(c)~="table" or typeof(c.name)~="string" or c.name=="" or #c.name>40 then continue end
+		local seed=if typeof(c.seed)=="number" and c.seed==c.seed and math.abs(c.seed)<1e12 then math.floor(math.abs(c.seed))%2147483647 else nil
+		table.insert(out,{name=c.name,role=if typeof(c.role)=="string" and ROLES[c.role] then c.role else "marketer",seed=seed})
+	end
+	return out
+end
+-- Prepaid company booking for the founder's business trip (package "itinerary"): no check-in counter, price 0 (the
+-- economy books the trip's flights in CompanyOps.tripPlan). opts = {to = "abroad" | "home", companions =
+-- {{name, role?, seed?}}? (<= 2, they board with him), trip = CompanyOps trip key "client:left"?}. A ticket he already
+-- holds for that direction becomes the company booking: a price he paid at the counter is refunded (refund(), P&L
+-- "travel" - the company books the seat, he never pays twice for it) and it gets the companions. The shuttle is
+-- public: a booking never runs out of seats. -> {ok, prepaid, flight, to, gate, departs, boardingStarts,
+-- boardingEnds, destination, refunded} | {ok = false, err = SHUTTLE_OFF | BAD_INPUT | BUSY | ALREADY_ABROAD | NOT_ABROAD}
+function Shuttle.book(s: any,opts: any): {[string]: any}
+	local a=api
+	if not a or not Shuttle.enabled() then return {ok=false,err="SHUTTLE_OFF"} end
+	local o=if typeof(opts)=="table" then opts else {}
+	local destination=o.to
+	if destination~="abroad" and destination~="home" then return {ok=false,err="BAD_INPUT"} end
+	local player: Player=s.player
+	local trip=a.trips[player.UserId]
+	local state=if trip then trip.state else "home"
+	if state=="flying" then return {ok=false,err="BUSY"} end
+	local from=if destination=="abroad" then "home" else "abroad"
+	if state~=from then return {ok=false,err=if destination=="abroad" then "ALREADY_ABROAD" else "NOT_ABROAD"} end
+	local tripKey: string?=if typeof(o.trip)=="string" and #o.trip>0 and #o.trip<=48 then o.trip else nil
+	local companions=cleanCompanions(o.companions)
+	local dir=if destination=="abroad" then "out" else "back"
+	local t=now()
+	local _,legStart,departs,boardEnd=FP.nextLeg(dir,t)
+	local held=tickets[player.UserId]
+	local refunded=0
+	if held and held.to==destination then
+		if held.price>0 then
+			refunded=held.price
+			refund(held.session or s,held.price)
+			held.price=0
+		end
+		held.prepaid=true;held.companions=companions;held.trip=tripKey
+	else
+		tickets[player.UserId]={to=destination,price=0,session=s,at=t,prepaid=true,companions=companions,trip=tripKey}
+	end
+	return {ok=true,prepaid=true,flight=FP.leg(dir).flight,to=destination,gate=FP.GATE_NAME[dir],departs=departs,boardingStarts=legStart,boardingEnds=boardEnd,
+		destination=if destination=="abroad" then "Port Meridian" else "City Airport",refunded=refunded}
+end
+-- Drop the founder's company booking if it was not used (a prepaid ticket goes, nothing to refund; a ticket he paid
+-- for himself stays and only loses the companions).
+function Shuttle.unbook(player: Player)
+	local t=tickets[player.UserId]
+	if not t or not t.trip and not t.prepaid then return end
+	if t.prepaid and t.price<=0 then tickets[player.UserId]=nil
+	else t.companions=nil;t.trip=nil end
+end
+-- The open booking / ticket of a player: {to, prepaid, companions, trip} (a copy) or nil
+function Shuttle.booking(player: Player): {[string]: any}?
+	local t=tickets[player.UserId]
+	if not t then return nil end
+	return {to=t.to,prepaid=t.prepaid==true,price=t.price,trip=t.trip,companions=if t.companions then table.clone(t.companions) else nil}
+end
+-- Did the travellers of trip `tripKey` (client..":"..left) of this founder already fly out on a shuttle leg?
+function Shuttle.flownAhead(player: Player,tripKey: string): boolean
+	local f=flown[player.UserId..":"..tripKey]
+	return f~=nil and f.dir=="out"
+end
+-- On which leg did the travellers of trip `tripKey` of this founder fly last? -> (dir "out" | "back", cycle) or nil
+function Shuttle.travellersLeg(player: Player,tripKey: string): (string?,number?)
+	local key=player.UserId..":"..tripKey
+	local best: Flown?=nil
+	for k,f in flown do
+		if f.profile~=nil and string.sub(k,1,#key+1)==key..":" and (best==nil or f.cycle>best.cycle or (f.cycle==best.cycle and f.dir=="back")) then best=f end
+	end
+	local f=best or flown[key]
+	if not f then return nil,nil end
+	return f.dir,f.cycle
+end
+-- The travellers of trip `tripKey` came home another way (with the founder in the company jet): no shuttle leg flies
+-- them home again
+function Shuttle.travellersHome(player: Player,tripKey: string)
+	local key=player.UserId..":"..tripKey
+	local cycle=FP.at(now()).cycle
+	for k,f in flown do
+		if f.owner==player.UserId and f.profile~=nil and f.dir=="out" and string.sub(k,1,#key+1)==key..":" then f.dir="back";f.cycle=cycle end
+	end
+end
+-- the companions of a company booking count as flown in that direction (no second copy on another leg)
+local function markCompanions(ticket: Ticket,player: Player,st: FP.State)
+	if not ticket.trip then return end
+	local key=player.UserId..":"..ticket.trip
+	local companions: {any}=ticket.companions or {}
+	local s=ticket.session
+	local company=if s and typeof(s.data)=="table" and typeof(s.data.company)=="table" and typeof(s.data.company.name)=="string" then s.data.company.name else ""
+	if st.dir=="out" then
+		flown[key]={dir="out",cycle=st.cycle,owner=player.UserId,profile=nil,role="",company=company}
+		for _,c in companions do
+			flown[key..":"..c.role]={dir="out",cycle=st.cycle,owner=player.UserId,profile={n=c.name,s=c.seed},role=c.role,company=company}
+		end
+	else
+		for k,f in flown do
+			if f.owner==player.UserId and f.profile~=nil and string.sub(k,1,#key+1)==key..":" then
+				for _,c in companions do
+					if c.role==f.role then f.dir="back";f.cycle=st.cycle end
+				end
+			end
+		end
+	end
+end
+
+-- ... and they join the leg's Passengers (the rigs ShuttlePassengers walks off at the destination, like the field staff)
+local function boardCompanions(ticket: Ticket,player: Player,st: FP.State)
+	local f=folder
+	local list=ticket.companions
+	if not f or not list or #list==0 then return end
+	local pax=f:FindFirstChild("Passengers")
+	local legKey=st.dir..":"..st.cycle
+	if not pax or pax:GetAttribute("Leg")~=legKey then return end
+	local s=ticket.session
+	local company=if s and typeof(s.data)=="table" and typeof(s.data.company)=="table" and typeof(s.data.company.name)=="string" then s.data.company.name else ""
+	local n=#pax:GetChildren()
+	local temp=Instance.new("Folder")
+	for i,c in list do
+		local ok,err=pcall(function()
+			local m=Rig.build(temp,player.UserId,760+n+i,c.role,CFrame.new(),{n=c.name,s=c.seed})
+			m:RemoveTag("CompanyEmployee")
+			for _,d in m:GetDescendants() do
+				if d:IsA("ProximityPrompt") then d:Destroy()
+				elseif d:IsA("BasePart") then d.Anchored=d.Name=="HumanoidRootPart";d.CanCollide=false;d.CanTouch=false;d.CanQuery=false end
+			end
+			m.Name="Passenger"..(n+i)
+			m:SetAttribute("PassengerName",c.name);m:SetAttribute("Company",company);m:SetAttribute("Leg",legKey);m:SetAttribute("CompanionOf",player.UserId)
+			m.Parent=pax
+		end)
+		if not ok then warn("[Shuttle] building a companion rig failed: "..tostring(err)) end
+	end
+	temp:Destroy()
+end
+
 ------------------------------------------------------------------------------------------------ boarding
 local function hide(trip: any,humanoid: Humanoid?)
 	if humanoid then trip.display=humanoid.DisplayDistanceType;humanoid.DisplayDistanceType=Enum.HumanoidDisplayDistanceType.None end
@@ -347,8 +530,11 @@ local function doBoard(s: any,ticket: Ticket,st: FP.State,character: Model,root:
 	local player: Player=s.player
 	local key=st.dir..":"..st.cycle
 	local trip={player=player,state="flying",to=ticket.to,character=character,root=root,wasAnchored=root.Anchored,releaseAt=math.huge,
-		kind="shuttle",price=ticket.price,session=s,leg=key,dir=st.dir,cycle=st.cycle,moved=false,arriving=false,arrived=false,display=nil}
+		kind="shuttle",price=ticket.price,session=s,leg=key,dir=st.dir,cycle=st.cycle,moved=false,arriving=false,arrived=false,display=nil,
+		companions=ticket.companions,booking=ticket.trip}
 	tickets[player.UserId]=nil
+	markCompanions(ticket,player,st)
+	boardCompanions(ticket,player,st)
 	a.trips[player.UserId]=trip
 	a.setState(player,"flying")
 	player:SetAttribute("ShuttleLeg",key)

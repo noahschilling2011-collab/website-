@@ -19,9 +19,11 @@
 --     (FlightPlan outTracks / backTracks control points, the same Port Meridian line FP.PM_LINE clear of the
 --     towers); ground tracks run hangar -> hangar apron -> west apron edge -> taxiway -> west connector ->
 --     runway at home and on the runway / shoulder / apron at Port Meridian.
---   * Runway separation: JetPlan.schedule delays a departure (at most CONFIG.maxDelay s, inside "boarding") until
---     none of its field windows overlaps the shuttle's runway / taxiway use at either airport (FlightPlan
---     timetable) or another company jet's windows (the ambient airliners are not considered).
+--   * Separation: JetPlan.schedule delays a departure (inside "boarding": at most CONFIG.maxDelay s with the founder
+--     aboard, CONFIG.maxDelayEmpty s for an empty / staff flight) until none of its field windows (JP.windows: the
+--     time the jet spends in a field's zone - City Airport runway + taxiway + corridors, the runway alone for the
+--     ambient airliners, Port Meridian's runway + corridors, the apron in front of Hangar 1) overlaps the shuttle
+--     (FlightPlan timetable), the ambient airliners at City Airport (FlightPlan.ambient) or another company jet.
 --   * Pose (cf, phase, speed, gear, engines), airstair, tug, crew and companion states for the client.
 local CityPlan=require(script.Parent.Config.CityPlan)
 local FP=require(script.Parent.FlightPlan)
@@ -37,19 +39,22 @@ JP.CONFIG={
 	ferryBoarding=6,
 	doors=4,startup=5,deboarding=10,ferryDeboarding=4,
 	pushSpeed=12,pushAcc=3,towSpeed=10,towAcc=2.5,taxiSpeed=32,taxiAcc=7,
-	liftoff=110,climbSpeed=240,cruiseSpeed=380,approachSpeed=130,touchdown=110,
+	liftoff=110,climbSpeed=240,cruiseSpeed=380,approachSpeed=130,touchdown=110,brake=7,
 	gEff=60,maxBank=math.rad(26),
-	maxDelay=150, -- seconds a departure may wait for a clear runway
-	guard=3, -- seconds added around every field window
+	maxDelay=240, -- seconds a departure with the founder aboard may wait for a clear runway (else RUNWAY_BUSY; alone
+	-- on the server the jet always finds one within ~150 s, median ~40 s - tests/guests_jet sep_check)
+	maxDelayEmpty=600, -- the same for empty / staff flights (ferry, positioning, field staff) - nobody waits aboard
+	guard=2, -- seconds added around every field window of a jet
+	pad=2, -- seconds added around the shuttle's / ambient airliners' field windows
 	autoFerry=20, -- seconds after the founder left Port Meridian another way before the parked jet flies home empty
 }
 JP.PHASES={"boarding","doors","pushback","startup","taxi","takeoff","climb","cruise","approach","landing","taxiin","deboarding","towin"}
 JP.PHASE_TEXT={boarding="Boarding",doors="Doors closed",pushback="Pushback",startup="Engine start",taxi="Taxiing",takeoff="Take-off",
-	climb="Climbing",cruise="Cruising",approach="Approach",landing="Landing",taxiin="Taxiing to the stand",deboarding="Arrived",towin="Towing into the hangar"}
+	climb="Climbing",cruise="Cruising",approach="Approach",landing="Landing",taxiin="Taxiing to the stand",deboarding="Arrived",towin="Towing into the hangar",parked="Arrived - stepping off"}
 
 export type Segment=FP.Segment
 export type Pose=FP.Pose
-export type Slot={id: number,name: string,cf: CFrame,arrive: {Vector3},arriveR: number,depart: {Vector3},departR: number,rollFrom: number,hides: string?,exit: {Vector3}}
+export type Slot={id: number,name: string,where: string,cf: CFrame,arrive: {Vector3},arriveR: number,depart: {Vector3},departR: number,rollFrom: number,hides: string?,exit: {Vector3}}
 export type Timeline={kind: string,slot: number,delay: number,dir: string,from: string,to: string,segments: {Segment},
 	phases: {[string]: {t0: number,t1: number}},duration: number,park: CFrame}
 export type Window={field: string,a: number,b: number}
@@ -77,54 +82,87 @@ JP.HOME_PARK=CFrame.lookAt(v(-930,HY,HZ),v(-1000,HY,HZ))
 JP.HOME_STAND=CFrame.lookAt(v(JX,HY,HZ),v(JX-60,HY,HZ))
 JP.HANGAR_X=hg.x2 -- door plane (the hangar opens east)
 -- Port Meridian stands (pivot = tyre contact on the centre line, nose west). The airstair is on the left (south)
--- side; exit = where the companions walk after deboarding (towards the VIP helicopter terminal / the hall).
+-- side; exit = where the companions walk after deboarding (rig root height; slot 1: forward round the nose and
+-- south between the apron and helipad fences, slot 2: south-west along the apron fence towards the hall).
 JP.PM_SLOTS={
-	{id=1,name="VIP apron",cf=CFrame.lookAt(v(600,AY,7612),v(560,AY,7612)),
+	{id=1,name="VIP apron",where="on the VIP apron",cf=CFrame.lookAt(v(600,AY,7612),v(560,AY,7612)),
 		arrive={v(470,PY,PZ),v(632,PY,PZ),v(632,AY,7612),v(600,AY,7612)},arriveR=28,
 		depart={v(600,AY,7612),v(552,AY,7612),v(552,PY,PZ),v(500,PY,PZ)},departR=26,rollFrom=500,hides=nil,
-		exit={v(598,AY,7625),v(646,AY,7625),v(654,AY,7650)}},
-	{id=2,name="Stand 2",cf=CFrame.lookAt(v(480,AY,7664),v(440,AY,7664)),
+		exit={v(575,AY+3,7622),v(558,AY+3,7628),v(558,AY+3,7660)}},
+	{id=2,name="Stand 2",where="at Stand 2",cf=CFrame.lookAt(v(480,AY,7664),v(440,AY,7664)),
 		arrive={v(470,PY,PZ),v(520,PY,PZ),v(520,AY,7664),v(480,AY,7664)},arriveR=24,
 		depart={v(480,AY,7664),v(450,AY,7664),v(450,PY,PZ),v(400,PY,PZ)},departR=24,rollFrom=400,hides="PM2",
-		exit={v(469,AY,7678),v(420,AY,7700),v(300,AY,7700)}},
+		exit={v(452,AY+3,7680),v(452,AY+3,7700),v(300,AY+3,7705)}},
 } :: {Slot}
 function JP.slot(i: number?): Slot return JP.PM_SLOTS[i or 1] or JP.PM_SLOTS[1] end
 -- the founder after the flight: by the VIP limousine stand in Port Meridian (under the canopy, facing the bay) /
 -- City Airport arrivals (the shuttle's arrival point)
 local limo=if okMetro and typeof(MetroPlan)=="table" and typeof(MetroPlan.VIP_LIMO)=="table" and typeof(MetroPlan.VIP_LIMO.stand)=="CFrame" then MetroPlan.VIP_LIMO.stand :: CFrame else CFrame.new(176,PY,7762)
 JP.ARRIVAL={abroad=CFrame.lookAt(v(limo.X-8,G+3.3,limo.Z-12),v(limo.X-8,G+3.3,limo.Z)),home=A.arrival}
+-- Placement spots after a flight (JetService takes the first one no other character stands on): the arrival
+-- point, then lateral steps of ARRIVAL_STEP studs along it (Port Meridian: along the kerb under the canopy; City
+-- Airport: along the east end of the arrivals hall). Checked against the built world (tests/guests_jet/clearance.py).
+JP.ARRIVAL_STEP=3
+JP.ARRIVAL_OFFSETS={0,-1,1,-2,2,-3}
+function JP.arrivalSpots(dest: string): {CFrame}
+	local base=if dest=="abroad" then JP.ARRIVAL.abroad else JP.ARRIVAL.home
+	local out: {CFrame}={}
+	for _,k in JP.ARRIVAL_OFFSETS do
+		local off=if dest=="abroad" then Vector3.new(k*JP.ARRIVAL_STEP,0,0) else Vector3.new(k*JP.ARRIVAL_STEP,0,0)
+		table.insert(out,base+off)
+	end
+	return out
+end
 -- the boarded founder's character is held here (anchored, below the ground) while the client shows the ride
 JP.HOLD_HOME=CFrame.new(-930,G-40,HZ)
 function JP.hold(dest: string,slot: number?): CFrame
 	if dest=="abroad" then local c=JP.slot(slot).cf;return CFrame.new(c.X,G-40,c.Z) end
 	return JP.HOLD_HOME
 end
--- Crew corner in the south-west of Hangar 1 (AirportBuilder dresses it: sofa, table, coffee counter, lockers,
--- planning screen): where the two company pilots wait. spots = rig root frames (seat 1 on the sofa, 2 standing
--- at the counter), door = the corner's opening towards the jet.
-JP.CREW={spots={CFrame.lookAt(v(-983,HY+2.95,2703),v(-960,HY+2.95,2703)),CFrame.lookAt(v(-972,HY+3,2711.5),v(-972,HY+3,2690))},
-	sit={true,false},door=v(-958,HY+3,2694)}
--- Companions arrive at the hangar through its open door (south end) and leave Port Meridian on foot.
+-- Crew corner in the south-west of Hangar 1 (AirportBuilder dresses it: sofa, coffee table, coffee counter,
+-- lockers, planning screen, carpet, a "FLIGHT CREW" board): where the two company pilots wait. spots = rig root
+-- frames (captain on the sofa, first officer standing at the coffee counter), via = the first steps out of the
+-- corner per pilot (in front of the sofa, clear of its arm and the table), door = the corner's opening towards the jet.
+JP.CREW={spots={CFrame.lookAt(v(-992.6,HY+2.95,2701.5),v(-980,HY+2.95,2701.5)),CFrame.lookAt(v(-984.5,HY+3,2711.2),v(-984.5,HY+3,2716))},
+	sit={true,false},via={{v(-989.5,HY+3,2701.5),v(-989.5,HY+3,2697)},{v(-975,HY+3,2704)}},door=v(-960,HY+3,2694)}
+-- Companions come in through the hangar's open door (south end) and round the left wingtip to the airstair.
 JP.COMPANION_FROM=v(-852,HY+3,2700)
--- world path (rig root height) from a point outside the left airstair foot up into the cabin to `seat` (model)
-function JP.boardPath(cf: CFrame,seat: CFrame,from: Vector3): {Vector3}
-	local d=pts.doorL1
-	local z=d.Position.Z
-	local foot=cf*Vector3.new(-5.6,3,z)
-	local sill=cf*Vector3.new(-2.1,pts.cabin.floorY+3,z)
-	local aisle=cf*Vector3.new(0,pts.cabin.floorY+3,z)
-	local out: {Vector3}={from,foot+(cf.RightVector*-3),foot,sill,aisle}
-	table.insert(out,cf*Vector3.new(0,pts.cabin.floorY+3,seat.Position.Z+(if seat.LookVector.Z<0 then 1.4 else -1.4)))
+JP.COMPANION_VIA={v(-905,HY+3,2675),v(-948,HY+3,2656)}
+-- World path (rig root height) from `from` (+ optional waypoints) to the left airstair foot, up into the cabin and
+-- to `seat` (model frame of the jet at cf).
+function JP.boardPath(cf: CFrame,seat: CFrame,from: Vector3,via: {Vector3}?): {Vector3}
+	local z=pts.doorL1.Position.Z
+	local fl=pts.cabin.floorY+3
+	local out: {Vector3}={from}
+	local extra: {Vector3}=via or {}
+	for _,p in extra do table.insert(out,p) end
+	table.insert(out,cf*Vector3.new(-8.6,3,z));table.insert(out,cf*Vector3.new(-5.6,3,z))
+	table.insert(out,cf*Vector3.new(-2.1,fl,z));table.insert(out,cf*Vector3.new(0,fl,z))
+	table.insert(out,cf*Vector3.new(0,fl,seat.Position.Z+(if seat.LookVector.Z<0 then 1.4 else -1.4)))
 	table.insert(out,cf*seat.Position)
 	return out
 end
--- pilots: crew corner -> airstair -> cockpit seat i (1 captain, 2 first officer)
+-- pilots: crew corner spot i -> airstair -> cockpit seat i (1 captain, 2 first officer)
 function JP.crewPath(cf: CFrame,i: number): {Vector3}
 	local spot=JP.CREW.spots[i] or JP.CREW.spots[1]
 	local seat=if i==1 then pts.captain else pts.firstOfficer
-	local path=JP.boardPath(cf,seat,JP.CREW.door)
-	table.insert(path,1,spot.Position)
+	local way: {Vector3}=table.clone(JP.CREW.via[i] or JP.CREW.via[1])
+	table.insert(way,JP.CREW.door)
+	local path=JP.boardPath(cf,seat,spot.Position,way)
 	return path
+end
+-- companion k (1..3) boarding at home: hangar door -> round the wingtip -> cabin seat (seats 1, 2, 4: the founder
+-- has seat 3, the window seat camera)
+JP.COMPANION_SEATS={1,2,4}
+function JP.companionPath(cf: CFrame,k: number,atHome: boolean,slot: number?): {Vector3}
+	local seat=pts.cabinSeats[JP.COMPANION_SEATS[k] or 1]
+	if atHome then return JP.boardPath(cf,seat,JP.COMPANION_FROM,JP.COMPANION_VIA) end
+	-- Port Meridian: from the slot's exit path (reversed) to the seat
+	local ex=JP.slot(slot).exit
+	local list: {Vector3}={}
+	for i=#ex,1,-1 do table.insert(list,ex[i]) end
+	local from=table.remove(list,1) :: Vector3
+	return JP.boardPath(cf,seat,from,list)
 end
 
 ------------------------------------------------------------------------------------------------ tracks
@@ -204,7 +242,8 @@ local function build(kind: string,slot: Slot,delay: number): ({Segment},string)
 		local flL=a.length-t.flareFrom
 		add(moveSeg("landing","air",a,t.flareFrom,a.length,profile(flL,C.approachSpeed,C.approachSpeed,C.touchdown,(C.approachSpeed^2-C.touchdown^2)/(2*flL)),false,rad(3),rad(6)))
 		local rL=t.rollout.length
-		add(moveSeg("landing","rollout",t.rollout,0,rL,profile(rL,C.touchdown,C.touchdown,18,(C.touchdown^2-18^2)/(2*rL))))
+		-- roll-out: hold the touchdown speed, then brake (at least CONFIG.brake) - frees the runway sooner
+		add(moveSeg("landing","rollout",t.rollout,0,rL,profile(rL,C.touchdown,C.touchdown,18,math.max(C.brake,(C.touchdown^2-18^2)/(2*rL)))))
 	end
 	if kind=="out" then
 		local t=tracks("out",slot)
@@ -247,7 +286,7 @@ local tlCount=0
 function JP.timeline(kind: string,slot: number?,delay: number?): Timeline
 	local k=if kind=="out" or kind=="back" or kind=="ferry" then kind else "out"
 	local sl=JP.slot(slot)
-	local d=math.clamp(math.floor((delay or 0)*10+0.5)/10,0,JP.CONFIG.maxDelay)
+	local d=math.clamp(math.floor((delay or 0)*10+0.5)/10,0,JP.CONFIG.maxDelayEmpty)
 	local key=k..":"..sl.id..":"..d
 	local c=tlCache[key]
 	if c then return c end
@@ -407,62 +446,205 @@ function JP.usesSlot(tl: Timeline,tau: number): boolean
 	return tau<ph.taxi.t1
 end
 
------------------------------------------------------------------------------------------------- runway separation
--- Field windows of a flight (seconds since its start), padded by CONFIG.guard: "home" = City Airport's runway,
--- the taxiway west of exit 1 and the west connector (from the taxi start to the climb; from the flare until the
--- jet turns off the taxiway towards the hangar), "pm" = Port Meridian's runway (from the flare until the jet
--- turns off towards its stand; from the taxi start to the climb). Pushback, towing and the stands are clear of
--- the shuttle at both airports.
-function JP.windows(tl: Timeline): {Window}
-	local g=JP.CONFIG.guard
-	local ph=tl.phases
-	if tl.dir=="out" then
-		return {{field="home",a=ph.taxi.t0-g,b=ph.climb.t0+g},{field="pm",a=ph.landing.t0-g,b=ph.taxiin.t0+8+g}}
-	end
-	return {{field="pm",a=ph.taxi.t0-g,b=ph.climb.t0+g},{field="home",a=ph.landing.t0-g,b=ph.taxiin.t0+(ph.taxiin.t1-ph.taxiin.t0)*0.75+g}}
-end
--- The shuttle's use of a field that overlaps [a, b] (server time): at home taxi -> climb (out) and flare ->
--- taxi in (back), at Port Meridian flare -> off the runway (out) and taxi -> climb (back) (FlightPlan timetable).
-function JP.shuttleBusy(field: string,a: number,b: number): boolean
-	local I=FP.interval()
-	local out,back=FP.leg("out"),FP.leg("back")
-	local po,pb=out.phases,back.phases
-	local k0=math.floor((a-FP.CONFIG.epoch)/I)-1
-	local k1=math.floor((b-FP.CONFIG.epoch)/I)+1
-	for k=k0,k1 do
-		local so,sb=FP.legStart("out",k),FP.legStart("back",k)
-		local w: {{number}}
-		if field=="home" then
-			w={{so+po.taxi.t0,so+po.climb.t0+4},{sb+pb.landing.t0-4,sb+pb.taxiin.t1}}
-		else
-			w={{so+po.landing.t0-4,so+po.taxiin.t0+6},{sb+pb.taxi.t0,sb+pb.climb.t0+4}}
-		end
-		for _,x in w do if a<x[2] and b>x[1] then return true end end
+------------------------------------------------------------------------------------------------ separation
+-- Fields = zones a movement occupies; two movements of the same field never share time (the zone box reaches
+-- ZONE.reach studs along the runway axis and ZONE.alt studs up: the runway, short final and the initial climb):
+--   "home"  City Airport runway + taxiway (z > taxiway - 30): the shuttle and the jets (they share the west half of
+--           the taxiway and the west connector)
+--   "rwy"   the same box without the taxiway (z > runway - 40): the ambient airliners (FlightPlan.ambient taxi on
+--           the east half of the taxiway, the jets on the west half - they only share the runway and its ends)
+--   "pm"    Port Meridian's runway (z PM_LINE - 300 .. PM_LINE + 46, x -ZONE.pmReach .. 950): shuttle + jets
+--   "apron" the apron edge and the stand in front of Hangar 1 (x < -660, z 2540 .. taxiway): pushback, taxi to /
+--           from the taxiway, deboarding at HOME_STAND and the tow-in (jets only)
+-- tests/guests_jet/test_jet samples every scheduled flight against the shuttle, the ambient airliners and a second
+-- jet (hull distance at every altitude) to prove these windows are enough.
+local RW=A.runway
+local TWZ1=A.taxiway.z1
+JP.FIELDS={"home","rwy","pm","apron"}
+JP.ZONE={reach=1600,pmReach=1700,alt=120}
+function JP.inZone(field: string,p: Vector3): boolean
+	local Z=JP.ZONE
+	if field=="home" or field=="rwy" then
+		local z1=if field=="home" then TWZ1-30 else RW.z1-40
+		return p.Z>z1 and p.Z<RW.z2+300 and math.abs(p.X)<Z.reach and p.Y-HY<Z.alt
+	elseif field=="pm" then
+		return p.Z>PZ-300 and p.Z<PZ+46 and p.X>-Z.pmReach and p.X<950 and p.Y-PY<Z.alt
+	elseif field=="apron" then
+		return p.X<-660 and p.X>hg.x1-10 and p.Z>2540 and p.Z<TWZ1
 	end
 	return false
 end
+JP.SPAN_STEP=0.25
+-- Time spans {a, b} (seconds from 0 to T) in which posAt(t) lies in the field's zone, sampled every SPAN_STEP s
+-- (each span starts one sample early: conservative).
+local function spans(field: string,posAt: (number)->Vector3?,T: number): {{number}}
+	local out: {{number}}={}
+	local open: number?=nil
+	local t=0
+	while t<=T+1e-6 do
+		local p=posAt(t)
+		local inside=p~=nil and JP.inZone(field,p)
+		if inside and not open then open=math.max(0,t-JP.SPAN_STEP) end
+		if not inside and open then table.insert(out,{open,t});open=nil end
+		t+=JP.SPAN_STEP
+	end
+	if open then table.insert(out,{open,T}) end
+	return out
+end
+JP.spans=spans
+local function spanAt(list: {{number}},t: number): {number}
+	for _,sp in list do if t>=sp[1]-1e-6 and t<=sp[2]+1e-6 then return sp end end
+	return {t,t}
+end
+-- Field windows of a flight (seconds since its start, padded by CONFIG.guard):
+--   out:  apron (doors closed .. the taxi leaves the apron), home (on the taxiway .. the climb leaves the zone), rwy
+--         (lined up .. the climb leaves the zone), pm (final approach .. turned off the runway towards the stand)
+--   back: pm (taxi start .. the climb leaves the zone), home / rwy (final approach .. off the runway / taxiway),
+--         apron (back on the apron .. towed into the hangar)
+function JP.windows(tl: Timeline): {Window}
+	local cached=(tl :: any).windows
+	if cached then return cached end
+	local g=JP.CONFIG.guard
+	local ph=tl.phases
+	local sp: {[string]: {{number}}}={}
+	for _,f in JP.FIELDS do sp[f]=spans(f,function(t: number): Vector3? return JP.pose(tl,t).cf.Position end,tl.duration) end
+	local out: {Window}={}
+	local function add(field: string,a: number,b: number) table.insert(out,{field=field,a=a-g,b=b+g}) end
+	local roll=ph.takeoff.t0+0.1
+	local land=ph.landing.t1-0.1 -- the end of the roll-out, still on the runway
+	if tl.dir=="out" then
+		add("apron",ph.doors.t0,spanAt(sp.apron,ph.doors.t0)[2])
+		local h=spanAt(sp.home,roll);add("home",h[1],h[2])
+		local r=spanAt(sp.rwy,roll);add("rwy",r[1],r[2])
+		local p=spanAt(sp.pm,land);add("pm",p[1],p[2])
+	else
+		add("pm",ph.taxi.t0,spanAt(sp.pm,roll)[2])
+		local h=spanAt(sp.home,land);add("home",h[1],h[2])
+		local r=spanAt(sp.rwy,land);add("rwy",r[1],r[2])
+		add("apron",spanAt(sp.apron,tl.duration)[1],tl.duration)
+	end
+	(tl :: any).windows=out
+	return out
+end
+-- The shuttle's zone spans per cycle (seconds into the cycle; FlightPlan legs: out from 0, back after it).
+local shuttleCache: {[string]: {{number}}}?=nil
+local function shuttleSpans(): {[string]: {{number}}}
+	local c=shuttleCache
+	if c then return c end
+	local out: {[string]: {{number}}}={home={},pm={}}
+	local outDur=FP.leg("out").duration
+	for _,dir in {"out","back"} do
+		local leg=FP.leg(dir)
+		local off=if dir=="out" then 0 else outDur
+		for _,f in {"home","pm"} do
+			for _,s in spans(f,function(t: number): Vector3? return FP.legPose(leg,t).cf.Position end,leg.duration) do
+				table.insert(out[f],{off+s[1],off+s[2]})
+			end
+		end
+	end
+	shuttleCache=out
+	return out
+end
+-- The ambient airliners' runway spans relative to each event's start (arrival / departure).
+local ambientRel: {[string]: {{number}}}?=nil
+local function ambientSpans(): {[string]: {{number}}}
+	local c=ambientRel
+	if c then return c end
+	local rel: {[string]: {{number}}}={}
+	for k=0,3 do
+		for _,e in FP.ambient(k) do
+			if (e.kind=="arrival" or e.kind=="departure") and not rel[e.kind] then
+				rel[e.kind]=spans("rwy",function(t: number): Vector3?
+					local p=FP.ambientPose(e,e.t0+t)
+					return if p then p.cf.Position else nil
+				end,e.duration)
+			end
+		end
+	end
+	ambientRel=rel
+	return rel
+end
+local ambCycle: {[number]: {{number}}}={}
+local ambCount=0
+-- absolute runway windows (padded) of the ambient airliners of cycle k
+local function ambientWindows(k: number): {{number}}
+	local c=ambCycle[k]
+	if c then return c end
+	local rel=ambientSpans()
+	local pad=JP.CONFIG.pad
+	local out: {{number}}={}
+	for _,e in FP.ambient(k) do
+		local list=rel[e.kind]
+		if list then for _,s in list do table.insert(out,{e.t0+s[1]-pad,e.t0+s[2]+pad}) end end
+	end
+	ambCount+=1
+	if ambCount>48 then table.clear(ambCycle);ambCount=0 end
+	ambCycle[k]=out
+	return out
+end
+-- Absolute windows {a, b} of the shuttle (field "home" / "pm") or the ambient airliners ("rwy") within [a, b].
+function JP.trafficWindows(field: string,a: number,b: number): {{number}}
+	local I=FP.interval()
+	local e0=FP.CONFIG.epoch
+	local k0=math.floor((a-e0)/I)-1
+	local k1=math.floor((b-e0)/I)+1
+	local out: {{number}}={}
+	if field=="home" or field=="pm" then
+		local pad=JP.CONFIG.pad
+		local list=shuttleSpans()[field]
+		for k=k0,k1 do
+			local base=e0+k*I
+			for _,s in list do
+				local x1,x2=base+s[1]-pad,base+s[2]+pad
+				if x2>a and x1<b then table.insert(out,{x1,x2}) end
+			end
+		end
+	elseif field=="rwy" then
+		for k=k0,k1 do for _,w in ambientWindows(k) do if w[2]>a and w[1]<b then table.insert(out,w) end end end
+	end
+	return out
+end
+-- Seconds of [a, b] (server time) during which the shuttle / the ambient airliners use the field.
+function JP.trafficOverlap(field: string,a: number,b: number): number
+	local total=0
+	for _,w in JP.trafficWindows(field,a,b) do total+=math.max(0,math.min(b,w[2])-math.max(a,w[1])) end
+	return total
+end
+function JP.shuttleOverlap(field: string,a: number,b: number): number
+	return if field=="home" or field=="pm" then JP.trafficOverlap(field,a,b) else 0
+end
+function JP.ambientOverlap(a: number,b: number): number return JP.trafficOverlap("rwy",a,b) end
+function JP.shuttleBusy(field: string,a: number,b: number): boolean return JP.shuttleOverlap(field,a,b)>0 end
 -- Absolute windows of a published flight.
 function JP.absWindows(tl: Timeline,start: number): {Window}
 	local out: {Window}={}
 	for _,w in JP.windows(tl) do table.insert(out,{field=w.field,a=start+w.a,b=start+w.b}) end
 	return out
 end
--- The smallest departure delay (whole seconds, <= CONFIG.maxDelay) for a flight starting at `now` whose field
--- windows overlap neither the shuttle nor `others` (absolute windows of other jets). Returns (delay, clear):
--- clear = false when no gap was found (the flight then leaves without waiting).
-function JP.schedule(kind: string,slot: number?,now: number,others: {Window}?): (number,boolean)
-	local base=JP.windows(JP.timeline(kind,slot,0))
+-- Overlap (seconds) of the flight `kind` / `slot` starting at `now` with `d` s of extra boarding with the traffic
+-- and `others` (absolute windows of other jets).
+function JP.overlapAt(kind: string,slot: number?,now: number,d: number,others: {Window}?): number
+	local overlap=0
 	local list: {Window}=others or {}
-	for d=0,JP.CONFIG.maxDelay do
-		local ok=true
-		for _,w in base do
-			local a,b=now+w.a+d,now+w.b+d
-			if JP.shuttleBusy(w.field,a,b) then ok=false;break end
-			for _,o in list do if o.field==w.field and a<o.b and b>o.a then ok=false;break end end
-			if not ok then break end
-		end
-		if ok then return d,true end
+	for _,w in JP.windows(JP.timeline(kind,slot,0)) do
+		local a,b=now+w.a+d,now+w.b+d
+		overlap+=JP.trafficOverlap(w.field,a,b)
+		for _,o in list do if o.field==w.field then overlap+=math.max(0,math.min(b,o.b)-math.max(a,o.a)) end end
 	end
-	return 0,false
+	return overlap
+end
+-- The smallest departure delay (whole seconds, <= maxDelay, default CONFIG.maxDelay, at most CONFIG.maxDelayEmpty)
+-- for a flight starting at `now` whose field windows overlap neither the traffic nor `others`. Returns (delay,
+-- clear): when no such delay exists, the delay with the least overlap (clear = false; JetService then refuses a
+-- founder flight with RUNWAY_BUSY instead of departing into a conflict).
+function JP.schedule(kind: string,slot: number?,now: number,others: {Window}?,maxDelay: number?): (number,boolean)
+	local limit=math.floor(math.min(maxDelay or JP.CONFIG.maxDelay,JP.CONFIG.maxDelayEmpty))
+	local bestD,best=0,math.huge
+	for d=0,limit do
+		local overlap=JP.overlapAt(kind,slot,now,d,others)
+		if overlap<=0 then return d,true end
+		if overlap<best-1e-6 then best=overlap;bestD=d end
+	end
+	return bestD,false
 end
 return JP

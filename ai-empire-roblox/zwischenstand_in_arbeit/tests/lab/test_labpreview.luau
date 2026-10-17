@@ -138,9 +138,28 @@ local function body()
 		check("bestAffordable never spends more than money - reserve ($2,000..$40,000)", #over == 0, table.concat(over, ","))
 		local saving = LP.bestAffordable(d, "coding", 40000, true)
 		check("bestAffordable in Save mode: cost <= 30 % of the free cash", saving == nil or saving.estimate.cost <= 0.3 * (40000 - reserve), saving and saving.estimate.cost)
-		-- successor of the oldest line
-		local succ = LP.successor(d, d.money, false)
-		check("successor rich: Developer API (oldest line), name Coder, size/plan from BEST I CAN AFFORD", succ and succ.target == "developers" and succ.name == "Coder" and succ.sizeId == "s1b" and succ.recipeId == "deep", succ and succ.target)
+		-- the line SUCCESSOR button of Developer API (LAB_SPEC 8.1 step 4: BEST I CAN AFFORD failed the --ui-defaults
+		-- run, so suggestions use the economy bot's rule = LabPreview.successorPick: largest size the servers carry,
+		-- data plan, >= current + 3, Deep when the data is enough. With the live capacity the rich save gets 1B Deep;
+		-- without capacity info 7B Deep.)
+		local succ = LP.lineSuccessor(d, s.live, "developers", d.money, false)
+		check("line successor rich Developer API: name Coder, focus kept, bot rule with live capacity = 1B Deep", succ and succ.target == "developers" and succ.name == "Coder" and succ.focusId == "balanced" and succ.sizeId == "s1b" and succ.recipeId == "deep", succ and `{succ.target} {succ.sizeId} {succ.recipeId}`)
+		local blind = LP.lineSuccessor(d, nil, "developers", d.money, false)
+		check("line successor rich without capacity info: the largest size (7B Deep after its data plan)", blind and blind.sizeId == "s7b" and blind.recipeId == "deep", blind and `{blind.sizeId} {blind.recipeId}`)
+		-- the SUGGESTED tile: a free line first (Study App is free at Startup Campus), the bot's order
+		local sug = LP.suggest(d, s.live, d.money, false)
+		check("suggest rich: the free Study App line (new line), the bot's line order", sug and sug.kind == "newline" and sug.target == "students" and sug.model == nil, sug and `{sug.kind} {sug.target}`)
+		if sug and sug.pick then
+			local after = LP.estimate(LP.withStock(d, sug.pick.plan.stock), { sizeId = sug.sizeId, focusId = sug.focusId, recipeId = sug.recipeId }, nil)
+			check("suggest: the promised expected value is the after-plan estimate of its own pick", near(sug.expected, after.overall, 1e-9), `{sug.expected} vs {after.overall}`)
+			check("suggest: passes the bot's gate (after the plan >= current + 3)", sug.pick.plan.after >= sug.current + 3 and sug.current == sug.pick.current, `{sug.pick.plan.after} {sug.current}`)
+			local pre = LP.prefillOf(sug)
+			check("prefillOf carries the data plan (the Review offers it)", pre.target == "students" and pre.sizeId == sug.sizeId and pre.recipeId == sug.recipeId and (sug.pick.plan.cost == 0 or pre.plan == sug.pick.plan), pre.plan and pre.plan.cost)
+		else
+			check("suggest rich has a pick", false, sug and "no pick")
+		end
+		local sp = LP.successorPick(d, s.live, "developers", "balanced", d.money, false)
+		check("successorPick keeps the bot's gate: after its data plan >= the line's current model (overall - age) + 3", sp and sp.plan.after >= sp.current + 3, sp and `{sp.plan.after} vs {sp.current}`)
 		local last = LP.sameAsLast(d)
 		check("sameAsLast = newest non-training model (Sage 1B balanced)", last and last.sizeId == "s1b" and last.focusId == "balanced")
 		-- data plan: rich 1B Coding empty, 3B Coding 1x repos
@@ -290,7 +309,10 @@ local function body()
 	do
 		local ui, s, d = fresh("rich")
 		check("parseLook valid", (function() local c, i = ModelMath.parseLook("amber:3"); return c == "amber" and i == 3 end)())
-		for _, bad in { "amber:0", "amber:9", "purple:1", "amber:1.5", "amber", ":2", 5, true, string.rep("a", 30) .. ":1" } do
+		-- shop package (round 3): emblems 9-14 are the Identity Kit logos (valid format; the pass is checked by
+		-- StartTraining -> PASS_NEEDED, tests/shop2 T11), so the first invalid index is 15
+		check("parseLook accepts a Kit emblem (9)", (function() local c, i = ModelMath.parseLook("amber:9"); return c == "amber" and i == 9 end)())
+		for _, bad in { "amber:0", "amber:15", "purple:1", "amber:1.5", "amber", ":2", 5, true, string.rep("a", 30) .. ":1" } do
 			local c = ModelMath.parseLook(bad)
 			check("parseLook rejects " .. tostring(bad), c == nil)
 		end
@@ -308,6 +330,20 @@ local function body()
 		local r5 = ui2.binds.StartTraining(s2, { name = "Plain", sizeId = "s100m", focusId = "balanced", recipeId = "steady" })
 		local m5 = r5.ok and d2.models[r5.modelId]
 		check("old payload (no look/target): ok, look and plan nil", m5 and m5.look == nil and m5.plan == nil, m5 and tostring(m5.look))
+		-- save compatibility: the load path (Template.migrate + cleaners) keeps the new optional fields and leaves
+		-- old models (without them) exactly as they were
+		local Template = M.require(M.game.ServerScriptService.Server.Lib.Template)
+		local raw = deepcopy(d)
+		local oldModel = deepcopy(raw.models.coder)
+		local loaded, why = Template.migrate(raw)
+		local lm = loaded and loaded.models[r4.modelId]
+		check("save round trip keeps look / plan / recipeId of a new model", lm and lm.look == "amber:2" and lm.plan == "students" and lm.recipeId == "deep", why or (lm and tostring(lm.look)))
+		local lc = loaded and loaded.models.coder
+		local same = lc ~= nil and lc.look == nil and lc.plan == nil and lc.recipeId == nil and lc.overall == oldModel.overall and lc.sizeId == oldModel.sizeId and lc.focusId == oldModel.focusId and lc.version == oldModel.version and lc.status == oldModel.status
+		check("save round trip: an old model without the fields loads unchanged (no look/plan/recipeId added)", same)
+		local LP7 = UI.LabPreview
+		local last = LP7.sameAsLast(d2)
+		check("SAME AS LAST on an old model (no recipeId saved) keeps the current plan (recipeId nil)", last and last.recipeId == nil, last and tostring(last.recipeId))
 	end
 
 	------------------------------------------------------------------ 8. S1: TRAINING_COMPLETE carries expected / refinement / before / event
@@ -345,6 +381,112 @@ local function body()
 		M.settle(0.2)
 		local e = got3[#got3]
 		check("S1 event: eventId + outcome", e and e.eventId == "data_issue" and e.outcome == "ignore", e and tostring(e.outcome))
+	end
+
+	------------------------------------------------------------------ 9. fix round 1: suggestion = the bot's line rule, ceiling, Deep reasons, spec text
+	do
+		-- the casual bot's line choice (agents/corefix/sim.luau tryTrain, verbatim): a free line first in ITS order,
+		-- else the weakest live line (overall minus age)
+		local function botLine(d)
+			local LINES = { "general", "developers", "students", "businesses" }
+			local lives = {}
+			for _, id in d.modelOrder do local m = d.models[id]; if m and m.status == "live" then table.insert(lives, m) end end
+			local function effective(m)
+				if not m then return 0 end
+				if not (MarketConfig.AGE and m.market) then return m.overall end
+				return m.overall - MarketConfig.AGE.maxFit * math.clamp((m.market.vage or 0) / MarketConfig.AGE.full, 0, 1)
+			end
+			local function liveInLine(line)
+				for _, m in lives do if m.release and MarketMath.lineOf(m.release.target) == MarketMath.lineOf(line) then return m end end
+				return nil
+			end
+			local pick, current = nil, 0
+			if #lives < (MarketConfig.PRODUCT_SLOTS[d.empire.office] or 1) then
+				for _, line in LINES do if not liveInLine(line) then pick = line; current = 0; break end end
+				local best
+				for _, id in d.modelOrder do local m = d.models[id]; if m and m.status == "live" and (not best or m.overall > best.overall) then best = m end end
+				if pick and best then current = math.max(0, effective(best) - 12) end
+			end
+			if not pick then
+				local worst
+				for _, m in lives do if not worst or effective(m) < effective(worst) then worst = m end end
+				if worst then pick = worst.release.target; current = effective(worst) end
+			end
+			return pick, current
+		end
+		local cases = 0
+		local bad = {}
+		for _, state in { "rich", "full", "hq" } do
+			for _, ages in { { 0, 0, 0 }, { 3600, 0, 0 }, { 0, 3600, 1800 }, { 900, 900, 3600 } } do
+				for _, cash in { 9000, 60000, 186400, 2400000 } do
+					local ui, s, d, LP = fresh(state)
+					d.money = cash
+					local i = 0
+					for _, id in d.modelOrder do
+						local m = d.models[id]
+						if m.status == "live" and m.market then i += 1; m.market.vage = ages[(i - 1) % 3 + 1] end
+					end
+					local sug = LP.suggest(d, s.live, d.money, false)
+					local pick, current = botLine(d)
+					cases += 1
+					if not sug or sug.target ~= pick or not near(sug.current, current, 1e-9) then
+						table.insert(bad, `{state} {table.concat(ages, "/")} ${cash}: suggest {sug and sug.target} {sug and sug.current} vs bot {pick} {current}`)
+					end
+					if sug and sug.pick and not near(sug.pick.current, sug.current, 1e-9) then
+						table.insert(bad, `{state}: pick.current {sug.pick.current} vs {sug.current}`)
+					end
+				end
+			end
+		end
+		check(`suggest = the economy bot's line choice and gate base in {cases} states (ages x cash)`, #bad == 0, table.concat(bad, "; "))
+		-- the first model has no suggestion (DESIGN NEW MODEL is its path)
+		do
+			local ui, s, d, LP = fresh("fresh")
+			check("suggest: nil for the first model", LP.suggest(d, s.live, d.money, false) == nil)
+		end
+		-- ceiling: never below what the Studio shows; the old 'Max score' (size potential) was
+		local below, compared = {}, 0
+		for _, state in { "rich", "hq", "starter" } do
+			local ui, s, d, LP = fresh(state)
+			for _, size in ModelConfig.SIZES do
+				for _, recipe in ModelConfig.RECIPES do
+					for _, focus in ModelConfig.FOCUSES do
+						local sel = { sizeId = size.id, focusId = focus.id, recipeId = recipe.id }
+						local e = LP.estimate(d, sel, nil)
+						local c = LP.ceiling(d, sel)
+						compared += 1
+						if c + 1e-9 < e.overall then table.insert(below, `{state} {size.id}/{recipe.id}/{focus.id} {c} < {e.overall}`) end
+					end
+				end
+			end
+		end
+		check(`ceiling >= the shown expected value for all {compared} choices (rich, hq, starter)`, #below == 0, table.concat(below, "; "))
+		do
+			local ui, s, d, LP = fresh("rich")
+			local sel = { sizeId = "s1b", focusId = "coding", recipeId = "deep" }
+			local size = ModelConfig.getSize("s1b")
+			check("rich 1B Coding Deep: ceiling >= 88.5 while the size potential is 63 (the old 'Max score' was wrong)", LP.ceiling(d, sel) >= 88.5 and size.potential == 63, LP.ceiling(d, sel))
+		end
+		-- Deep's reason names the condition that fails (ModelMath.recipeFactor)
+		do
+			local ui, s, d, LP = fresh("starter") -- 4B tokens at 42.5 %
+			local sm = ModelMath.dataSummary(d.data)
+			check("deepShort starter 100M: enough tokens, low quality -> 'Needs 60% quality'", LP.deepShort("s100m", sm) == "Needs 60% quality", LP.deepShort("s100m", sm))
+			local ui2, s2, d2, LP2 = fresh("rich") -- 16B at 80.6 %
+			local sm2 = ModelMath.dataSummary(d2.data)
+			check("deepShort rich 1B: enough -> nil", LP2.deepShort("s1b", sm2) == nil)
+			local need7 = ModelConfig.getSize("s7b").dataNeed * 0.5
+			local want = if sm2.total < need7 then "Needs " .. M.require(RS.Shared.Format).tokens(need7) .. " data" else nil
+			check("deepShort rich 7B: the data amount (half of 7B's need) when that is what fails", LP2.deepShort("s7b", sm2) == want, LP2.deepShort("s7b", sm2))
+			local e7 = LP2.estimate(d2, { sizeId = "s7b", focusId = "coding", recipeId = "deep" }, nil)
+			check("deepShort agrees with the overfit flag (7B Deep overfits in rich)", e7.overfit == (LP2.deepShort("s7b", sm2) ~= nil))
+		end
+		do
+			local LP = UI.LabPreview
+			check("specBonusText general = 'spec +2 each skill'", LP.specBonusText("general") == "spec +2 each skill", LP.specBonusText("general"))
+			check("specBonusText coding = 'spec +6 Coding'", LP.specBonusText("coding") == "spec +6 Coding", LP.specBonusText("coding"))
+			check("specBonusText efficient names a stat outside Overall", LP.specBonusText("efficient") == "spec +6 Efficiency (not in Overall)", LP.specBonusText("efficient"))
+		end
 	end
 end
 
