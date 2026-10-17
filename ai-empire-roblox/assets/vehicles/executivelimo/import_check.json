@@ -1,0 +1,1672 @@
+{
+  "fbx": {
+    "Ambient_LED": {
+      "tris": 144,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.0607,
+        0.8571,
+        -2.3357
+      ],
+      "bbox_max_studs": [
+        2.7857,
+        5.075,
+        9.2786
+      ],
+      "has_vertex_colours": true
+    },
+    "Body": {
+      "tris": 18448,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.4958,
+        0.5,
+        -13.0909
+      ],
+      "bbox_max_studs": [
+        3.4958,
+        5.5689,
+        14.0194
+      ],
+      "has_vertex_colours": true
+    },
+    "Caliper_FL": {
+      "tris": 86,
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1643,
+        1.2874,
+        -9.2729
+      ],
+      "bbox_max_studs": [
+        -2.8429,
+        1.8655,
+        -8.7946
+      ],
+      "has_vertex_colours": true
+    },
+    "Caliper_FR": {
+      "tris": 86,
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.8429,
+        1.2874,
+        -9.2729
+      ],
+      "bbox_max_studs": [
+        3.1643,
+        1.8655,
+        -8.7946
+      ],
+      "has_vertex_colours": true
+    },
+    "Caliper_RL": {
+      "tris": 86,
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1643,
+        1.2874,
+        9.7842
+      ],
+      "bbox_max_studs": [
+        -2.8429,
+        1.8655,
+        10.2625
+      ],
+      "has_vertex_colours": true
+    },
+    "Caliper_RR": {
+      "tris": 86,
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.8429,
+        1.2874,
+        9.7842
+      ],
+      "bbox_max_studs": [
+        3.1643,
+        1.8655,
+        10.2625
+      ],
+      "has_vertex_colours": true
+    },
+    "Chrome": {
+      "tris": 3504,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.49,
+        0.9788,
+        -13.1072
+      ],
+      "bbox_max_studs": [
+        3.49,
+        5.0716,
+        14.0006
+      ],
+      "has_vertex_colours": true
+    },
+    "Door_Driver": {
+      "tris": 1458,
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        -7.1357
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.4958,
+        1.24,
+        -7.0207
+      ],
+      "bbox_max_studs": [
+        -2.9107,
+        3.5636,
+        -2.8757
+      ],
+      "has_vertex_colours": true
+    },
+    "Door_Driver_Glass": {
+      "tris": 352,
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        -7.1357
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1896,
+        3.488,
+        -5.5179
+      ],
+      "bbox_max_studs": [
+        -2.6096,
+        4.9779,
+        -3.0026
+      ],
+      "has_vertex_colours": true
+    },
+    "Door_RearL": {
+      "tris": 1254,
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        5.4571
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.4958,
+        1.24,
+        5.5721
+      ],
+      "bbox_max_studs": [
+        -2.9107,
+        3.5636,
+        8.9136
+      ],
+      "has_vertex_colours": true
+    },
+    "Door_RearL_Glass": {
+      "tris": 364,
+      "pivot_studs": [
+        -3.5,
+        2.2143,
+        5.4571
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1916,
+        3.4916,
+        5.6893
+      ],
+      "bbox_max_studs": [
+        -2.6201,
+        4.9821,
+        8.8361
+      ],
+      "has_vertex_colours": true
+    },
+    "Door_RearR": {
+      "tris": 1250,
+      "pivot_studs": [
+        3.5,
+        2.2143,
+        5.4571
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.9107,
+        1.24,
+        5.5721
+      ],
+      "bbox_max_studs": [
+        3.4958,
+        3.5636,
+        8.9136
+      ],
+      "has_vertex_colours": true
+    },
+    "Door_RearR_Glass": {
+      "tris": 364,
+      "pivot_studs": [
+        3.5,
+        2.2143,
+        5.4571
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.6201,
+        3.4916,
+        5.6893
+      ],
+      "bbox_max_studs": [
+        3.1916,
+        4.9821,
+        8.8361
+      ],
+      "has_vertex_colours": true
+    },
+    "Glass": {
+      "tris": 1624,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1556,
+        2.1521,
+        -12.6108
+      ],
+      "bbox_max_studs": [
+        3.1896,
+        5.1176,
+        -3.0025
+      ],
+      "has_vertex_colours": true
+    },
+    "GlassPrivacy": {
+      "tris": 2048,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1898,
+        3.4919,
+        -2.8493
+      ],
+      "bbox_max_studs": [
+        3.1898,
+        5.125,
+        11.5268
+      ],
+      "has_vertex_colours": true
+    },
+    "Grille": {
+      "tris": 2608,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -2.963,
+        1.2214,
+        -12.9954
+      ],
+      "bbox_max_studs": [
+        2.9333,
+        2.5673,
+        -12.3069
+      ],
+      "has_vertex_colours": true
+    },
+    "Interior_Bar": {
+      "tris": 4600,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1607,
+        0.8393,
+        -2.2071
+      ],
+      "bbox_max_studs": [
+        -1.6429,
+        3.5143,
+        5.4714
+      ],
+      "has_vertex_colours": true
+    },
+    "Interior_Front": {
+      "tris": 4536,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1786,
+        0.6786,
+        -7.0821
+      ],
+      "bbox_max_studs": [
+        3.1786,
+        4.3063,
+        -2.2362
+      ],
+      "has_vertex_colours": true
+    },
+    "Interior_Lounge": {
+      "tris": 6148,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1786,
+        0.6786,
+        -2.5821
+      ],
+      "bbox_max_studs": [
+        3.1915,
+        5.2035,
+        11.5821
+      ],
+      "has_vertex_colours": true
+    },
+    "Lights_Front": {
+      "tris": 1640,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1095,
+        2.2028,
+        -12.5401
+      ],
+      "bbox_max_studs": [
+        3.1158,
+        2.5446,
+        -12.1855
+      ],
+      "has_vertex_colours": true
+    },
+    "Lights_Rear": {
+      "tris": 948,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.1352,
+        1.5048,
+        9.774
+      ],
+      "bbox_max_studs": [
+        3.1352,
+        5.2362,
+        13.9704
+      ],
+      "has_vertex_colours": true
+    },
+    "Mirror_L": {
+      "tris": 624,
+      "pivot_studs": [
+        -2.997,
+        3.7,
+        -5.85
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.8396,
+        3.599,
+        -6.0622
+      ],
+      "bbox_max_studs": [
+        -2.9447,
+        4.0713,
+        -5.6395
+      ],
+      "has_vertex_colours": true
+    },
+    "Mirror_R": {
+      "tris": 624,
+      "pivot_studs": [
+        2.997,
+        3.7,
+        -5.85
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.9447,
+        3.599,
+        -6.0622
+      ],
+      "bbox_max_studs": [
+        3.8396,
+        4.0713,
+        -5.6395
+      ],
+      "has_vertex_colours": true
+    },
+    "StarLights": {
+      "tris": 600,
+      "pivot_studs": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -1.9279,
+        5.0861,
+        -1.7496
+      ],
+      "bbox_max_studs": [
+        1.9369,
+        5.1161,
+        8.9517
+      ],
+      "has_vertex_colours": true
+    },
+    "SteeringWheel": {
+      "tris": 844,
+      "pivot_studs": [
+        -1.4286,
+        3.125,
+        -5.6179
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -2.1464,
+        2.464,
+        -5.9518
+      ],
+      "bbox_max_studs": [
+        -0.7107,
+        3.786,
+        -5.2839
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_FL": {
+      "tris": 3896,
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.3946,
+        0.0,
+        -10.7841
+      ],
+      "bbox_max_studs": [
+        -2.5339,
+        2.5111,
+        -8.273
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_FR": {
+      "tris": 3896,
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        -9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.5339,
+        0.0,
+        -10.7841
+      ],
+      "bbox_max_studs": [
+        3.3946,
+        2.5111,
+        -8.273
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_RL": {
+      "tris": 3896,
+      "pivot_studs": [
+        -2.9643,
+        1.2555,
+        9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        -3.3946,
+        0.0,
+        8.273
+      ],
+      "bbox_max_studs": [
+        -2.5339,
+        2.5111,
+        10.7841
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_RR": {
+      "tris": 3896,
+      "pivot_studs": [
+        2.9643,
+        1.2555,
+        9.5286
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bbox_min_studs": [
+        2.5339,
+        0.0,
+        8.273
+      ],
+      "bbox_max_studs": [
+        3.3946,
+        2.5111,
+        10.7841
+      ],
+      "has_vertex_colours": true
+    },
+    "_overall": {
+      "objects": 29,
+      "tris": 69910,
+      "size_studs_XYZ": [
+        7.679,
+        5.569,
+        27.127
+      ],
+      "size_m_XYZ": [
+        2.1501,
+        1.5593,
+        7.5956
+      ],
+      "min_studs": [
+        -3.8396,
+        0.0,
+        -13.1072
+      ],
+      "max_studs": [
+        3.8396,
+        5.5689,
+        14.0194
+      ]
+    }
+  },
+  "obj": {
+    "objects": 29,
+    "tris": 69910,
+    "size_studs_XYZ": [
+      7.679,
+      5.569,
+      27.127
+    ],
+    "names_match": true
+  },
+  "raw_fbx": {
+    "UpAxis": 1,
+    "UpAxisSign": 1,
+    "FrontAxis": 2,
+    "FrontAxisSign": -1,
+    "UnitScaleFactor": 100.0,
+    "nodes": {
+      "Ambient_LED": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.061,
+          0.857,
+          -2.336
+        ],
+        "bbox_max": [
+          2.786,
+          5.075,
+          9.279
+        ]
+      },
+      "Body": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.496,
+          0.5,
+          -13.091
+        ],
+        "bbox_max": [
+          3.496,
+          5.569,
+          14.019
+        ]
+      },
+      "Caliper_FL": {
+        "translation": [
+          -2.9643,
+          1.2555,
+          -9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.164,
+          1.287,
+          -9.273
+        ],
+        "bbox_max": [
+          -2.843,
+          1.865,
+          -8.795
+        ]
+      },
+      "Caliper_FR": {
+        "translation": [
+          2.9643,
+          1.2555,
+          -9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.843,
+          1.287,
+          -9.273
+        ],
+        "bbox_max": [
+          3.164,
+          1.865,
+          -8.795
+        ]
+      },
+      "Caliper_RL": {
+        "translation": [
+          -2.9643,
+          1.2555,
+          9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.164,
+          1.287,
+          9.784
+        ],
+        "bbox_max": [
+          -2.843,
+          1.865,
+          10.262
+        ]
+      },
+      "Caliper_RR": {
+        "translation": [
+          2.9643,
+          1.2555,
+          9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.843,
+          1.287,
+          9.784
+        ],
+        "bbox_max": [
+          3.164,
+          1.865,
+          10.262
+        ]
+      },
+      "Chrome": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.49,
+          0.979,
+          -13.107
+        ],
+        "bbox_max": [
+          3.49,
+          5.072,
+          14.001
+        ]
+      },
+      "Door_Driver": {
+        "translation": [
+          -3.5,
+          2.2143,
+          -7.1357
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.496,
+          1.24,
+          -7.021
+        ],
+        "bbox_max": [
+          -2.911,
+          3.564,
+          -2.876
+        ]
+      },
+      "Door_Driver_Glass": {
+        "translation": [
+          -3.5,
+          2.2143,
+          -7.1357
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.19,
+          3.488,
+          -5.518
+        ],
+        "bbox_max": [
+          -2.61,
+          4.978,
+          -3.003
+        ]
+      },
+      "Door_RearL": {
+        "translation": [
+          -3.5,
+          2.2143,
+          5.4571
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.496,
+          1.24,
+          5.572
+        ],
+        "bbox_max": [
+          -2.911,
+          3.564,
+          8.914
+        ]
+      },
+      "Door_RearL_Glass": {
+        "translation": [
+          -3.5,
+          2.2143,
+          5.4571
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.192,
+          3.492,
+          5.689
+        ],
+        "bbox_max": [
+          -2.62,
+          4.982,
+          8.836
+        ]
+      },
+      "Door_RearR": {
+        "translation": [
+          3.5,
+          2.2143,
+          5.4571
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.911,
+          1.24,
+          5.572
+        ],
+        "bbox_max": [
+          3.496,
+          3.564,
+          8.914
+        ]
+      },
+      "Door_RearR_Glass": {
+        "translation": [
+          3.5,
+          2.2143,
+          5.4571
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.62,
+          3.492,
+          5.689
+        ],
+        "bbox_max": [
+          3.192,
+          4.982,
+          8.836
+        ]
+      },
+      "Glass": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.156,
+          2.152,
+          -12.611
+        ],
+        "bbox_max": [
+          3.19,
+          5.118,
+          -3.003
+        ]
+      },
+      "GlassPrivacy": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.19,
+          3.492,
+          -2.849
+        ],
+        "bbox_max": [
+          3.19,
+          5.125,
+          11.527
+        ]
+      },
+      "Grille": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.963,
+          1.221,
+          -12.995
+        ],
+        "bbox_max": [
+          2.933,
+          2.567,
+          -12.307
+        ]
+      },
+      "Interior_Bar": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.161,
+          0.839,
+          -2.207
+        ],
+        "bbox_max": [
+          -1.643,
+          3.514,
+          5.471
+        ]
+      },
+      "Interior_Front": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.179,
+          0.679,
+          -7.082
+        ],
+        "bbox_max": [
+          3.179,
+          4.306,
+          -2.236
+        ]
+      },
+      "Interior_Lounge": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.179,
+          0.679,
+          -2.582
+        ],
+        "bbox_max": [
+          3.192,
+          5.204,
+          11.582
+        ]
+      },
+      "Lights_Front": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.109,
+          2.203,
+          -12.54
+        ],
+        "bbox_max": [
+          3.116,
+          2.545,
+          -12.185
+        ]
+      },
+      "Lights_Rear": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.135,
+          1.505,
+          9.774
+        ],
+        "bbox_max": [
+          3.135,
+          5.236,
+          13.97
+        ]
+      },
+      "Mirror_L": {
+        "translation": [
+          -2.997,
+          3.7,
+          -5.85
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.84,
+          3.599,
+          -6.062
+        ],
+        "bbox_max": [
+          -2.945,
+          4.071,
+          -5.64
+        ]
+      },
+      "Mirror_R": {
+        "translation": [
+          2.997,
+          3.7,
+          -5.85
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.945,
+          3.599,
+          -6.062
+        ],
+        "bbox_max": [
+          3.84,
+          4.071,
+          -5.64
+        ]
+      },
+      "StarLights": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -1.928,
+          5.086,
+          -1.75
+        ],
+        "bbox_max": [
+          1.937,
+          5.116,
+          8.952
+        ]
+      },
+      "SteeringWheel": {
+        "translation": [
+          -1.4286,
+          3.125,
+          -5.6179
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.146,
+          2.464,
+          -5.952
+        ],
+        "bbox_max": [
+          -0.711,
+          3.786,
+          -5.284
+        ]
+      },
+      "Wheel_FL": {
+        "translation": [
+          -2.9643,
+          1.2555,
+          -9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.395,
+          0.0,
+          -10.784
+        ],
+        "bbox_max": [
+          -2.534,
+          2.511,
+          -8.273
+        ]
+      },
+      "Wheel_FR": {
+        "translation": [
+          2.9643,
+          1.2555,
+          -9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.534,
+          0.0,
+          -10.784
+        ],
+        "bbox_max": [
+          3.395,
+          2.511,
+          -8.273
+        ]
+      },
+      "Wheel_RL": {
+        "translation": [
+          -2.9643,
+          1.2555,
+          9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.395,
+          0.0,
+          8.273
+        ],
+        "bbox_max": [
+          -2.534,
+          2.511,
+          10.784
+        ]
+      },
+      "Wheel_RR": {
+        "translation": [
+          2.9643,
+          1.2555,
+          9.5286
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.534,
+          0.0,
+          8.273
+        ],
+        "bbox_max": [
+          3.395,
+          2.511,
+          10.784
+        ]
+      }
+    }
+  },
+  "mismatches": []
+}

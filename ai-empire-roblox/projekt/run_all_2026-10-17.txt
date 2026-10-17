@@ -1,0 +1,168 @@
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+layout                 rc=0  layout tests: 50 passed, 0 failed
+door_service           rc=0  door_service_test: 72 passed, 0 failed
+lift_logic             rc=0  lift_logic: 70 passed, 0 failed
+lift_service           rc=0  lift_service: 87 passed, 0 failed
+lift_ui                rc=0  lift_ui: 19 passed, 0 failed
+snapshot               rc=0  snapshot test: 13 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+net_patch              rc=0  net patch tests: 32 passed, 0 failed
+net                    rc=0  net tests: 90 passed, 0 failed
+net_e2e                rc=0  net e2e tests: 9 passed, 0 failed
+people                 rc=0  people tests: 2147 passed, 0 failed
+people_client          rc=0  people client tests: 45 passed, 0 failed
+people_real            rc=0  people real-building tests (tier 2): 9 passed, 0 failed
+staff_t1               rc=0  staff tests: 422 passed, 0 failed
+staff_t2               rc=0  staff tests: 810 passed, 0 failed
+staff_t3               rc=0  staff tests: 1394 passed, 0 failed
+staff_t4               rc=0  staff tests: 2416 passed, 0 failed
+staff_sim              rc=0  staff sim: 200592 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+screens_fake           rc=0  [print] SUMMARY problems=0 tickOk=true
+screens_real           rc=0  [print] SUMMARY problems=0 tickOk=true
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+talk_dialogue          rc=0  talk dialogue tests: 1810 passed, 0 failed
+talk                   rc=0  talk service tests: 113 passed, 0 failed
+talk_client            rc=0  talk client tests: 31 passed, 0 failed
+talk_real              rc=0  talk real-building tests (tier 2): 150 passed, 0 failed
+life_props             rc=0  life props: 17711 passed, 0 failed
+life_client            rc=0  life client: 1106 passed, 0 failed
+life_t1                rc=0  life staff: 57 passed, 0 failed
+life_t2                rc=0  life staff: 57 passed, 0 failed
+life_t3                rc=0  life staff: 57 passed, 0 failed
+life_t4                rc=0  life staff: 57 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+shop                   rc=0  shop tests: 146 passed, 0 failed
+shop_client            rc=0  shop client tests: 50 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+shop2_server           rc=0  shop2_server: 170 passed, 0 failed
+shop2_math             rc=0  shop2_math: 201 passed, 0 failed
+shop2_client           rc=0  shop2_client: 113 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+menu_server            rc=0  menu_server: 111 passed, 0 failed
+menu_client_guide      rc=0  menu_client_guide: 104 passed, 0 failed
+menu_client_menu       rc=0  menu_client_menu: 59 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+world_cityplan         rc=0  world_cityplan: 144 passed, 0 failed
+world_build            rc=0  world_build: 27 passed, 0 failed
+world_travel           rc=0  world_travel: 51 passed, 0 failed
+world_vehicle          rc=0  world_vehicle: 27 passed, 0 failed
+world_client           rc=0  world_client: 22 passed, 0 failed
+buildings_tier0        rc=0  buildings tier0 runtime: 34 passed, 0 failed
+buildings_build        rc=0  buildings build tests: 154 passed, 0 failed
+buildings_admin        rc=0  buildings admin: 24 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+econ_ops               rc=0  econ ops tests: 173 passed, 0 failed
+econ_b2b               rc=0  econ b2b tests: 61 passed, 0 failed
+econ_service           rc=0  econ service tests: 92 passed, 0 failed
+econ_migration         rc=0  econ migration tests: 95 passed, 0 failed
+econ_net               rc=0  econ net tests: 18 passed, 0 failed
+corefix                rc=0  corefix server tests: 55 passed, 0 failed
+corefix_ui             rc=0  corefix ui tests: 8 passed, 0 failed
+models                 rc=0  models_ui_full: 42 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+airport                rc=0  airport: 95 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+metro_plan             rc=0  metro_plan: 44 passed, 0 failed
+metro_build            rc=0  metro_build: 42 passed, 0 failed
+metro_life             rc=0  metro_life: 46 passed, 0 failed
+metro_paths            rc=0  metro_paths: 6 passed, 0 failed
+metro_stress           rc=0  metro_stress: 8 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+flight_plan            rc=0  flight_plan: 95 passed, 0 failed
+flight_shuttle         rc=0  flight_shuttle: 111 passed, 0 failed
+flight_client          rc=0  flight_client: 90 passed, 0 failed
+flight_aircraft        rc=0  flight_aircraft: 45 passed, 0 failed
+flight_clearance       rc=0  flight_clearance: 18 passed, 0 failed
+world_check            rc=0  WORLD CHECK: OK
+world_entrances        rc=0  ENTRANCES: 23/23 buildings fully reachable
+metro_reach            rc=0  waterfront: 90393 reachable cells of 90393 standable; targets 4/4 reachable
+hotelpolish            rc=0  hotelpolish: 684 passed, 0 failed
+staffops_clock         rc=0  staffops_clock: 45 passed, 0 failed
+staffops_absence       rc=0  staffops_absence: 27 passed, 0 failed
+staffops_night         rc=0  staffops_night: 15 passed, 0 failed
+staffops_ops           rc=0  staffops_ops: 22 passed, 0 failed
+staffops_apprentice    rc=0  staffops_apprentice: 42 passed, 0 failed
+staffops_academy       rc=0  staffops_academy: 17 passed, 0 failed
+staffops_rack          rc=0  staffops_rack: 27 passed, 0 failed
+staffops_nightfault    rc=0  staffops_nightfault: 11 passed, 0 failed
+staffops_garage        rc=0  staffops_garage: 9 passed, 0 failed
+staffops_beacon        rc=0  staffops_beacon: 15 passed, 0 failed
+staffops_arrival       rc=0  staffops_arrival: 24 passed, 0 failed
+staffops_talk          rc=0  staffops_talk: 14 passed, 0 failed
+staffops_client        rc=0  staffops_client: 34 passed, 0 failed
+staffops_perf          rc=0  staffops_perf: 12 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+phone                  rc=0  phone: 227 passed, 0 failed
+phone_ui_garage        rc=0  phone_ui_garage: 36 passed, 0 failed
+phone_ui_rich          rc=0  phone_ui_rich: 50 passed, 0 failed
+phone_ui_fixes         rc=0  phone_ui_fixes: 43 passed, 0 failed
+phone_ui_touch         rc=0  phone_ui_touch: 19 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+apps_ui_garage         rc=0  apps_ui_garage: 42 passed, 0 failed
+apps_ui_client         rc=0  apps_ui_client: 31 passed, 0 failed
+apps_ui_save           rc=0  apps_ui_save: 33 passed, 0 failed
+apps_ui_mid            rc=0  apps_ui_mid: 76 passed, 0 failed
+apps_ui_rich           rc=0  apps_ui_rich: 36 passed, 0 failed
+apps_ui_phone          rc=0  apps_ui_phone: 15 passed, 0 failed
+apps_server_garage     rc=0  apps_server_garage: 40 passed, 0 failed
+apps_server_mid        rc=0  apps_server_mid: 58 passed, 0 failed
+apps_server_rich       rc=0  apps_server_rich: 38 passed, 0 failed
+apps_adv_garage_edge   rc=0  apps_adv_garage_edge: 15 passed, 0 failed
+apps_adv_stage5        rc=0  apps_adv_stage5: 14 passed, 0 failed
+apps_adv_rackfull      rc=0  apps_adv_rackfull: 22 passed, 0 failed
+apps_adv_oldsave       rc=0  apps_adv_oldsave: 20 passed, 0 failed
+apps_adv_many          rc=0  apps_adv_many: 11 passed, 0 failed
+apps_adv_spam          rc=0  apps_adv_spam: 11 passed, 0 failed
+apps_adv_midnight      rc=0  apps_adv_midnight: 7 passed, 0 failed
+apps_adv_broke         rc=0  apps_adv_broke: 13 passed, 0 failed
+apps_adv_hr            rc=0  apps_adv_hr: 11 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+drivers_plan           rc=0  drivers_plan: 229 passed, 0 failed
+drivers_service        rc=0  drivers_service: 166 passed, 0 failed
+drivers_client         rc=0  drivers_client: 49 passed, 0 failed
+drivers_review         rc=0  drivers_review: 71 passed, 0 failed
+drivers_review_cl      rc=0  drivers_review_client: 48 passed, 0 failed
+drivers_clearance      rc=0  drivers_clearance: 3542 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+guests_jet_jet         rc=0  guests_jet_jet: 210 passed, 0 failed
+guests_jet_guests      rc=0  guests_jet_guests: 205 passed, 0 failed
+guests_jet_aircraft    rc=0  guests_jet_aircraft: 27 passed, 0 failed
+guests_jet_geometry    rc=0  guests_jet_clearance: 18 passed, 0 failed
+manifest: 181 entries, 167 scripts from /tmp/claude-0/-home-user-website-/b11d0a70-15ce-5721-a0e0-6adea8266453/scratchpad/agents/rel1017/sandbox/work/src
+itinerary_math         rc=0  itinerary_math: 227 passed, 0 failed
+itinerary_abroad       rc=0  itinerary_service_abroad: 91 passed, 0 failed
+itinerary_jet          rc=0  itinerary_service_jet: 33 passed, 0 failed
+itinerary_region       rc=0  itinerary_service_region: 21 passed, 0 failed
+itinerary_offer        rc=0  itinerary_service_offer: 34 passed, 0 failed
+itinerary_edge         rc=0  itinerary_service_edge: 41 passed, 0 failed
+itinerary_remote       rc=0  itinerary_service_remote: 32 passed, 0 failed
+itinerary_client       rc=0  itinerary_client: 74 passed, 0 failed
+itinerary_review_race  rc=0  itinerary_review_race: 6 passed, 0 failed
+itinerary_review_offerwait rc=0  itinerary_review_offerwait: 3 passed, 0 failed
+itinerary_review_cabin rc=0  itinerary_review_cabin: 3 passed, 0 failed
+itinerary_review_cabinctl rc=0  itinerary_review_cabinctl: 2 passed, 0 failed
+itinerary_review_paidticket rc=0  itinerary_review_paidticket: 9 passed, 0 failed
+itinerary_review_garage rc=0  itinerary_review_garage: 14 passed, 0 failed
+itinerary_review_stalecall rc=0  itinerary_review_stalecall: 5 passed, 0 failed
+itinerary_review_abroadstart rc=0  itinerary_review_abroadstart: 11 passed, 0 failed
+itinerary_review_two   rc=0  itinerary_review_two: 17 passed, 0 failed
+itinerary_review_midnight rc=0  itinerary_review_midnight: 7 passed, 0 failed
+itinerary_review_leave rc=0  itinerary_review_leave: 15 passed, 0 failed
+itinerary_review_respawn rc=0  itinerary_review_respawn: 11 passed, 0 failed
+itinerary_review_spam  rc=0  itinerary_review_spam: 7 passed, 0 failed
+itinerary_review_endflight rc=0  itinerary_review_endflight: 13 passed, 0 failed
+itinerary_review_overhold rc=0  itinerary_review_overhold: 9 passed, 0 failed
+itinerary_review_stage5 rc=0  itinerary_review_stage5: 9 passed, 0 failed
+itinerary_review_rigcost rc=0  itinerary_review_rigcost: 3 passed, 0 failed
+itinerary_review_timed rc=0  itinerary_review_timed: 14 passed, 0 failed
+itinerary_review_together rc=0  itinerary_review_together: 14 passed, 0 failed
+itinerary_review_jettogether rc=0  itinerary_review_jettogether: 8 passed, 0 failed
+itinerary_review_perf  rc=0  itinerary_review_perf: 3 passed, 0 failed
+trip_e2e               rc=0  trip_e2e: 113 passed, 0 failed
+
+real	27m36.102s
+user	25m45.523s
+sys	0m33.504s
+exit=0

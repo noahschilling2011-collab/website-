@@ -1,0 +1,189 @@
+[
+ {
+  "id": "DS-1",
+  "severity": "high",
+  "files": [
+   "ServerScriptService/Server/Services/SessionService.module.luau"
+  ],
+  "fix": "Snapshot lines 332-357 and 380-397. Add a module counter `local closing = 0`. In closeSession, do `closing += 1` right after `session.released = true` and `closing -= 1` after `sessions[player] = nil`. In the BindToClose loop use `while (pending > 0 or closing > 0) and os.clock() - started < 25 do task.wait(0.25) end`. Already in agents/robloxreview/fix.diff. Regression test: agents/robloxreview/probe_save.luau -a bindtoclose should show the callback returning after the final commit, with stored money 777."
+ },
+ {
+  "id": "P1",
+  "severity": "high",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/Controllers/EmployeeController.module.luau"
+  ],
+  "fix": "Snapshot lines 394-462. Replace the rate at line 422 with `local sameFloor = math.abs(root.Position.Y - camera.CFrame.Position.Y) < 12` and `cache.next = time + (if sameFloor and distance < 60 then 1/30 elseif sameFloor and distance < Config.NEAR then 0.1 else 0.2)`. Move the OffDuty GetAttribute read at line 407 after the `time < cache.next` check, or cache it with GetAttributeChangedSignal(\"OffDuty\"). Client only, no economy impact. Proven in agents/robloxreview/perf/patched: 7,690 to 1,600 poses/s. Confirm with the MicroProfiler on a phone."
+ },
+ {
+  "id": "DS-3/F1",
+  "severity": "medium",
+  "files": [
+   "ServerScriptService/Server/Services/SaveService.module.luau",
+   "ServerScriptService/Server/Services/SessionService.module.luau"
+  ],
+  "fix": "Snapshot SaveService line 155: make the ownership check strict, `if meta.lockJobId ~= jobId then lostLock = true; return nil end`, which also refuses a released (nil) lock, so a late autosave or Shop.saveNow cannot commit after the release save. In SessionService.saveSession (line 272), only kick when `lostLock and not release and not session.released`. Use together with DS-2's per-session token. The strict check is already in agents/robloxreview/fix.diff; add the `not session.released` guard. Regression test: probe_save.luau -a stale_autosave should end with stored 777 and lock nil."
+ },
+ {
+  "id": "DS-2",
+  "severity": "medium",
+  "files": [
+   "ServerScriptService/Server/Services/SaveService.module.luau",
+   "ServerScriptService/Server/Services/SessionService.module.luau",
+   "ServerScriptService/Server/Services/ShopService.module.luau"
+  ],
+  "fix": "Use one lock token per session instead of game.JobId. In SaveService.load, set `local jobId = SESSION_ID .. \"/\" .. HttpService:GenerateGUID(false)` and return it as a 3rd value. Add a typed `lockToken: string?` field to the Session type (not an `any` cast), set it in onPlayerAdded, and pass it to SaveService.save(userId, data, release, token), SaveService.releaseLock(userId, token) and ShopService deps.save (4th argument). meta.lockJobId stays a string, so old saves load unchanged. Already in agents/robloxreview/fix.diff. Regression test: probe_save.luau -a rejoin should end with stored 777. Re-run tests/shop and the econ suites."
+ },
+ {
+  "id": "P4",
+  "severity": "medium",
+  "files": [
+   "ServerScriptService/Server/Services/HeadquartersDesign.module.luau",
+   "ServerScriptService/Server/Services/PlotService.module.luau",
+   "ServerScriptService/Server/Services/RoomKitsWork.module.luau",
+   "ServerScriptService/Server/Services/RoomKitsSpecial.module.luau",
+   "ServerScriptService/Server/Services/RoomKitsPavilion.module.luau"
+  ],
+  "fix": "Snapshot HeadquartersDesign lines 73-76: build into the unparented office as now, but task.wait() between generators and every N rooms inside the RoomKits generators, then parent once at the end. In PlotService (claim line 144, refresh line 98), add a per-plot `p.building` flag. A refresh that arrives during a build only sets `p.dirty = true`, and refresh runs once more when the build ends. After Design.build returns, check `p.owner == session.player and not session.closed`, and otherwise destroy the new office. No save change. Measure the stall with the server MicroProfiler before and after."
+ },
+ {
+  "id": "P2",
+  "severity": "medium",
+  "files": [
+   "pack.py",
+   "tests/buildings/test_build.luau"
+  ],
+  "fix": "pack.py lines 129-130: set StreamingMinRadius to 64 and StreamingTargetRadius to 256. These Workspace properties are NotScriptable, so they must be set in the place file. Add a per-tier office part budget next to the tier-0 budget (test_build.luau:222). Before shipping, check in Studio that the AirTraffic view, CityLife regions and the travel arrival still work at 256. Measure join/respawn pause and memory on a low-memory phone."
+ },
+ {
+  "id": "P3",
+  "severity": "medium",
+  "files": [
+   "ServerScriptService/Server/Services/StaffService.module.luau",
+   "ServerScriptService/Server/Services/WorkstationService.module.luau",
+   "ServerScriptService/Server/Services/StaffJobs.module.luau",
+   "ServerScriptService/Server/Services/StaffEvents.module.luau"
+  ],
+  "fix": "Set e.humanoid.EvaluateStateMachine = false wherever a rig is anchored to stand or park: StaffService park (line 127) and leave (:454), WorkstationService standing stations (:192, :207), StaffJobs (:81, :295) and StaffEvents (:103). Nav.go (EmployeeNavigation:160) and StaffEvents:206 already turn it back on before a walk. Leave seated stations (WorkstationService:197-198) for later, until Studio confirms that Humanoid.SeatPart (NotReplicated in API-Dump) still drives the client sitting pose; otherwise publish a Seated attribute. Economy unchanged (CORE_SPEC 5.1)."
+ },
+ {
+  "id": "F2",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/EmpireService.module.luau"
+  ],
+  "fix": "In dealAction joinMeeting (snapshot lines 439-453) and in the City.setMeetingHandler callback (476-482), lazily require CityService and refuse with {ok=false, err=\"TOO_FAR\"} unless `City.state(session.player) == (if client.trip == \"abroad\" then \"abroad\" else \"home\")`. Flights (CityService:159) and the shuttle (ShuttleService:426) both set state abroad, so legitimate travellers pass. Add a test: a teleport without a trip is refused."
+ },
+ {
+  "id": "DS-4",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/SaveService.module.luau"
+  ],
+  "fix": "Snapshot lines 64-68: run the __probe GetAsync only in Studio: `if RunService:IsStudio() then candidate:GetAsync(\"__probe\") end; store = candidate`. Live servers rely on the existing load and save retries. Already in agents/robloxreview/fix.diff. Regression test: probe_save.luau -a init_fail."
+ },
+ {
+  "id": "F3",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/VehicleService.module.luau"
+  ],
+  "fix": "In Vehicles.tick (snapshot line 174), add `or insideForeignHQ(position, userId)` to the reset condition. Use a helper that loops over Plot.all() and returns true when `p.owner and p.office and p.owner.UserId ~= ownerId` and `Plan.inside(tier, p.cframe:PointToObjectSpace(pos))`, with tier from p.office:GetAttribute(\"OfficeTier\"). Plan and Plot are already required. The existing branch ejects the driver and pivots the car home. Regression test: agents/robloxreview/sec_probe/probe_car.luau should show the car reset."
+ },
+ {
+  "id": "F5",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/TalkService.module.luau",
+   "tests/talk/test_talk.luau"
+  ],
+  "fix": "Snapshot line 386: give the owner precedence. `if busy and not busy.closed and busy.player ~= player then if own then finish(busy, busy.farewell, true) else return refuse(player, i, \"NPC_BUSY\", viaPrompt) end end`. Update test_talk.luau:209-214 to expect the owner to take over, and that the visitor gets TALK_CLOSE."
+ },
+ {
+  "id": "F4",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/FacilityService.module.luau"
+  ],
+  "fix": "In grantGuest (snapshot lines 260-266): if guests[s.userId][p.userId] is still later than os.time(), only extend the expiry, both the guests entry and the existing card's cards[tool].expires, and return {ok=true} with no new Tool and no toast. Add a per-(granter, target) cooldown of one new card and toast per 60 s."
+ },
+ {
+  "id": "P5",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/BuildingStateService.module.luau"
+  ],
+  "fix": "In Service.tick (snapshot lines 766-792), track the nearest player's position, not only the distance, and use the 6 s interval also when math.abs(screen.Position.Y - nearest.Y) > 12 (line 785)."
+ },
+ {
+  "id": "P6",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/DoorService.module.luau",
+   "StarterPlayer/StarterPlayerScripts/Client/Controllers/PropFxController.module.luau"
+  ],
+  "fix": "Stop the server-side PivotTo animation (snapshot lines 260-267, Heartbeat at 290-296). Replicate a DoorState plus DoorMovedAt attribute and animate the leaves on the client with PropFxController's existing hinge and slider kinds. The server keeps setCollision and the timers. Check smoothness on a phone."
+ },
+ {
+  "id": "P7",
+  "severity": "low",
+  "files": [
+   "ServerScriptService/Server/Services/PlotService.module.luau"
+  ],
+  "fix": "In Plot.refresh (snapshot lines 107 and 118-121), cache the SignAnchor/Label and the six board SurfaceGuis per office at build time, in a table keyed by office and renewed on rebuild, instead of using FindFirstChild(name, true) or FindFirstChildWhichIsA(\"SurfaceGui\", true) on every GPU buy or sell, hire, fire or training step. Or search only office.Site and office.Facade."
+ },
+ {
+  "id": "UI-1",
+  "severity": "high",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/UI/UIRoot.module.luau"
+  ],
+  "fix": "Implement apps request #8 in Computer.mount. When Kit.isTouch() and the root scale is below 0.62, set boost = math.clamp(0.62/rootScale, 1, 1.45), use it as the window UIScale (also as the target of the open tween at Computer.lua:106-107 instead of 1), and size the window UDim2.new(1/boost, -40/boost, 1/boost, -28/boost) so it still fills the screen and reflows. Apply the same boost to the Toast holder and to the Intro form column. Studio.applyScale already divides by designScale(host), so it adapts; re-run tests/lab. Test that should exist: an apps phone-state check (a copy of probe_phone_pt) that opens every Computer app at 844x390 touch and asserts every visible text is at least 11 pt and every GuiButton at least 44 pt.",
+  "note": "added by lead from verifier journal; re-check on work/src (snapshot predates menu package)"
+ },
+ {
+  "id": "UI-2",
+  "severity": "medium",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/Controllers/SecurityController.module.luau"
+  ],
+  "fix": "In show(), before capturing `old`, refuse when another mode owns the camera: `if camera.CameraType ~= Enum.CameraType.Custom then Toast.show(\"info\", \"The cameras are not available right now.\"); return end`. Alternatively, in close(), always restore Custom plus the humanoid as CameraSubject unless a ride is still active. Test that should exist: in the SecurityController block of tests/apps/test_server.luau, set the camera to Scriptable, open the CCTV, set Custom, press Back, and assert CameraType == Custom (the probe scenario).",
+  "note": "added by lead from verifier journal; re-check on work/src (snapshot predates menu package)"
+ },
+ {
+  "id": "UI-3",
+  "severity": "low",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/UI/Screens/Conversation.module.luau"
+  ],
+  "fix": "Use the TalkPanel pattern in all three. Compute the scale from screen.AbsoluteSize: `math.clamp(math.min((s.Y-16)/H, (s.X-16)/W), .3, 1)`, fall back to ViewportSize only while AbsoluteSize is 0, and re-fit on screen:GetPropertyChangedSignal(\"AbsoluteSize\"). On touch, also raise footer and floor buttons with Kit.tap(46, 72). Tests that should exist: people_client and lift_ui cases at 667x375 (insets 58/0/0/0) asserting panel top >= ScreenGui top and Close/footer bottom <= ScreenGui bottom.",
+  "note": "added by lead from verifier journal; re-check on work/src (snapshot predates menu package)"
+ },
+ {
+  "id": "UI-4",
+  "severity": "low",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/Controllers/TravelController.module.luau"
+  ],
+  "fix": "When expanding, size the box to its ScreenGui: `box.Position = UDim2.fromOffset(16, 8); box.Size = UDim2.fromOffset(250, math.min(330, gui.AbsoluteSize.Y - 16))`, and restore the old position when collapsing. Optionally list City Airport right after 'My HQ'. Test that should exist: in world_client, set the TravelGPS AbsoluteSize to 750x311 and 667x317 and assert box bottom <= AbsoluteSize.Y and that the last entry can be fully scrolled into view.",
+  "note": "added by lead from verifier journal; re-check on work/src (snapshot predates menu package)"
+ },
+ {
+  "id": "UI-5",
+  "severity": "medium",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/UI/Apps/CampusApp.module.luau"
+  ],
+  "fix": "`button(security, \"Open live campus cameras\", function() if navigator then navigator.close() end; Security.open() end)`. navigator is already stored in App.mount. Optionally have Security.close() reopen the Campus app. Test that should exist: in apps test_ui, click the button and assert Computer.isOpen() == false and the blur is 0 while CampusSecurity exists.",
+  "note": "added by lead from verifier journal; re-check on work/src (snapshot predates menu package)"
+ },
+ {
+  "id": "UI-8",
+  "severity": "low",
+  "files": [
+   "StarterPlayer/StarterPlayerScripts/Client/Controllers/ShuttleController.module.luau"
+  ],
+  "fix": "Place the pass left of the HUD lane: read `hud:GetAttribute(\"LaneWidth\")` from PlayerGui.AIEmpire_HUD.Root.HUD (as Screens/Phone does) and set Position = UDim2.new(1, -(lane*layerScale) - 16, 0.5, 40), or move the pass to bottom-centre above the safe area. Test that should exist: in flight_client on an 844x390 touch viewport, the ShuttlePass rectangle must not intersect the HUD Column rectangle.",
+  "note": "added by lead from verifier journal; re-check on work/src (snapshot predates menu package)"
+ }
+]

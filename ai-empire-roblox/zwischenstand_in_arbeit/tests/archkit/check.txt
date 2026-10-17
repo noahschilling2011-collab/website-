@@ -1,0 +1,175 @@
+== GEOMETRY REPORT  tests/archkit/dump.json  tier 1  mode local  (converted to local: False)
+instances 1516  parts 1155  mock thread errors 0  stubs {}
+
+== PART COUNTS
+total parts 1155  (character/NPC rig parts 0, building parts 1155)
+collidable building parts 507   non-collidable detail parts 648
+invisible collidable parts (Transparency>=0.99) 0   glass-like (0<T<0.99) 56
+by name prefix (building parts; count / collidable):
+   Book                             59 / 0
+   Batten                           46 / 0
+   Skirting                         42 / 0
+   Slab                             35 / 35
+   ReaderLight                      32 / 0
+   ChairLeg                         30 / 0
+   Post                             29 / 29
+   Louvre                           26 / 18
+   PromptOut                        26 / 0
+   PromptIn                         26 / 0
+   Sensor                           26 / 0
+   Hinge                            25 / 0
+   Wall                             20 / 20
+   ChairBase                        19 / 1
+   Seat                             17 / 17
+   ChairBack                        17 / 17
+   Lintel                           17 / 17
+   JambL                            16 / 16
+   JambR                            16 / 16
+   Glass                            15 / 15
+   Lever                            15 / 0
+   Head                             14 / 14
+   TopRail                          13 / 6
+   BottomRail                       11 / 11
+   DeskLeg                          10 / 10
+   CeilingSlat                      10 / 10
+   Mullion                          10 / 10
+   LaneLight                        10 / 0
+   FlapEdge                         10 / 0
+   MonitorStand                     10 / 0
+   ChairStem                         9 / 0
+   Box                               9 / 9
+   KickPlate                         9 / 0
+   Caster                            8 / 0
+   ArmRest                           8 / 2
+   DeskTop                           8 / 8
+   Shelf                             7 / 7
+   Pull                              7 / 0
+   GateCabinet                       7 / 7
+   GateCabinetTop                    7 / 7
+   ChairSeat                         7 / 7
+   DisplayContent                    7 / 0
+   Keyboard                          7 / 0
+   Mouse                             7 / 0
+   Foliage                           6 / 0
+   ... 199 more prefixes (use --verbose)
+
+== BOUNDS (building-local, from oriented boxes)
+all parts: x [-110.0, 110.0]  y [0.0, 15.3]  z [-110.0, 120.0]
+building : x [-110.0, 110.0]  y [0.0, 15.3]  z [-110.0, 120.0]
+allowed box x[-142.0,145.0] y[-27.0,200.0] z[-221.0,228.0]: 0 part(s) outside
+
+== DEGENERATE / INVALID
+NaN/inf values: 0   size<0.05: 68   size>=2048: 0   clamped by Roblox (requested size out of range): 0   non-orthonormal rotation: 0
+   SMALL Office/Furniture/PowerHub size [1.2, 0.04, 0.6]
+   SMALL Office/Furniture/PowerHub size [1.2, 0.04, 0.6]
+   SMALL Office/Furniture/RugBorder size [8, 0.04, 6]
+   SMALL Office/Furniture/Groove size [0.04, 2.2, 0.02]
+   SMALL Office/Furniture/Groove size [0.04, 2.2, 0.02]
+   SMALL Office/Furniture/Groove size [0.04, 6, 0.02]
+   SMALL Office/Furniture/StickyNote size [0.5, 0.5, 0.02]
+   SMALL Office/Furniture/StickyNote size [0.5, 0.5, 0.02]
+   SMALL Office/Furniture/Note size [0.6, 0.8, 0.02]
+   SMALL Office/Furniture/Note size [0.6, 0.8, 0.02]
+   SMALL Office/Furniture/Note size [0.6, 0.8, 0.02]
+   SMALL Office/Furniture/Note size [0.6, 0.8, 0.02]
+   SMALL Office/Furniture/Note size [0.6, 0.8, 0.02]
+   SMALL Office/Furniture/Canvas size [3.7, 2.7, 0.04]
+   SMALL Office/Furniture/ArtPanel size [1.158082, 1.544709, 0.02]
+
+== DUPLICATE COLLIDABLE PARTS (identical CFrame and size)
+0 group(s) of exact duplicates (0 redundant parts)
+
+== WALKABILITY  grid 1.0 stud, step 1.6, clearance [0.3, 5.0], radius 1.3
+solid parts 507 (doors/gates treated as open: 14; characters ignored; non-colliding groups: 0)
+grid 287x449 cells, surfaces 53534, standable nodes 48856, clearance constraints 66716
+lift links: none (0 nodes linked)
+edges 377218, components 45, union-find iterations 3
+start node at (-60.5, 0.10, -30.5); reachable nodes 32782 / 48856 (67.1%)
+
+reachability by category (reachable / total):
+   workstations                     7 / 7
+   seats                            7 / 24
+   seats (front side)               0 / 24
+   doors (both sides)               7 / 25
+   proximity prompts               66 / 66
+
+UNREACHABLE seats (17):
+   Office/Furniture/Seat at (-100.0, 2.1, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-95.0, 2.1, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-90.0, 2.1, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-85.0, 1.9, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-80.0, 1.5, -80.3) -- standable but not connected to start
+   Office/Furniture/Seat at (-75.5, 1.5, -80.3) -- standable but not connected to start
+   Office/Furniture/Seat at (-72.5, 1.5, -80.3) -- standable but not connected to start
+   Office/Furniture/Seat at (-64.0, 3.0, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-60.5, 1.7, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-57.5, 1.7, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-39.0, 1.9, -83.4) -- standable but not connected to start
+   Office/Furniture/Seat at (-39.0, 1.9, -76.6) -- standable but not connected to start
+   Office/Furniture/Seat at (-36.0, 1.9, -83.4) -- standable but not connected to start
+   Office/Furniture/Seat at (-36.0, 1.9, -76.6) -- standable but not connected to start
+   Office/Furniture/Seat at (-33.0, 1.9, -83.4) -- standable but not connected to start
+   Office/Furniture/Seat at (-33.0, 1.9, -76.6) -- standable but not connected to start
+   Office/Furniture/Booth1/Seat at (-33.0, 2.0, -53.5) -- standable but not connected to start
+
+UNREACHABLE seats (front side) (24):
+   Office/Furniture/Seat at (-100.0, 2.1, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-95.0, 2.1, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-90.0, 2.1, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-85.0, 1.9, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-80.0, 1.5, -80.3) -- standable but not connected to start
+   Office/Furniture/Seat at (-75.5, 1.5, -80.3) -- standable but not connected to start
+   Office/Furniture/Seat at (-72.5, 1.5, -80.3) -- standable but not connected to start
+   Office/Furniture/Seat at (-64.0, 3.0, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-60.5, 1.7, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-57.5, 1.7, -80.0) -- standable but not connected to start
+   Office/Furniture/Seat at (-39.0, 1.9, -83.4) -- standable but not connected to start
+   Office/Furniture/Seat at (-39.0, 1.9, -76.6) -- standable but not connected to start
+   Office/Furniture/Seat at (-36.0, 1.9, -83.4) -- standable but not connected to start
+   Office/Furniture/Seat at (-36.0, 1.9, -76.6) -- standable but not connected to start
+   Office/Furniture/Seat at (-33.0, 1.9, -83.4) -- standable but not connected to start
+   Office/Furniture/Seat at (-33.0, 1.9, -76.6) -- standable but not connected to start
+   Office/Furniture/Booth1/Seat at (-33.0, 2.0, -53.5) -- no standable node nearby
+   Office/Stations/WS_bench/ChairSeat at (-96.0, 2.1, -22.9) -- standable but not connected to start
+   Office/Stations/WS_ldesk/ChairSeat at (-80.0, 2.1, -22.9) -- standable but not connected to start
+   Office/Stations/WS_standing/ChairSeat at (-64.0, 3.1, -22.6) -- standable but not connected to start
+   Office/Stations/WS_dual/ChairSeat at (-48.0, 2.1, -22.9) -- standable but not connected to start
+   Office/Stations/WS_trading/ChairSeat at (-32.0, 2.1, -22.9) -- standable but not connected to start
+   Office/Stations/WS_lab/ChairSeat at (-16.0, 2.1, -22.8) -- standable but not connected to start
+   Office/Stations/WS_rot/ChairSeat at (-2.9, 2.1, -20.0) -- standable but not connected to start
+
+UNREACHABLE doors (both sides) (18):
+   Office/Furniture/Booth1/BoothDoor at (-32.3, 3.0, -57.4) -- standable but not connected to start; sides reachable [False, False]
+   Office/Furniture/RackDoor at (-1.0, 3.0, -57.1) -- standable but not connected to start; sides reachable [False, False]
+   Office/Furniture/RackDoor at (3.0, 3.0, -57.1) -- standable but not connected to start; sides reachable [False, False]
+   Office/Furniture/RackDoor at (7.0, 3.0, -57.1) -- standable but not connected to start; sides reachable [False, False]
+   Office/Furniture/LockerDoor at (-89.2, 3.3, -41.9) -- standable but not connected to start; sides reachable [True, False]
+   Office/Furniture/LockerDoor at (-87.8, 3.3, -41.9) -- standable but not connected to start; sides reachable [True, False]
+   Office/Furniture/LockerDoor at (-86.2, 3.3, -41.9) -- standable but not connected to start; sides reachable [True, False]
+   Office/Furniture/LockerDoor at (-84.8, 3.3, -41.9) -- standable but not connected to start; sides reachable [True, False]
+   Office/Furniture/LockerDoor at (-83.2, 3.3, -41.9) -- standable but not connected to start; sides reachable [True, False]
+   Office/Furniture/LockerDoor at (-81.8, 3.3, -41.9) -- standable but not connected to start; sides reachable [True, False]
+   Office/Furniture/FridgeDoorLine at (-3.2, 7.5, -42.5) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG1/Frame/GateCabinetTop at (-17.0, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG1/Frame/GateCabinetTop at (-11.0, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG2/Frame/GateCabinetTop at (-9.0, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG2/Frame/GateCabinetTop at (-4.5, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG3/Frame/GateCabinetTop at (0.0, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG4/Frame/GateCabinetTop at (4.5, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+   Office/Doors/Door_SG5/Frame/GateCabinetTop at (9.0, 6.1, 70.0) -- standable but not connected to start; sides reachable [False, False]
+
+per level (nodes with surface in [Y-2, Y+12)): standable / reachable cells
+   level      0: standable  47400  reachable  32782
+
+(checked in 0.3s)
+
+== SUMMARY
+  parts outside allowed box: 0
+  degenerate: NaN 0, tiny(<0.05) 68, huge 0, non-orthonormal 0
+  exact duplicate collidable groups: 0
+  workstations: 7/7 reachable
+  seats: 7/24 reachable
+  seats (front side): 0/24 reachable
+  doors (both sides): 7/25 reachable
+  proximity prompts: 66/66 reachable
+  standable nodes 48856, reachable 32782 (67.1%), components 45

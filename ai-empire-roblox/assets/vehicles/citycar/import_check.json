@@ -1,0 +1,554 @@
+{
+  "fbx": {
+    "Body": {
+      "tris": 7836,
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Glass": {
+      "tris": 792,
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Headlights": {
+      "tris": 176,
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Interior": {
+      "tris": 856,
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Seat_Driver": {
+      "tris": 232,
+      "pivot_studs": [
+        -1.3393,
+        1.8036,
+        -0.5714
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "SteeringWheel": {
+      "tris": 332,
+      "pivot_studs": [
+        -1.3393,
+        3.0714,
+        -1.7857
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Taillights": {
+      "tris": 328,
+      "pivot_studs": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_FL": {
+      "tris": 908,
+      "pivot_studs": [
+        -2.8446,
+        1.1941,
+        -5.1161
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_FR": {
+      "tris": 908,
+      "pivot_studs": [
+        2.8446,
+        1.1941,
+        -5.1161
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_RL": {
+      "tris": 908,
+      "pivot_studs": [
+        -2.8696,
+        1.1941,
+        5.1161
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "Wheel_RR": {
+      "tris": 908,
+      "pivot_studs": [
+        2.8696,
+        1.1941,
+        5.1161
+      ],
+      "rotation_deg": [
+        90.0,
+        -0.0,
+        -180.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "has_vertex_colours": true
+    },
+    "_overall": {
+      "objects": 11,
+      "tris": 14184,
+      "size_studs_XYZ": [
+        7.429,
+        5.16,
+        16.964
+      ],
+      "size_m_XYZ": [
+        2.0801,
+        1.4448,
+        4.7499
+      ],
+      "min_studs": [
+        -3.7143,
+        0.0,
+        -8.1875
+      ],
+      "max_studs": [
+        3.7143,
+        5.1598,
+        8.7768
+      ]
+    }
+  },
+  "obj": {
+    "objects": 11,
+    "tris": 14184,
+    "size_studs_XYZ": [
+      7.429,
+      5.16,
+      16.964
+    ]
+  },
+  "raw_fbx": {
+    "UpAxis": 1,
+    "UpAxisSign": 1,
+    "FrontAxis": 2,
+    "FrontAxisSign": -1,
+    "CoordAxis": 0,
+    "UnitScaleFactor": 100.0,
+    "nodes": {
+      "Body": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.714,
+          0.471,
+          -8.188
+        ],
+        "bbox_max": [
+          3.714,
+          5.16,
+          8.777
+        ]
+      },
+      "Glass": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.049,
+          3.312,
+          -3.601
+        ],
+        "bbox_max": [
+          3.049,
+          5.004,
+          6.712
+        ]
+      },
+      "Headlights": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.938,
+          2.074,
+          -7.87
+        ],
+        "bbox_max": [
+          2.938,
+          2.304,
+          -7.284
+        ]
+      },
+      "Interior": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.964,
+          0.607,
+          -3.643
+        ],
+        "bbox_max": [
+          2.964,
+          4.422,
+          6.643
+        ]
+      },
+      "Seat_Driver": {
+        "translation": [
+          -1.3393,
+          1.8036,
+          -0.5714
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.25,
+          1.214,
+          -1.464
+        ],
+        "bbox_max": [
+          -0.429,
+          4.422,
+          1.55
+        ]
+      },
+      "SteeringWheel": {
+        "translation": [
+          -1.3393,
+          3.0714,
+          -1.7857
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.057,
+          2.426,
+          -2.648
+        ],
+        "bbox_max": [
+          -0.621,
+          3.717,
+          -1.464
+        ]
+      },
+      "Taillights": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -2.827,
+          3.113,
+          8.158
+        ],
+        "bbox_max": [
+          2.827,
+          3.324,
+          8.773
+        ]
+      },
+      "Wheel_FL": {
+        "translation": [
+          -2.8446,
+          1.1941,
+          -5.1161
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.264,
+          0.0,
+          -6.31
+        ],
+        "bbox_max": [
+          -2.425,
+          2.388,
+          -3.922
+        ]
+      },
+      "Wheel_FR": {
+        "translation": [
+          2.8446,
+          1.1941,
+          -5.1161
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.425,
+          0.0,
+          -6.31
+        ],
+        "bbox_max": [
+          3.264,
+          2.388,
+          -3.922
+        ]
+      },
+      "Wheel_RL": {
+        "translation": [
+          -2.8696,
+          1.1941,
+          5.1161
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          -3.289,
+          0.0,
+          3.922
+        ],
+        "bbox_max": [
+          -2.45,
+          2.388,
+          6.31
+        ]
+      },
+      "Wheel_RR": {
+        "translation": [
+          2.8696,
+          1.1941,
+          5.1161
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scaling": [
+          1,
+          1,
+          1
+        ],
+        "bbox_min": [
+          2.45,
+          0.0,
+          3.922
+        ],
+        "bbox_max": [
+          3.289,
+          2.388,
+          6.31
+        ]
+      }
+    }
+  },
+  "mismatches": []
+}

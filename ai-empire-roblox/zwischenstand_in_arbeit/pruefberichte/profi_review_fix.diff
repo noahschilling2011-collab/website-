@@ -1,0 +1,171 @@
+diff -ru agents/stable/snap_lab_1150/ServerScriptService/Server/Services/SaveService.module.luau agents/robloxreview/patched/ServerScriptService/Server/Services/SaveService.module.luau
+--- agents/stable/snap_lab_1150/ServerScriptService/Server/Services/SaveService.module.luau	2026-10-10 18:05:08.029069712 +0000
++++ agents/robloxreview/patched/ServerScriptService/Server/Services/SaveService.module.luau	2026-10-11 16:32:32.551508638 +0000
+@@ -63,7 +63,7 @@
+ 	end
+ 	local ok, err = pcall(function()
+ 		local candidate = DataStoreService:GetDataStore(GameConfig.DATASTORE_NAME)
+-		candidate:GetAsync("__probe")
++		if RunService:IsStudio() then candidate:GetAsync("__probe") end -- Studio: "API access off" check only
+ 		store = candidate
+ 	end)
+ 	if ok then
+@@ -74,14 +74,14 @@
+ end
+ 
+ -- Lädt und sperrt den Spielstand. Gibt (Daten, nil) oder (nil, Grund) zurück.
+-function SaveService.load(userId: number): (Types.PlayerData?, string?)
++function SaveService.load(userId: number): (Types.PlayerData?, string?, string?)
+ 	local activeStore = store
+ 	if not SaveService.enabled or not activeStore then
+ 		if RunService:IsStudio() or game.PlaceId == 0 then return Template.new(), nil end
+ 		return nil, "storage unavailable; please rejoin"
+ 	end
+ 	local key = keyFor(userId)
+-	local jobId = SESSION_ID
++	local jobId = SESSION_ID .. "/" .. HttpService:GenerateGUID(false) -- one token per session, not per server
+ 
+ 	for attempt = 1, GameConfig.LOAD_ATTEMPTS do
+ 		local lockedElsewhere = false
+@@ -124,7 +124,7 @@
+ 		end)
+ 		if ok and invalidReason then return nil, invalidReason end
+ 		if ok and not lockedElsewhere then
+-			return loaded, nil
++			return loaded, nil, jobId
+ 		end
+ 		if not ok then
+ 			warn(`[Save] Laden fehlgeschlagen (Versuch {attempt}): {err}`)
+@@ -136,13 +136,13 @@
+ 
+ -- Speichert. release = true gibt den Lock frei (Spieler verlässt den Server).
+ -- Rückgabe: (gespeichert, Lock verloren)
+-function SaveService.save(userId: number, data: Types.PlayerData, release: boolean): (boolean, boolean)
++function SaveService.save(userId: number, data: Types.PlayerData, release: boolean, token: string?): (boolean, boolean)
+ 	local activeStore = store
+ 	if not SaveService.enabled or not activeStore then
+ 		return true, false
+ 	end
+ 	local key = keyFor(userId)
+-	local jobId = SESSION_ID
++	local jobId = token
+ 	local payload = sanitize(data)
+ 
+ 	for attempt = 1, GameConfig.SAVE_ATTEMPTS do
+@@ -152,7 +152,7 @@
+ 			activeStore:UpdateAsync(key, function(old: any)
+ 				lostLock = false
+ 				local meta = if typeof(old) == "table" and typeof(old.meta) == "table" then old.meta else {}
+-				if meta.lockJobId ~= nil and meta.lockJobId ~= jobId then
++				if meta.lockJobId ~= jobId then -- strict: a released (nil) or foreign lock is never written
+ 					lostLock = true
+ 					return nil -- eine andere Session besitzt die Daten: nicht überschreiben
+ 				end
+@@ -173,18 +173,18 @@
+ 			return not lostLock, lostLock
+ 		end
+ 		warn(`[Save] Speichern fehlgeschlagen (Versuch {attempt}): {err}`)
+-		task.wait(2 ^ attempt)
++		if attempt < GameConfig.SAVE_ATTEMPTS then task.wait(2 ^ attempt) end
+ 	end
+ 	return false, false
+ end
+ 
+ -- Lock freigeben, ohne Daten zu schreiben (Spieler hat den Server verlassen, bevor das Laden fertig war)
+-function SaveService.releaseLock(userId: number)
++function SaveService.releaseLock(userId: number, token: string?)
+ 	local activeStore = store
+ 	if not SaveService.enabled or not activeStore then
+ 		return
+ 	end
+-	local jobId = SESSION_ID
++	local jobId = token
+ 	pcall(function()
+ 		activeStore:UpdateAsync(keyFor(userId), function(old: any)
+ 			if typeof(old) == "table" and typeof(old.meta) == "table" and old.meta.lockJobId == jobId then
+diff -ru agents/stable/snap_lab_1150/ServerScriptService/Server/Services/SessionService.module.luau agents/robloxreview/patched/ServerScriptService/Server/Services/SessionService.module.luau
+--- agents/stable/snap_lab_1150/ServerScriptService/Server/Services/SessionService.module.luau	2026-10-10 18:05:08.029086248 +0000
++++ agents/robloxreview/patched/ServerScriptService/Server/Services/SessionService.module.luau	2026-10-11 16:32:32.583497724 +0000
+@@ -268,7 +268,7 @@
+ end
+ 
+ local function saveSession(session: Session, release: boolean)
+-	local _, lostLock = SaveService.save(session.userId, session.data, release)
++	local _, lostLock = SaveService.save(session.userId, session.data, release, (session :: any).lockToken)
+ 	if lostLock and not release then
+ 		-- Ein anderer Server hat übernommen: hier nichts mehr verändern oder speichern
+ 		session.closed = true
+@@ -290,11 +290,11 @@
+ end
+ 
+ local function onPlayerAdded(player: Player)
+-	local data, reason = SaveService.load(player.UserId)
++	local data, reason, token = SaveService.load(player.UserId)
+ 	if player.Parent == nil then
+ 		-- schon wieder weg, während wir geladen haben
+ 		if data then
+-			SaveService.releaseLock(player.UserId)
++			SaveService.releaseLock(player.UserId, token)
+ 		end
+ 		return
+ 	end
+@@ -323,18 +323,21 @@
+ 		released = false,
+ 		rng = Random.new(),
+ 	}
++	;(session :: any).lockToken = token
+ 	sessions[player] = session
+ 	for _, callback in loadedCallbacks do
+ 		task.spawn(callback, session)
+ 	end
+ end
+ 
++local closing = 0
+ local function closeSession(player: Player)
+ 	local session = sessions[player]
+ 	if not session or session.released then
+ 		return -- unbekannt oder wird schon geschlossen (PlayerRemoving + BindToClose gleichzeitig)
+ 	end
+ 	session.released = true
++	closing += 1
+ 	local lockLost = session.closed -- closed ohne released = anderer Server hat übernommen
+ 	session.closed = true
+ 	for _, callback in closingCallbacks do
+@@ -354,6 +357,7 @@
+ 		saveSession(session, true)
+ 	end
+ 	sessions[player] = nil
++	closing -= 1
+ end
+ 
+ function SessionService.init()
+@@ -391,7 +395,7 @@
+ 			end)
+ 		end
+ 		local started = os.clock()
+-		while pending > 0 and os.clock() - started < 25 do
++		while (pending > 0 or closing > 0) and os.clock() - started < 25 do
+ 			task.wait(0.25)
+ 		end
+ 	end)
+diff -ru agents/stable/snap_lab_1150/ServerScriptService/Server/Services/ShopService.module.luau agents/robloxreview/patched/ServerScriptService/Server/Services/ShopService.module.luau
+--- agents/stable/snap_lab_1150/ServerScriptService/Server/Services/ShopService.module.luau	2026-10-10 18:05:08.029136858 +0000
++++ agents/robloxreview/patched/ServerScriptService/Server/Services/ShopService.module.luau	2026-10-11 16:32:32.587452651 +0000
+@@ -50,7 +50,7 @@
+ type Deps = {
+ 	market: any,
+ 	players: any,
+-	save: (userId: number, data: any, release: boolean) -> (boolean, boolean),
++	save: (userId: number, data: any, release: boolean, token: string?) -> (boolean, boolean),
+ 	getSession: (player: any) -> Session?,
+ 	now: () -> number,
+ 	plot: () -> any, -- PlotService, required lazily (it pulls in the whole building generator)
+@@ -342,7 +342,7 @@
+ 		return false -- closing: the final save carries the grant; the retry then finds the record
+ 	end
+ 	session.saving = true
+-	local ok, saved, lostLock = pcall(deps.save, session.userId, session.data, false)
++	local ok, saved, lostLock = pcall(deps.save, session.userId, session.data, false, (session :: any).lockToken)
+ 	session.saving = false
+ 	if not ok then
+ 		warn("[Shop] save failed:", saved)
