@@ -81,7 +81,7 @@ end
 function Parts.emblem(look: any, logo: string?): string
 	local _, index = ModelMath.parseLook(look)
 	if index then
-		return Parts.glyph(CompanyConfig.LOGOS[index])
+		return Parts.glyph(CompanyConfig.allLogos()[index] or "N") -- shop package: Kit emblems follow LOGOS (SHOP_SPEC 3.5)
 	end
 	return Parts.glyph(logo or "N")
 end

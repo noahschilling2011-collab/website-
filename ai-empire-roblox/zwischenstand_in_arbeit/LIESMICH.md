@@ -1,5 +1,7 @@
 # Zwischenstand in Arbeit (17.10., ca. 12:10 UTC)
 
+> **Neuer:** Der fertig geprüfte Stand vom 17.10. abends ist `../AIEmpire_Stand_2026-10-17.rbxlx` (mit Shop-Fix). Die Datei hier unten ist älter.
+
 Sicherung des Arbeitsstands, damit nichts verloren geht, falls der Cloud-Rechner gelöscht wird oder ein Nutzungslimit die Arbeit stoppt.
 
 ## Spielbare Datei

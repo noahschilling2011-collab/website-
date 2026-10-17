@@ -21,7 +21,10 @@ function Math.new(): any
 		calendar = { day = 1 }, deals = Ops.newDeals(), labLevel = 0, jet = false, hr = { auto = true, budget = 0.40 },
 		saveMode = "auto", nightShift = {}, apprentices = {}, unpaidLeave = 0, ledger = {},
 		-- player preferences (phone request 1; a pure addition, no DATA_VERSION bump): PhoneService "autoTrips"
-		prefs = { autoTrips = false } }
+		prefs = { autoTrips = false },
+		-- "First steps" guide (ONBOARDING_SPEC A6; menu package; a pure addition, no DATA_VERSION bump):
+		-- flags + highest step reached; Template.cleanTutorial repairs it, TutorialMath reads it
+		tutorial = { v = 1, step = 0, done = false, skipped = false, tipsOff = false, seen = {}, tips = {} } }
 end
 -- Persistent staff identities: staffProfiles[roleId][i] = {n = name, s = appearance seed,
 -- k = skill 1..5, w = wage multiplier} for the i-th hired person of that role (StaffAssignment builds

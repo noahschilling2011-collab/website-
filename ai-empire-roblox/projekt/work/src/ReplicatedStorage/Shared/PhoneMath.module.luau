@@ -640,7 +640,7 @@ function PhoneMath.tripCall(t: TripCall): (string, string)
 end
 
 function PhoneMath.officeCall(officeName: string, price: number): (string, string)
-	return "We can move!", "We have enough cash for the " .. officeName .. " (" .. Ops.money(price) .. ") and a safety reserve. Open Company → Office when you want to move."
+	return "We can move!", "We have enough cash for the " .. officeName .. " (" .. Ops.money(price) .. ") and a safety reserve. Open Team → Office when you want to move."
 end
 
 ------------------------------------------------------------------------------------------------ AI chat

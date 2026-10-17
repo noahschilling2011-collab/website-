@@ -19,6 +19,9 @@
 --   * GPS - TravelAction {action="route", to=destinationId|"home"} returns the CityPlan road route from the
 --     character to the destination (points + length); City.guide(player, id) asks the client to fetch and
 --     draw one (Notify TRAVEL_GUIDE) - for appointments later.
+--   * Meetings (package "itinerary", additive): City.onMeeting(fn(player, clientId)) listeners run after the registered
+--     meeting handler (EmpireService.joinMeeting) for every "Start meeting" prompt - the founder's itinerary reacts at
+--     once (the joined flag itself stays CompanyOps' trip.joined).
 -- Server writes: the Player attribute "TravelState" on each change (nil = home), nothing per frame.
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Prompts=game:GetService("ProximityPromptService")
@@ -37,6 +40,7 @@ type Trip={player: Player,state: string,to: string,character: Model?,root: BaseP
 local trips: {[number]: Trip}={}
 local clock=0
 local meetingHandler: ((Player,string,ProximityPrompt)->())?=nil
+local meetingFns: {(Player,string)->()}={}
 local promptAt: {[Player]: number}={}
 City.trips=trips
 
@@ -134,6 +138,14 @@ end
 function City.setMeetingHandler(fn: (Player,string,ProximityPrompt)->())
 	meetingHandler=fn
 end
+-- Listeners called after the meeting handler ran for a "Start meeting" prompt: fn(player, clientId). -> disconnect()
+function City.onMeeting(fn: (Player,string)->()): ()->()
+	table.insert(meetingFns,fn)
+	return function()
+		local i=table.find(meetingFns,fn)
+		if i then table.remove(meetingFns,i) end
+	end
+end
 
 ------------------------------------------------------------------------------------------------ lifecycle
 local function onPrompt(q: ProximityPrompt,player: Player)
@@ -145,9 +157,16 @@ local function onPrompt(q: ProximityPrompt,player: Player)
 	local clientId=q:GetAttribute("ClientId")
 	if typeof(clientId)~="string" then return end
 	local handler=meetingHandler
-	if handler then handler(player,clientId,q);return end
-	local d=CityPlan.clientOffice(clientId)
-	Remote.fire(player,"Notify","CAMPUS_NOTICE",{text="No meeting with "..(if d then d.name else clientId).." is scheduled yet."})
+	if handler then
+		handler(player,clientId,q)
+	else
+		local d=CityPlan.clientOffice(clientId)
+		Remote.fire(player,"Notify","CAMPUS_NOTICE",{text="No meeting with "..(if d then d.name else clientId).." is scheduled yet."})
+	end
+	for _,fn in table.clone(meetingFns) do
+		local ok,err=pcall(function() fn(player,clientId) end)
+		if not ok then warn("[City] meeting listener failed: "..tostring(err)) end
+	end
 end
 function City.tick(dt: number)
 	clock+=dt

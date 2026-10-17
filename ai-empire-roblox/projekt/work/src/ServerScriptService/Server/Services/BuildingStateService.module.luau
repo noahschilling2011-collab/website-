@@ -192,14 +192,14 @@ local function guidance(d: any): string
 	if flow.missingVram>0 then
 		-- JourneyMath checks the smallest size on the server, so a smaller size is no option here.
 		local smallest=ModelConfig.getSize("s100m") or ModelConfig.SIZES[1]
-		return string.format("%s needs %d GB more VRAM · Open Hardware",smallest.label,flow.missingVram)
+		return string.format("%s needs %d GB more VRAM · Open Lab → GPUs",smallest.label,flow.missingVram)
 	end
-	if not fit then return "Open Hardware: no model size fits your VRAM yet." end
+	if not fit then return "Open Lab → GPUs: no model size fits your VRAM yet." end
 	local stock=ModelMath.dataSummary(d.data)
 	if stock.total<ModelConfig.TRAINING.minTokens then return flow.hint end
 	if nextSize then
 		local missing=nextSize.vram-vram
-		return string.format("%s needs %d GB more VRAM · Open Hardware or choose a smaller model size",nextSize.label,missing)
+		return string.format("%s needs %d GB more VRAM · Open Lab → GPUs or pick a smaller size",nextSize.label,missing)
 	end
 	if not d.empire.research.frontier then return "7B fits your VRAM; it requires Frontier Architecture research." end
 	return flow.hint
@@ -412,7 +412,7 @@ end
 P.research=function(c)
 	local e=c.e;local job=e.researchJob;local p=if job then math.clamp(job.elapsed/math.max(1,job.seconds),0,1) else 0
 	local def=if job then EmpireConfig.find(EmpireConfig.RESEARCH,job.id) else nil
-	return if job then "RESEARCH ACTIVE" else "RESEARCH · IDLE",string.format("Study  %s\nProgress  %.1f%%\nResearch points  %s\nProduction  %.1f points/s\n%s",if def then def.name else if job then job.id else "No active study",p*100,Format.compact(e.points),EmpireMath.bonuses(e).points,if job then "Better architecture helps your next model." else "Start a study in Company → Research."),c.footer,p
+	return if job then "RESEARCH ACTIVE" else "RESEARCH · IDLE",string.format("Study  %s\nProgress  %.1f%%\nResearch points  %s\nProduction  %.1f points/s\n%s",if def then def.name else if job then job.id else "No active study",p*100,Format.compact(e.points),EmpireMath.bonuses(e).points,if job then "Better architecture helps your next model." else "Start a study in Lab → Research."),c.footer,p
 end
 P.design=function(c)
 	local d=c.d;local vram=ModelMath.fleet(d.gpus).vram;local lines={}
@@ -584,7 +584,7 @@ P.hr=function(c)
 	table.insert(lines,string.format("Today  %d on vacation · %d sick · morale %d%%",vacation,sick,math.floor(Ops.morale(e)*100+.5)))
 	table.insert(lines,"Wages  "..Format.money(b.wage*Ops.DAY).."/day"..(if Ops.apprenticeCount(e)>0 then string.format("  ·  %d apprentices",Ops.apprenticeCount(e)) else ""))
 	local nextOffice=EmpireConfig.OFFICES[stage+1]
-	local hint=if staff<cap then string.format("%d desks free · %s",cap-staff,if Ops.hrSettings(e) then "HR hires automatically" else "hire in Company → Team")
+	local hint=if staff<cap then string.format("%d desks free · %s",cap-staff,if Ops.hrSettings(e) then "HR hires automatically" else "hire in Team → Staff")
 		elseif nextOffice then string.format("All desks filled · %s adds %d desks (%s)",nextOffice.name,nextOffice.staff-cap,Format.money(nextOffice.price))
 		else "All desks filled in the largest headquarters"
 	return "PEOPLE & COMPANY",table.concat(lines,"\n"),hint,math.clamp(staff/math.max(1,cap),0,1)

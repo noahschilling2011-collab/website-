@@ -40,6 +40,8 @@ local EconomyService = require(script.Parent.EconomyService)
 local PlotService = require(script.Parent.PlotService)
 local PricingService = require(script.Parent.PricingService)
 local CompanyOps = require(ReplicatedStorage.Shared.CompanyOps)
+local ShopMath = require(ReplicatedStorage.Shared.ShopMath) -- shop package: Overclock (SHOP_SPEC 3.3)
+local CompanyConfig = require(ReplicatedStorage.Shared.Config.CompanyConfig)
 
 type Session = ServerTypes.Session
 type TrainingState = Types.TrainingState
@@ -388,6 +390,7 @@ local function trainingTick(session: Session, dt: number)
 	end
 
 	local rate = EmpireMath.trainingRate(session.data.gpus, training.workTotal, session.data.empire)
+	rate = ShopMath.boostRate(session.data, training.workTotal, rate) -- Overclock x1.5 while it runs; the 12 s floor stays
 	training.workDone = math.min(training.workTotal, training.workDone + rate * dt)
 	updateLoss(session, training)
 	if not training.eventRolled and training.workDone / training.workTotal >= T.eventAt then
@@ -427,6 +430,31 @@ function AIModelService.finishNow(session: Session): boolean
 	return true
 end
 
+-- Last Epoch voucher (shop package, SHOP_SPEC 3.2): the running training or refinement finishes now, by the rules of
+-- waiting. The run's one event check happens first if it has not come yet (same odds as at 35 %), so the chances stay
+-- the same; an event that needs a decision must be decided first (DECIDE_FIRST, the voucher is kept; the one handler
+-- that changes state - the roll - and still returns an error: the roll would come at 35 % anyway). The final stats
+-- roll comes from finish() like after waiting: "same chances as waiting", never "same result".
+function AIModelService.lastEpoch(session: Session): (boolean, string?)
+	local training = session.data.training
+	if not training then
+		return false, "NO_TRAINING"
+	end
+	local event = training.event
+	if event and event.pending then
+		return false, "DECIDE_FIRST"
+	end
+	if not training.eventRolled then
+		rollEvent(session, training, workspace:GetServerTimeNow())
+		local rolled = training.event
+		if rolled and rolled.pending then
+			SessionService.markDirty(session, true)
+			return false, "DECIDE_FIRST"
+		end
+	end
+	return AIModelService.finishNow(session), nil
+end
+
 local function startTraining(session: Session, payload: ServerTypes.Payload): ServerTypes.Result
 	local recipeId=if payload.recipeId==nil then "steady" else Guard.id(payload.recipeId)
 	if not recipeId or not ModelConfig.getRecipe(recipeId) then return {ok=false,err="BAD_INPUT"} end
@@ -437,6 +465,16 @@ local function startTraining(session: Session, payload: ServerTypes.Payload): Se
 	if payload.look ~= nil then
 		local colorId, emblem = ModelMath.parseLook(payload.look)
 		if not colorId or not emblem then return {ok=false,err="BAD_INPUT"} end
+		-- Identity Kit colours / logos (emblem > #LOGOS) need the pass (SHOP_SPEC 3.5); free looks never do, and neither
+		-- does the company's own saved colour / logo (fix round 1, R9: the Studio's defaults after a refund)
+		local company = session.data.company
+		local ownColor = company ~= nil and company.color == colorId
+		local ownLogo = company ~= nil and CompanyConfig.allLogos()[emblem] == company.logo
+		if (CompanyConfig.isKitColor(colorId) and not ownColor) or (emblem > #CompanyConfig.LOGOS and not ownLogo) then
+			local shopModule = script.Parent:FindFirstChild("ShopService")
+			local Shop = if shopModule then (require :: any)(shopModule) else nil
+			if not Shop or not Shop.owns(session, CompanyConfig.KIT_PASS) then return {ok=false,err="PASS_NEEDED"} end
+		end
 		look = `{colorId}:{emblem}`
 	end
 	local planTarget: string? = nil
@@ -777,6 +815,14 @@ function AIModelService.init()
 	Remote.bind("UpdatePricing", { burst = 8, perSecond = 3, company = true }, updatePricing)
 	Remote.bind("RetireModel", { burst = 3, perSecond = 0.5, company = true }, retireModel)
 	PricingService.init()
+	-- shop package: the Last Epoch voucher (lazy require: ShopService never requires this module)
+	local shopModule = script.Parent:FindFirstChild("ShopService")
+	if shopModule then
+		local Shop = (require :: any)(shopModule)
+		Shop.setRedeemHandler("lastEpoch", function(session: Session): (boolean, string?)
+			return AIModelService.lastEpoch(session)
+		end)
+	end
 end
 
 return AIModelService

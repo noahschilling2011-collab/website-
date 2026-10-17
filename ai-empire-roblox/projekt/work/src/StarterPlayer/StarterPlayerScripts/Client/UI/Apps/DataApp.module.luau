@@ -95,7 +95,8 @@ function DataApp.mount(parent: Frame, navigation: Kit.Nav)
 		C.muted,
 		2
 	)
-	local scrapeButton = Kit.button(scrapeCard, "SCRAPE", "secondary", UDim2.fromOffset(200, 42))
+	-- fix round 1 (review B3): touch targets >= 56 px on touch (44.8 pt in the Menu's legacy x 0.80)
+	local scrapeButton = Kit.button(scrapeCard, "SCRAPE", "secondary", UDim2.fromOffset(200, Kit.tap(42, 56)))
 	scrapeButton.LayoutOrder = 3
 	Kit.onClick(scrapeButton, function()
 		local ok = ActionController.call("Scrape", {})
@@ -131,13 +132,15 @@ function DataApp.mount(parent: Frame, navigation: Kit.Nav)
 		local price = Kit.text(card, Format.money(pack.price), 18, F.black, C.text)
 		price.AnchorPoint = Vector2.new(0, 1)
 		price.Position = UDim2.fromScale(0, 1)
-		local buy5 = Kit.button(card, "x5", "ghost", UDim2.fromOffset(52, 36))
+		local tapH = Kit.tap(36, 56)
+		local buy5W = Kit.tap(52, 58)
+		local buy5 = Kit.button(card, "x5", "ghost", UDim2.fromOffset(buy5W, tapH))
 		buy5.AnchorPoint = Vector2.new(1, 1)
 		buy5.Position = UDim2.fromScale(1, 1)
 		buy5.TextSize = 14
-		local buy = Kit.button(card, "BUY", "primary", UDim2.fromOffset(86, 36))
+		local buy = Kit.button(card, "BUY", "primary", UDim2.fromOffset(86, tapH))
 		buy.AnchorPoint = Vector2.new(1, 1)
-		buy.Position = UDim2.new(1, -60, 1, 0)
+		buy.Position = UDim2.new(1, -(buy5W + 8), 1, 0)
 		buy.TextSize = 14
 
 		local function purchase(count: number)

@@ -45,6 +45,14 @@ function Kit.tween(
 	return tween
 end
 
+-- endless back-and-forth tween (guide ring pulse): TweenInfo(seconds, Sine, InOut, repeat forever, reverses)
+function Kit.tweenLoop(inst: Instance, seconds: number, goals: { [string]: any }): Tween
+	local info = TweenInfo.new(seconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+	local tween = TweenService:Create(inst, info, goals)
+	tween:Play()
+	return tween
+end
+
 function Kit.corner(parent: Instance, radius: number?): UICorner
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius or 10)
@@ -249,6 +257,7 @@ function Kit.button(parent: Instance?, text: string, style: ButtonStyle?, size: 
 	button.Font = F.bold
 	button.TextSize = 16
 	button.Size = size or UDim2.fromOffset(140, 40)
+	button.Selectable = true -- Roblox's default for buttons, stated (the Menu's gamepad page selection relies on it)
 	button.Parent = parent
 	Kit.corner(button, 10)
 
@@ -772,7 +781,31 @@ function Kit.icon(parent: Instance, kind: string, size: number?): Icon
 		Kit.corner(r, radius)
 		table.insert(rings, Kit.stroke(r, 0, C.white, 2))
 	end
-	if kind == "empire" then
+	-- Menu rail icons (ONBOARDING_SPEC B8, menu package): blocks and rings, no rotation
+	if kind == "home" then -- 2 x 2 rounded tiles
+		block(0.06, 0.06, 0.4, 0.4, 3)
+		block(0.54, 0.06, 0.4, 0.4, 3)
+		block(0.06, 0.54, 0.4, 0.4, 3)
+		block(0.54, 0.54, 0.4, 0.4, 3)
+	elseif kind == "tag" then -- price tag: a block with a hole (the hole is a ring in the panel colour)
+		block(0.08, 0.2, 0.84, 0.62, 4)
+		block(0.0, 0.36, 0.2, 0.3, 2)
+		local hole = Kit.frame(frame, UDim2.fromScale(0.16, 0.16), UDim2.fromScale(0.2, 0.43))
+		hole.BackgroundTransparency = 0
+		hole.BackgroundColor3 = C.bg
+		Kit.corner(hole, s)
+	elseif kind == "clients" then -- briefcase: wide block + handle + strap (never a padlock)
+		ring(0.34, 0.08, 0.32, 0.22, 3)
+		block(0.02, 0.28, 0.96, 0.62, 3)
+		local strap = Kit.frame(frame, UDim2.fromScale(0.96, 0.06), UDim2.fromScale(0.02, 0.52))
+		strap.BackgroundTransparency = 0
+		strap.BackgroundColor3 = C.bg
+	elseif kind == "team" then -- two heads, two bodies
+		ring(0.06, 0.08, 0.3, 0.3, s)
+		block(0.0, 0.48, 0.42, 0.42, 6)
+		ring(0.56, 0.08, 0.3, 0.3, s)
+		block(0.5, 0.48, 0.42, 0.42, 6)
+	elseif kind == "empire" then
 		block(0.12,0.25,0.76,0.68,2)
 		ring(0.3,0.02,0.4,0.23,2)
 	elseif kind == "lab" then -- Neuron
@@ -795,6 +828,115 @@ function Kit.icon(parent: Instance, kind: string, size: number?): Icon
 		ring(.15,.18,.7,.75,1);block(.05,.88,.9,.1);block(.3,.34,.12,.15);block(.57,.34,.12,.15);block(.44,.65,.12,.28)
 	elseif kind=="shop" then -- shopping bag with handle
 		ring(.14,.34,.72,.58,3);ring(.32,.08,.36,.36,6);block(.14,.5,.72,.08)
+	-- shop package (SHOP_SPEC 2 icon briefs): item icons from blocks and rings, our own shapes
+	elseif kind == "bulb" then -- Eureka: a bulb with a base
+		ring(0.2, 0.02, 0.6, 0.6, s)
+		block(0.38, 0.22, 0.24, 0.24, s)
+		block(0.32, 0.66, 0.36, 0.1, 2)
+		block(0.36, 0.8, 0.28, 0.1, 2)
+	elseif kind == "epoch" then -- Last Epoch: a screen with a full progress bar and a tick
+		ring(0.04, 0.12, 0.92, 0.62, 3)
+		block(0.14, 0.52, 0.72, 0.1, 2)
+		block(0.3, 0.26, 0.14, 0.14, 2)
+		block(0.42, 0.18, 0.28, 0.12, 2)
+		block(0.3, 0.82, 0.4, 0.08, 2)
+	elseif kind == "mic" then -- Keynote: a stage microphone with an arrow
+		ring(0.22, 0.04, 0.32, 0.5, s)
+		block(0.34, 0.6, 0.08, 0.26, 1)
+		block(0.18, 0.86, 0.4, 0.08, 2)
+		block(0.66, 0.22, 0.26, 0.08, 2)
+		block(0.84, 0.1, 0.08, 0.26, 2)
+	elseif kind == "bolt" then -- Overclock: a chip with a bolt
+		ring(0.14, 0.14, 0.72, 0.72, 3)
+		block(0.46, 0.22, 0.12, 0.3, 1)
+		block(0.36, 0.46, 0.28, 0.1, 1)
+		block(0.42, 0.52, 0.12, 0.28, 1)
+		block(0, 0.4, 0.1, 0.08, 1)
+		block(0.9, 0.52, 0.1, 0.08, 1)
+	elseif kind == "fireworks" then -- two bursts over a small block
+		ring(0.04, 0.04, 0.42, 0.42, s)
+		ring(0.52, 0.16, 0.38, 0.38, s)
+		block(0.2, 0.2, 0.1, 0.1, s)
+		block(0.66, 0.3, 0.1, 0.1, s)
+		block(0.22, 0.66, 0.56, 0.3, 2)
+	elseif kind == "shield" then -- Identity Kit: a shield with four dots
+		ring(0.12, 0.04, 0.76, 0.86, 8)
+		block(0.3, 0.28, 0.16, 0.16, s)
+		block(0.54, 0.28, 0.16, 0.16, s)
+		block(0.3, 0.52, 0.16, 0.16, s)
+		block(0.54, 0.52, 0.16, 0.16, s)
+	elseif kind == "rack" then -- Server Glow: a rack with a light wave
+		ring(0.1, 0.04, 0.52, 0.92, 3)
+		block(0.2, 0.18, 0.32, 0.08, 1)
+		block(0.2, 0.36, 0.32, 0.08, 1)
+		block(0.2, 0.54, 0.32, 0.08, 1)
+		block(0.2, 0.72, 0.32, 0.08, 1)
+		block(0.72, 0.3, 0.08, 0.4, 2)
+		block(0.86, 0.2, 0.08, 0.6, 2)
+	elseif kind == "spot" then -- Stage Lights: two spotlights over a card
+		block(0.04, 0.04, 0.26, 0.2, 3)
+		block(0.7, 0.04, 0.26, 0.2, 3)
+		ring(0.26, 0.4, 0.48, 0.56, 4)
+		block(0.4, 0.56, 0.2, 0.16, s)
+	elseif kind == "gallery" then -- AI Gallery: three frames over a neon bar
+		ring(0.02, 0.1, 0.28, 0.4, 2)
+		ring(0.36, 0.1, 0.28, 0.4, 2)
+		ring(0.7, 0.1, 0.28, 0.4, 2)
+		block(0.1, 0.66, 0.8, 0.14, 3)
+	elseif kind == "hoodie" then -- Team Hoodies
+		ring(0.34, 0.04, 0.32, 0.26, s)
+		block(0.16, 0.26, 0.68, 0.66, 6)
+		block(0.02, 0.32, 0.16, 0.5, 4)
+		block(0.82, 0.32, 0.16, 0.5, 4)
+	elseif kind == "robot" then -- Robo Buddy: a round robot with an antenna
+		block(0.46, 0.0, 0.08, 0.2, 1)
+		ring(0.14, 0.18, 0.72, 0.6, s)
+		block(0.32, 0.4, 0.12, 0.12, s)
+		block(0.56, 0.4, 0.12, 0.12, s)
+		block(0.3, 0.84, 0.4, 0.1, 3)
+	elseif kind == "cards" then -- Style Collection: two stacked cards
+		ring(0.28, 0.04, 0.6, 0.72, 4)
+		block(0.1, 0.22, 0.6, 0.72, 4)
+	elseif kind == "coins" then -- company cash: a coin stack
+		block(0.14, 0.7, 0.72, 0.18, 4)
+		block(0.14, 0.46, 0.72, 0.18, 4)
+		block(0.14, 0.22, 0.72, 0.18, 4)
+	elseif kind == "person" then -- Headhunter: a person with a star
+		ring(0.22, 0.06, 0.34, 0.34, s)
+		block(0.1, 0.5, 0.58, 0.44, 8)
+		block(0.72, 0.1, 0.22, 0.22, 2)
+	elseif kind == "balloon" then -- Team party: two balloons
+		ring(0.04, 0.04, 0.42, 0.52, s)
+		ring(0.54, 0.12, 0.42, 0.52, s)
+		block(0.24, 0.6, 0.04, 0.36, 1)
+		block(0.74, 0.66, 0.04, 0.3, 1)
+	elseif kind == "heart" then -- tips
+		block(0.08, 0.14, 0.44, 0.44, s)
+		block(0.48, 0.14, 0.44, 0.44, s)
+		block(0.22, 0.36, 0.56, 0.42, 6)
+	elseif kind == "crown" then -- VIP Founder
+		block(0.06, 0.62, 0.88, 0.22, 2)
+		block(0.06, 0.24, 0.16, 0.4, 2)
+		block(0.42, 0.12, 0.16, 0.52, 2)
+		block(0.78, 0.24, 0.16, 0.4, 2)
+	elseif kind == "limo" then -- Executive Limo: a long car
+		block(0.0, 0.42, 1.0, 0.26, 4)
+		block(0.22, 0.24, 0.5, 0.2, 4)
+		ring(0.1, 0.62, 0.2, 0.2, s)
+		ring(0.7, 0.62, 0.2, 0.2, s)
+	elseif kind == "lounge" then -- Founder Suite: a chair and a fire bowl
+		block(0.04, 0.36, 0.14, 0.5, 3)
+		block(0.04, 0.6, 0.5, 0.18, 3)
+		block(0.66, 0.6, 0.3, 0.12, 4)
+		block(0.76, 0.3, 0.1, 0.3, s)
+	elseif kind == "lock" then -- a small lock (Identity Kit tiles for non-owners)
+		ring(0.26, 0.02, 0.48, 0.56, s)
+		block(0.12, 0.42, 0.76, 0.56, 2)
+	elseif kind == "chart" then -- Investor Relations: rising bars with an arrow
+		block(0.04, 0.6, 0.2, 0.36)
+		block(0.34, 0.42, 0.2, 0.54)
+		block(0.64, 0.2, 0.2, 0.76)
+		block(0.62, 0.02, 0.34, 0.08, 2)
 	elseif kind=="arena" then
 		ring(.1,.05,.8,.57,3);block(.43,.6,.14,.22);block(.25,.85,.5,.1)
 	else -- Markt: steigende Balken

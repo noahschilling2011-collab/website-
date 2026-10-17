@@ -58,6 +58,10 @@ local UNIFORMS: {[string]:any}={
  ["Training Lead"]={shirt=rgb(46,126,112),trousers=rgb(44,50,66),shoes=rgb(40,34,30)},
  -- shuttle pilots (ShuttleService, role "pilot"): white shirt, navy jacket and tie, uniform cap with a gold band
  Pilot={shirt=rgb(244,244,240),jacket=rgb(26,34,58),trousers=rgb(26,34,58),shoes=rgb(18,18,20),tie=rgb(20,26,44),cap=rgb(26,34,58)},
+ -- company drivers (DriverService, role "driver"): white shirt, charcoal suit and tie, chauffeur cap with a silver band
+ Driver={shirt=rgb(238,238,234),jacket=rgb(40,42,48),trousers=rgb(40,42,48),shoes=rgb(18,18,20),tie=rgb(28,30,36),driverCap=rgb(34,36,42)},
+ -- the VIP limousine service in Port Meridian (role "chauffeur"): black suit, black cap, white gloves
+ Chauffeur={shirt=rgb(246,246,242),jacket=rgb(16,16,20),trousers=rgb(16,16,20),shoes=rgb(12,12,14),tie=rgb(14,14,18),driverCap=rgb(18,18,22),gloves=rgb(238,238,234)},
 }
 -- Counter-based stream over EmployeeConfig.hash: identical on every server, no correlated draws.
 local function stream(seed: number): (number)->number
@@ -75,7 +79,7 @@ local function weighted(pick: (number)->number,weights: {number}): number
 end
 -- profile (optional, persistent identity): n = name, s = appearance seed, k = skill 1..5.
 function Rig.build(parent: Instance,owner: number,index: number,role: string,pose: CFrame,profile: Profile?): Model
- local job=if role=="support" then Config.OPERATIONS_JOBS[index-300] elseif role=="pilot" then "Pilot" else Config.ROLES[role]
+ local job=if role=="support" then Config.OPERATIONS_JOBS[index-300] elseif role=="pilot" then "Pilot" elseif role=="driver" then "Driver" elseif role=="chauffeur" then "Chauffeur" else Config.ROLES[role]
  local seed=if profile and profile.s then math.floor(math.abs(profile.s))%2147483647 else Config.seed(index,owner)
  local name=if profile and profile.n then profile.n else CampusMath.staffName(index,owner)
  local feminine: boolean
@@ -155,7 +159,7 @@ function Rig.build(parent: Instance,owner: number,index: number,role: string,pos
  end
  local H=1.5 -- head centre above the root
  for _,side in {-1,1} do
-  accessory("Hand",Vector3.new(1.04,.52,1.04),at(side*1.5,-.76,0),skin,if side<0 then leftArm else rightArm)
+  accessory("Hand",Vector3.new(1.04,.52,1.04),at(side*1.5,-.76,0),if uniform and uniform.gloves then uniform.gloves else skin,if side<0 then leftArm else rightArm)
   accessory("Shoe",Vector3.new(1.04,.36,1.12),at(side*.5,-2.82,-.05),shoes,if side<0 then leftLeg else rightLeg)
  end
  -- Lanyard in the role colour; a tie wearer clips the badge to the chest pocket instead.
@@ -192,6 +196,12 @@ function Rig.build(parent: Instance,owner: number,index: number,role: string,pos
   accessory("PilotCap",Vector3.new(1.42,.42,1.16),at(0,H+.66,.02),uniform.cap,head,Enum.Material.Fabric)
   accessory("CapBand",Vector3.new(1.45,.12,1.19),at(0,H+.5,.02),rgb(212,176,84),head,Enum.Material.Metal)
   accessory("CapVisor",Vector3.new(1.2,.08,.46),at(0,H+.47,-.68),rgb(20,22,26),head)
+ end
+ if uniform and uniform.driverCap and fits(3) then
+  -- chauffeur cap: flatter crown than the pilot cap, silver band, black visor
+  accessory("DriverCap",Vector3.new(1.4,.36,1.14),at(0,H+.64,.02),uniform.driverCap,head,Enum.Material.Fabric)
+  accessory("CapBand",Vector3.new(1.43,.1,1.17),at(0,H+.5,.02),rgb(176,178,184),head,Enum.Material.Metal)
+  accessory("CapVisor",Vector3.new(1.2,.08,.46),at(0,H+.47,-.68),rgb(16,16,18),head)
  end
  if uniform and uniform.tie and fits(1) then accessory("Tie",Vector3.new(.2,1.15,.05),at(0,.25,-.55),uniform.tie,torso) end
  if uniform and uniform.apron then accessory("Apron",Vector3.new(1.5,2.2,.06),at(0,-.6,-.535),uniform.apron,torso,Enum.Material.Fabric) end

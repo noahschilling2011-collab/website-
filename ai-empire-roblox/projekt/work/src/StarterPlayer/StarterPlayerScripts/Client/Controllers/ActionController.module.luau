@@ -64,7 +64,7 @@ local MESSAGES: { [string]: string } = {
 	NOT_OWNED = "You don't own that.",
 	TRAINING_ACTIVE = "A training run is already in progress.",
 	NO_GPU = "You need a GPU to train.",
-	VRAM = "Not enough VRAM for this model size. Open Hardware or choose a smaller model size.",
+	VRAM = "Not enough VRAM for this model size. Open Lab → GPUs or choose a smaller model size.",
 	NO_DATA = "Not enough training data.",
 	NO_EVENT = "There is nothing to decide right now.",
 	BAD_MODEL = "That model isn't available.",
@@ -86,13 +86,19 @@ local MESSAGES: { [string]: string } = {
 	REFINE_LIMIT = "This model was already refined 3 times. Train a new version instead.",
 	MAX_LEVEL = "The Lab is at its highest level.",
 	OWNED = "You already own this.",
-	OFFICE = "This needs a bigger office stage. Move up in Company → Office.",
+	OFFICE = "This needs a bigger office stage. Move up in Team → Office.",
 	NO_MEETING = "No meeting with this client is scheduled right now.",
 	TOO_FAR = "Go to the client's office to join the meeting.",
 	NEEDS_PASS = "This car comes with the Executive Limousine game pass.",
+	-- shop package (SHOP_SPEC 5.4): the free colour & logo change
+	PASS_NEEDED = "This colour comes with Identity Kit.",
+	TOO_FAST = "You can change it again in a minute.",
 }
 
 local busy: { [string]: boolean } = {}
+
+-- the last refused call (shop package, SHOP_SPEC 5.2.1 rule 4): no Robux button appears within 10 s of a failure
+ActionController.lastFailure = nil :: { err: string, at: number }?
 
 function ActionController.message(err: string?): string
 	if err == "BAD_NAME" then
@@ -114,6 +120,7 @@ function ActionController.call(name: string, payload: { [string]: any }?, silent
 	busy[name] = nil
 
 	if not ok or typeof(result) ~= "table" then
+		ActionController.lastFailure = { err = "NETWORK", at = os.clock() }
 		if not silent then
 			Toast.show("error", MESSAGES.NETWORK)
 		end
@@ -121,6 +128,7 @@ function ActionController.call(name: string, payload: { [string]: any }?, silent
 	end
 	local response: Result = result
 	if response.ok ~= true then
+		ActionController.lastFailure = { err = if typeof(response.err) == "string" then response.err else "UNKNOWN", at = os.clock() }
 		if not silent then
 			Toast.show("error", ActionController.message(response.err))
 		end

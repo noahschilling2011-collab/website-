@@ -29,6 +29,8 @@ local Parts = require(script.Parent.StudioParts)
 local LabPreview = require(script.Parent.LabPreview)
 local LabState = require(script.Parent.LabState)
 local ModelsUI = require(UI.Apps.ModelsUI)
+local ShopMath = require(Shared.ShopMath) -- shop package: the 7B lock strip (SHOP_SPEC 5.2.4), Kit looks (5.2.6)
+local ShopCore = require(UI.Shop.ShopCore)
 
 local C = Theme.colors
 local F = Theme.font
@@ -130,8 +132,15 @@ end
 
 local function logoIndex(data: PlayerData): number
 	local company = data.company
-	local index = if company then table.find(CompanyConfig.LOGOS, company.logo) else nil
+	-- shop package: an Identity Kit company logo is an index after LOGOS (CompanyConfig.allLogos)
+	local index = if company then table.find(CompanyConfig.allLogos(), company.logo) else nil
 	return index or #CompanyConfig.LOGOS
+end
+
+-- shop package (SHOP_SPEC 5.2.6): owns the Identity Kit (its pass or the Style Collection)
+local function ownsKit(snapshot: Snapshot): boolean
+	local shop = (snapshot.live :: any).shop
+	return ShopMath.ownsPass(if typeof(shop) == "table" then shop.passes else nil, CompanyConfig.KIT_PASS)
 end
 
 function DesignSteps.build(Studio: any): any
@@ -212,6 +221,7 @@ function DesignSteps.build(Studio: any): any
 	local planCache: { key: string, plan: LabPreview.DataPlan }? = nil
 	local compact = true
 	local refresh: () -> () = function() end
+	local studioLock: (Snapshot, Sel, number, any) -> string = function(_s: Snapshot, _sel: Sel, _m: number, _st: any): string return "" end
 	local focusNow: () -> GuiObject? = function(): GuiObject? return nil end
 
 	local function sel(): Sel
@@ -280,6 +290,32 @@ function DesignSteps.build(Studio: any): any
 		local detail = Parts.label(tile.button, "", 20, F.medium, C.muted, UDim2.fromOffset(10, 38), UDim2.new(1, -20, 0, 26), Enum.TextXAlignment.Center)
 		presets[def[1]] = { button = tile.button, stroke = tile.stroke, name = name, detail = detail }
 	end
+	-- shop package (SHOP_SPEC 5.2.4): the lock strip that replaces the presets while the picked size is locked by
+	-- Frontier Architecture: OPEN RESEARCH › (free deep link) and, only when Frontier is the ONLY lock, SKIP RESEARCH ·
+	-- EUREKA in the price-chip look (never the primary); or OPEN GPUs › when VRAM / a GPU is the other need
+	-- fix round 1 (review): the Robux button is never wider than the free action next to it (equal widths), and on the
+	-- Review (step 6) the strip has no OPEN RESEARCH › of its own (the primary is that same free deep link)
+	type LockStrip = { frame: Frame, research: TextButton, gpus: TextButton, offer: ShopCore.OfferButton, review: boolean }
+	local function lockStrip(parent: Instance, review: boolean): LockStrip
+		local f = Kit.frame(parent, UDim2.new(1, 0, 0, 74))
+		f.Name = "LockStrip"
+		f.Visible = false
+		f.ZIndex = 2
+		local research = Parts.button(f, "OPEN RESEARCH ›", "secondary", UDim2.fromOffset(0, 0), UDim2.fromOffset(228, 74), 20)
+		research.Name = "OpenResearch"
+		local gpus = Parts.button(f, "OPEN GPUs ›", "secondary", UDim2.fromOffset(238, 0), UDim2.fromOffset(200, 74), 20)
+		gpus.Name = "OpenGpus"
+		gpus.Visible = false
+		-- the short label fits the equal-width slot on a phone ("SKIP RESEARCH · EUREKA | R$ 15" needs ~370 px)
+		local offer = ShopCore.offerButton(f, "SKIP · EUREKA", UDim2.new(1, -238, 0, 74), 20)
+		offer.button.Name = "SkipResearch"
+		offer.button.Position = UDim2.fromOffset(238, 0)
+		offer.set(nil, "")
+		research.Visible = not review
+		return { frame = f, research = research, gpus = gpus, offer = offer, review = review }
+	end
+	local lockStrip2 = lockStrip(bodies[2], false)
+	local lockStrip6 = lockStrip(bodies[6], true)
 	type SizeTile = { tile: Parts.TileButton, label: TextLabel, tier: Parts.TierBar, cost: TextLabel, delta: TextLabel, time: TextLabel, warn2: TextLabel, vram: TextLabel, check: Frame }
 	local sizeTiles: { [string]: SizeTile } = {}
 	for i, size in ModelConfig.SIZES do
@@ -348,10 +384,52 @@ function DesignSteps.build(Studio: any): any
 	local nameStroke = nameBox:FindFirstChildOfClass("UIStroke")
 	local randomName = Parts.button(bodies[5], "RANDOM NAME", "secondary", UDim2.fromOffset(442, 0), UDim2.fromOffset(212, 74), 22)
 	randomName.Name = "RandomName"
-	type Swatch = { tile: Parts.TileButton, check: Frame }
+	-- shop package (SHOP_SPEC 5.2.6): colours and emblems sit in horizontal rows that scroll, so the 8 Identity Kit
+	-- colours and 6 Kit logos can follow the free ones (with a small lock for non-owners, no buy button)
+	local function lookRow(name: string, y: number): ScrollingFrame
+		local row = Instance.new("ScrollingFrame")
+		row.Name = name
+		row.BackgroundTransparency = 1
+		row.BorderSizePixel = 0
+		row.Position = UDim2.fromOffset(0, y)
+		row.Size = UDim2.new(1, 0, 0, 78)
+		row.CanvasSize = UDim2.new()
+		row.AutomaticCanvasSize = Enum.AutomaticSize.X
+		row.ScrollingDirection = Enum.ScrollingDirection.X
+		row.ScrollBarThickness = 3
+		row.ScrollBarImageTransparency = 0.6
+		row.HorizontalScrollBarInset = Enum.ScrollBarInset.None
+		row.Parent = bodies[5]
+		local list = Kit.list(row, 8, true)
+		list.VerticalAlignment = Enum.VerticalAlignment.Top
+		return row
+	end
+	local colorRow = lookRow("ColorRow", 81)
+	local emblemRow = lookRow("EmblemRow", 162)
+	local function lockBadge(parent: Instance): Frame
+		local l = Kit.frame(parent, UDim2.fromOffset(28, 28), UDim2.new(1, -4, 1, -4))
+		l.Name = "Lock"
+		l.AnchorPoint = Vector2.new(1, 1)
+		l.BackgroundTransparency = 0.1
+		l.BackgroundColor3 = C.bg
+		Kit.corner(l, 8)
+		local icon = Kit.icon(l, "lock", 16)
+		icon.frame.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.frame.Position = UDim2.fromScale(0.5, 0.5)
+		icon.setColor(C.text)
+		l.Visible = false
+		return l
+	end
+	type Swatch = { tile: Parts.TileButton, check: Frame, lock: Frame?, kit: boolean }
 	local swatches: { [string]: Swatch } = {}
-	for i, def in CompanyConfig.COLORS do
-		local tile = Parts.tileButton(bodies[5], "Color_" .. def.id, UDim2.fromOffset((i - 1) * 82, 81), UDim2.fromOffset(74, 74), def.id)
+	local allColors: { CompanyConfig.ColorDef } = table.clone(CompanyConfig.COLORS)
+	for _, def in CompanyConfig.KIT_COLORS do
+		table.insert(allColors, def)
+	end
+	for i, def in allColors do
+		local kit = i > #CompanyConfig.COLORS
+		local tile = Parts.tileButton(colorRow, "Color_" .. def.id, UDim2.fromOffset((i - 1) * 82, 0), UDim2.fromOffset(74, 74), def.id)
+		tile.button.LayoutOrder = i
 		tile.button.BackgroundColor3 = Theme.rgb(def.rgb)
 		local check = Parts.check(tile.button, UDim2.fromOffset(20, 20))
 		check.BackgroundColor3 = C.bg
@@ -361,20 +439,38 @@ function DesignSteps.build(Studio: any): any
 			glyph.TextColor3 = C.text
 		end
 		check.Visible = false
-		swatches[def.id] = { tile = tile, check = check }
+		local lock = if kit then lockBadge(tile.button) else nil
+		swatches[def.id] = { tile = tile, check = check, lock = lock, kit = kit }
 		Kit.onClick(tile.button, function()
+			local snapshot = StateController.snapshot
+			if kit and snapshot and not ownsKit(snapshot) then
+				Toast.show("info", "This colour comes with Identity Kit.")
+				return
+			end
 			LabState.colorId = def.id
 			refresh()
 		end)
 	end
-	local emblems: { Parts.TileButton } = {}
-	for i, glyph in CompanyConfig.LOGOS do
-		local tile = Parts.tileButton(bodies[5], "Emblem_" .. i, UDim2.fromOffset((i - 1) * 82, 162), UDim2.fromOffset(74, 74), glyph)
+	local kitLine = Parts.label(colorRow, "More colours with Identity Kit (Shop)", 20, F.medium, C.dim, UDim2.new(), UDim2.fromOffset(250, 74))
+	kitLine.Name = "KitLine"
+	kitLine.TextWrapped = true
+	kitLine.LayoutOrder = 99
+	type EmblemTile = { tile: Parts.TileButton, lock: Frame?, kit: boolean }
+	local emblems: { EmblemTile } = {}
+	for i, glyph in CompanyConfig.allLogos() do
+		local kit = i > #CompanyConfig.LOGOS
+		local tile = Parts.tileButton(emblemRow, "Emblem_" .. i, UDim2.fromOffset((i - 1) * 82, 0), UDim2.fromOffset(74, 74), glyph)
+		tile.button.LayoutOrder = i
 		local label = Parts.label(tile.button, Parts.glyph(glyph), 30, F.bold, C.text, UDim2.new(), UDim2.fromScale(1, 1), Enum.TextXAlignment.Center)
 		label.TextTruncate = Enum.TextTruncate.None
-		emblems[i] = tile
+		local lock = if kit then lockBadge(tile.button) else nil
+		emblems[i] = { tile = tile, lock = lock, kit = kit }
 		Kit.onClick(tile.button, function()
 			local snapshot = StateController.snapshot
+			if kit and snapshot and not ownsKit(snapshot) then
+				Toast.show("info", "This logo comes with Identity Kit.")
+				return
+			end
 			if snapshot and LabState.colorId == nil then
 				LabState.colorId = focusColorId(snapshot.data, StateController.ui.focusId)
 			end
@@ -444,6 +540,108 @@ function DesignSteps.build(Studio: any): any
 		if nav and nav.isOpen() then
 			nav.show(app)
 		end
+	end
+
+	-- shop package (SHOP_SPEC 5.2.4): OPEN RESEARCH › = Lab → Research with the Frontier card outlined (free)
+	local function openResearch()
+		local nav = Studio.nav
+		ShopCore.requestFocus("research", "frontier")
+		Studio.close()
+		if nav and nav.isOpen() then
+			if (nav :: any).route then
+				(nav :: any).route("open:empire/research")
+			else
+				nav.show("empire")
+			end
+		end
+	end
+	-- the lock strip's state (both steps) and the warn hint of step 2: Frontier is the only lock -> the Eureka offer
+	-- (ShopMath.studioEurekaOffer); another lock after it -> name it, and OPEN GPUs › for VRAM / no GPU
+	local stripActions: { [LockStrip]: boolean } = {}
+	studioLock = function(snapshot: Snapshot, sel: Sel, money: number, strip: LockStrip): string
+		local data = snapshot.data
+		local size = ModelConfig.getSize(sel.sizeId) or ModelConfig.SIZES[1]
+		local def = ModelConfig.getSize("s7b")
+		local frontier = { cost = 65000, points = 500, seconds = 120 }
+		for _, r in require(Shared.Config.EmpireConfig).RESEARCH do
+			if r.id == "frontier" then frontier = { cost = r.cost, points = r.points, seconds = r.seconds } end
+		end
+		local ui = ShopCore.offerUi(snapshot, "eureka")
+		local offer = ShopMath.studioEurekaOffer(data, sel, money, LabPreview.estimate, ui)
+		local job = data.empire.researchJob
+		local running = typeof(job) == "table" and job.id == "frontier"
+		strip.offer.set(offer.state, if offer.state then select(3, ShopCore.offer(snapshot, "eureka")) else "")
+		strip.offer.label.Text = if running then "FINISH · EUREKA" else "SKIP · EUREKA"
+		local need = offer.need
+		strip.gpus.Visible = need == "VRAM" or need == "NO_GPU"
+		-- equal slots left to right: [OPEN RESEARCH ›] [OPEN GPUs ›] [SKIP RESEARCH · EUREKA]; the Review has no
+		-- OPEN RESEARCH › here (its primary is the same link), and its Robux button takes half the strip at most
+		local slots: { GuiObject } = {}
+		if not strip.review then
+			table.insert(slots, strip.research)
+		end
+		if strip.gpus.Visible then
+			table.insert(slots, strip.gpus)
+		end
+		if strip.offer.button.Visible then
+			table.insert(slots, strip.offer.button)
+		end
+		local count = math.max(2, #slots)
+		for i, b in slots do
+			b.Position = UDim2.new((i - 1) / count, if i > 1 then 5 else 0, 0, 0)
+			b.Size = UDim2.new(1 / count, -5, 0, 74)
+		end
+		if not stripActions[strip] then
+			stripActions[strip] = true
+			Kit.onClick(strip.research, openResearch)
+			Kit.onClick(strip.gpus, function()
+				closeTo("compute")
+			end)
+			Kit.onClick(strip.offer.button, function()
+				local snap = StateController.snapshot
+				if not snap then return end
+				local s2 = sel
+				local after = LabPreview.estimate(ShopMath.withResearch(snap.data, "frontier"), s2, nil)
+				local extra = { { caption = "Then", value = `{Parts.sizeLabel(s2.sizeId)} training costs {Parts.money(after.cost)}` } }
+				local function done(ok: boolean)
+					if ok then
+						Toast.show("success", "7B is unlocked.", 4)
+						refresh()
+					end
+				end
+				if strip.offer.button:GetAttribute("OfferState") == "owned" then
+					ShopCore.use("eureka", "frontier", { extra = extra, onDone = done })
+				else
+					ShopCore.buy("eureka", "frontier", { extra = extra, onDone = done })
+				end
+			end)
+		end
+		local label = size.label
+		local base = `<b>{label} needs Frontier Architecture</b>`
+		if running then
+			return base .. string.format(" · researching now, %s left", Format.duration(job.seconds - job.elapsed))
+		elseif need == "VRAM" then
+			local est = LabPreview.estimate(data, sel, money)
+			return base .. string.format(" + %d GB VRAM (have %d)", est.vramNeed, est.vramHave) -- one line on a phone
+		elseif need == "NO_GPU" then
+			return base .. " + a GPU"
+		elseif need == "MONEY" then
+			return base .. string.format(" + cash: %s and its training", Parts.money(frontier.cost))
+		elseif need == "MODEL_LIMIT" then
+			return base .. " + a free model slot"
+		elseif need == "NO_DATA" then
+			return base .. " + more training data"
+		elseif need == "TRAINING" then
+			return base .. " · training slot busy now"
+		end
+		local _ = def
+		-- fix round 1 (review): with a Eureka offer the line says what it saves (SHOP_SPEC 5.2.4, ShopMath.savingText) and
+		-- the cash both ways still cost; short enough for one phone line (the RP are what the Eureka covers)
+		local check = offer.check
+		if offer.state ~= nil and check and check.ok then
+			return `<b>{label} needs Frontier</b>` .. string.format(" · %s · Eureka saves %s", Parts.money(frontier.cost), ShopMath.savingText(check.seconds))
+		end
+		return base .. string.format(" · %s · %d RP · %s", Parts.money(frontier.cost), frontier.points, Format.duration(frontier.seconds))
 	end
 
 	-- The reply of a remote call may arrive after the player left the Studio (× while STARTING…): then nothing
@@ -555,7 +753,7 @@ function DesignSteps.build(Studio: any): any
 		elseif err == "VRAM" or err == "NO_GPU" then
 			closeTo("compute")
 		elseif err == "PREREQUISITE" then
-			closeTo("empire")
+			openResearch()
 		elseif err == "NO_DATA" then
 			local plan = dataPlan(data, s, StateController.money())
 			if plan.cost > 0 then
@@ -592,6 +790,8 @@ function DesignSteps.build(Studio: any): any
 			goStep(5)
 		elseif action == "training" then
 			Studio.open("training", {})
+		elseif action == "research" then
+			openResearch()
 		elseif action == "empire" or action == "market" or action == "compute" or action == "data" then
 			closeTo(action)
 		end
@@ -849,12 +1049,26 @@ function DesignSteps.build(Studio: any): any
 				refs.time.TextColor3 = if locked then C.warn else C.muted
 				refs.time.Font = if locked then F.bold else F.medium
 				refs.warn2.Text = lockLine2
-				refs.warn2.Position = UDim2.fromOffset(12, 130)
+				-- shop package (SHOP_SPEC 9 T18): a locked tile's lines sit tighter so "research" ends >= 4 px above the border
+				refs.delta.Position = UDim2.fromOffset(12, if locked then 79 else 84)
+				refs.time.Position = UDim2.fromOffset(12, if locked then 102 else 110)
+				refs.warn2.Position = UDim2.fromOffset(12, if locked then 122 else 130)
 				-- locked tiles read greyed out (the reference greys locked parts); the reason stays in warn
 				refs.label.TextColor3 = if locked then C.dim else C.text
 				refs.check.Visible = selected and not locked
 				refs.vram.Visible = not compact
 				refs.tier.set(table.find(ModelConfig.SIZES, sz) or 1, if locked then C.dim else card.color)
+			end
+			-- shop package (SHOP_SPEC 5.2.4): 7B (any size) picked and locked by Frontier Architecture -> the lock strip
+			local frontierLock = est.lock == "FRONTIER"
+			for _, p in presets do
+				p.button.Visible = not frontierLock
+			end
+			lockStrip2.frame.Visible = frontierLock
+			if frontierLock then
+				local hintText = studioLock(snapshot, s, money, lockStrip2)
+				hint.Text = hintText
+				hint.TextColor3 = C.warn
 			end
 			-- presets: what each picks, outlined when it matches the current pick
 			local cheapestOn = s.sizeId == "s100m" and s.recipeId == "rapid"
@@ -987,23 +1201,47 @@ function DesignSteps.build(Studio: any): any
 			end
 			local colorId = LabState.colorId or focusColorId(data, s.focusId)
 			local emblem = LabState.emblem or logoIndex(data)
+			-- Identity Kit tiles (shop package): shown once the Shop is open (guide over, first launch), locked for
+			-- non-owners; a saved Kit choice stays visible after a refund (it is the current pick)
+			local kitShown = ShopMath.gateOpen(data)
+			local owns = ownsKit(snapshot)
 			for id, sw in swatches do
 				local on = id == colorId
 				sw.tile.stroke.Color = if on then C.white else C.line
 				sw.tile.stroke.Transparency = if on then 0 else 0.7
 				sw.tile.stroke.Thickness = if on then 3 else 1
 				sw.check.Visible = on
+				if sw.kit then
+					sw.tile.button.Visible = kitShown or on
+					local lock = sw.lock
+					if lock then lock.Visible = not owns and not on end
+				end
 			end
-			for i, tile in emblems do
-				Parts.paintTile(tile, i == emblem, false, card.color)
+			for i, et in emblems do
+				Parts.paintTile(et.tile, i == emblem, false, card.color)
+				if et.kit then
+					et.tile.button.Visible = kitShown or i == emblem
+					local lock = et.lock
+					if lock then lock.Visible = not owns and i ~= emblem end
+				end
 			end
+			kitLine.Visible = kitShown and not owns
 			lookNote.Visible = not compact
 		elseif step == 6 then
+			-- shop package (SHOP_SPEC 5.2.4): the same lock strip at the top of the Final-review box
+			local frontierLock = est.lock == "FRONTIER"
+			local reviewLock = if frontierLock then studioLock(snapshot, s, money, lockStrip6) else nil
+			-- the Review's strip has no OPEN RESEARCH › (the primary): shown only with OPEN GPUs › or a Eureka offer
+			local stripShown = frontierLock and (lockStrip6.offer.button.Visible or lockStrip6.gpus.Visible)
+			lockStrip6.frame.Visible = stripShown
+			for _, t in moneyTiles do
+				t.frame.Visible = not stripShown
+			end
 			local offered = planMode and not noData
 			moneyTiles[1].caption.Text = "TRAINING COST"
 			moneyTiles[1].value.Text = Parts.money(est.cost)
-			moneyTiles[2].frame.Visible = not offered
-			planToggle.button.Visible = offered
+			moneyTiles[2].frame.Visible = not offered and not stripShown
+			planToggle.button.Visible = offered and not stripShown
 			moneyTiles[2].caption.Text = "TIME"
 			moneyTiles[2].value.Text = if est.rate > 0 then "~" .. Format.duration(est.seconds) else "--"
 			if offered then
@@ -1017,7 +1255,11 @@ function DesignSteps.build(Studio: any): any
 			moneyTiles[3].caption.Text = if planCost > 0 then "CASH AFTER ALL" else "CASH AFTER"
 			moneyTiles[3].value.Text = Parts.money(after)
 			moneyTiles[3].value.TextColor3 = if after < 0 then C.bad elseif after < reserve then C.warn else C.good
-			if first then
+			if reviewLock then
+				-- fix round 1 (review): START is impossible here, so the hint names the lock (not "Check it, then start.")
+				hint.Text = reviewLock
+				hint.TextColor3 = C.warn
+			elseif first then
 				hint.Text = if noData and afterPlan then "<b>FIRST MODEL</b> · buy the data plan, then press START." else "<b>FIRST MODEL</b> · a good starter is ready. Just press START."
 				hint.TextColor3 = C.good
 			elseif offered and afterPlan then
@@ -1119,16 +1361,16 @@ function DesignSteps.build(Studio: any): any
 				label = `NAME NEEDS {GameConfig.MODEL_NAME_MIN}-{GameConfig.MODEL_NAME_MAX} CHARACTERS`
 				action = "name"
 			elseif est.lock == "FRONTIER" then
-				label = "RESEARCH FRONTIER ARCHITECTURE · COMPANY"
-				action = "empire"
+				label = "OPEN RESEARCH › FRONTIER ARCHITECTURE" -- shop package (SHOP_SPEC 5.2.4): free deep link
+				action = "research"
 			elseif est.lock == "MODEL_LIMIT" then
 				label = "MODEL LIMIT · RETIRE OLD MODELS"
 				action = "market"
 			elseif est.lock == "NO_GPU" then
-				label = "NO GPU · OPEN COMPUTE"
+				label = "NO GPU · OPEN GPUs" -- ONBOARDING_SPEC B7 (request onboarding #5)
 				action = "compute"
 			elseif est.lock == "VRAM" then
-				label = `NEEDS {est.vramNeed - est.vramHave} GB MORE VRAM · OPEN COMPUTE`
+				label = `NEEDS {est.vramNeed - est.vramHave} GB MORE VRAM · OPEN GPUs`
 				action = "compute"
 			elseif plan and afterPlan and plan.cost <= money then
 				-- the shown plan first (no data yet, or a suggestion's plan), then START with the bought data

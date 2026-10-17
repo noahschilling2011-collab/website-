@@ -911,11 +911,11 @@ function Screens.finance(ctx: Ctx): Built
 			table.insert(lines, v)
 		end
 	end
-	local open = Kit.button(list, "Open Company → Money", "primary", UDim2.new(1, 0, 0, 44))
+	local open = Kit.button(list, "Open Home → Money", "primary", UDim2.new(1, 0, 0, 44))
 	open.Name = "OpenMoney"
 	open.LayoutOrder = 10
 	Kit.onClick(open, function() ctx.deps.openComputer("empire", "money") end)
-	local note = Kit.para(list, "The same numbers as Company → Money: today's ledger by category. A game day is 20 minutes.", 12, C.dim, 11)
+	local note = Kit.para(list, "The same numbers as Home → Money: today's ledger by category. A game day is 20 minutes.", 12, C.dim, 11)
 	note.TextXAlignment = Enum.TextXAlignment.Center
 	select(ctx, open)
 	return {
@@ -966,7 +966,7 @@ function Screens.team(ctx: Ctx): Built
 	if tm.vacation > 0 then table.insert(away, tm.vacation .. " on vacation") end
 	if tm.trip > 0 then table.insert(away, tm.trip .. " on a business trip") end
 	if tm.leave > 0 then table.insert(away, tm.leave .. " on unpaid leave") end
-	local todayText = if tm.staff == 0 then "Nobody hired yet: hire your first specialists in Company → Team."
+	local todayText = if tm.staff == 0 then "Nobody hired yet: hire your first specialists in Team → Staff."
 		elseif #away == 0 then "Today: everyone is at work." else "Today: " .. table.concat(away, " · ") .. "."
 	local tl = Kit.para(head, todayText, 13, if #away > 0 then C.warn else C.text, 3)
 	tl.Name = "Away"
@@ -979,7 +979,7 @@ function Screens.team(ctx: Ctx): Built
 	valueRow(extra, 1, "Apprentices", tostring(tm.apprentices))
 	valueRow(extra, 2, "Night shift (departments)", tostring(tm.night))
 	valueRow(extra, 3, "Open applications", tostring(tm.applications), if tm.applications > 0 then C.warn else nil)
-	local open = Kit.button(list, "Open Company → Team", "primary", UDim2.new(1, 0, 0, 44))
+	local open = Kit.button(list, "Open Team", "primary", UDim2.new(1, 0, 0, 44))
 	open.Name = "OpenTeam"
 	open.LayoutOrder = 10
 	Kit.onClick(open, function() ctx.deps.openComputer("empire", "team") end)

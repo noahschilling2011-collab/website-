@@ -27,7 +27,9 @@ local Client = UI.Parent
 local StateController = require(Client.Controllers.StateController)
 local Theme = require(UI.Theme)
 local Kit = require(UI.Kit)
+local Toast = require(UI.Toast)
 local Parts = require(script.Parent.StudioParts)
+local UseSheet = require(UI.Shop.UseSheet) -- shop fix round 1: the use sheet over the Studio is modal (Return, B)
 
 local C = Theme.colors
 local F = Theme.font
@@ -407,6 +409,8 @@ function Studio.open(mode: string, opts: any?)
 	Studio.mode = mode
 	current = view
 	generation += 1
+	-- lab request #5 (menu package): info toasts wait during the ceremonies (LAB_SPEC 3.6)
+	Toast.hold(mode == "reveal" or mode == "launch" or mode == "live")
 	root.Visible = true
 	view.frame.Visible = true
 	Studio.setTitle(view.title, nil)
@@ -427,6 +431,7 @@ end
 
 -- Back to the Lab home (every choice stays in StateController.ui / LabState).
 function Studio.close()
+	UseSheet.close() -- a sheet never outlives the Studio it was opened from
 	local view = current
 	current = nil
 	if view then
@@ -436,6 +441,7 @@ function Studio.close()
 	local wasOpen = Studio.mode ~= "closed"
 	Studio.mode = "closed"
 	generation += 1
+	Toast.hold(false)
 	local root = Studio.root
 	if root then
 		root.Visible = false
@@ -476,7 +482,8 @@ function Studio.init(labContainer: Frame, navigation: Kit.Nav)
 	end)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		local view = current
-		if processed or not view or Studio.mode == "closed" then
+		-- an open use sheet (shop) answers Return itself: the Studio's primary must not run under it
+		if processed or not view or Studio.mode == "closed" or UseSheet.isOpen() then
 			return
 		end
 		if (input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter) and UserInputService:GetFocusedTextBox() == nil then

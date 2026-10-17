@@ -12,8 +12,14 @@ export type Kind = "info" | "success" | "error" | "warn"
 
 local Toast = {}
 
+Toast.COMPACT_SCALE = 0.62 -- layer scale below which toasts are drawn compact (phones in landscape, like the HUD)
+Toast.COMPACT_BOOST = 1.9
+
 local MAX_VISIBLE = 1
+local HOLD_MAX = 3 -- queued info/success toasts while held (lab request #5, LAB_SPEC 3.6)
 local container: Frame? = nil
+local holding = false
+local held: { { kind: Kind, text: string, seconds: number? } } = {}
 local active: { { text: string, frame: Frame, expires: number } } = {}
 local counter = 0
 
@@ -37,6 +43,23 @@ function Toast.mount(parent: Instance)
 	local layout = Kit.list(holder, 8)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	container = holder
+	-- phones (menu package, ONBOARDING_SPEC T7 "text >= 12 pt"): the Top layer is scaled to about 0.43, so the 15 px
+	-- toast text would be 6.5 pt. Below COMPACT_SCALE the holder gets its own UIScale (15 x 0.432 x 1.9 = 12.3 pt) and
+	-- a narrower lane (400 x 0.82 = 328 pt, centred), which stays left of the HUD column (x >= 596 pt on 844x390).
+	local boost = Instance.new("UIScale")
+	boost.Name = "CompactBoost"
+	boost.Parent = holder
+	local function applyCompact()
+		local layer = parent:FindFirstChildOfClass("UIScale")
+		local compact = layer ~= nil and layer.Scale < Toast.COMPACT_SCALE
+		boost.Scale = if compact then Toast.COMPACT_BOOST else 1
+		holder.Size = UDim2.fromOffset(if compact then 400 else 440, 0)
+	end
+	local layer = parent:FindFirstChildOfClass("UIScale")
+	if layer then
+		layer:GetPropertyChangedSignal("Scale"):Connect(applyCompact)
+	end
+	applyCompact()
 end
 
 local function dismiss(entry: { text: string, frame: Frame, expires: number })
@@ -63,6 +86,19 @@ end
 function Toast.show(kind: Kind, text: string, seconds: number?)
 	local holder = container
 	if not holder then
+		return
+	end
+	-- during the Studio ceremonies (reveal, Launch Day, NOW LIVE) info/success wait; errors and warnings show at once
+	if holding and (kind == "info" or kind == "success") then
+		for _, entry in held do
+			if entry.text == text then
+				return
+			end
+		end
+		if #held >= HOLD_MAX then
+			table.remove(held, 1)
+		end
+		table.insert(held, { kind = kind, text = text, seconds = seconds })
 		return
 	end
 	local duration = seconds or 3
@@ -115,6 +151,39 @@ function Toast.show(kind: Kind, text: string, seconds: number?)
 			task.wait(0.2)
 		end
 	end)
+end
+
+-- Lab request #5 (LAB_SPEC 3.6): while on, info/success toasts are queued (dedupe by text, max 3); hold(false)
+-- flushes the queue one by one (each after the previous one's time). The Studio calls it per mode.
+function Toast.hold(on: boolean)
+	if holding == on then
+		return
+	end
+	holding = on
+	if on then
+		return
+	end
+	local queue = held
+	held = {}
+	task.spawn(function()
+		for i, entry in queue do
+			if holding then
+				-- held again before the flush finished: back into the queue
+				for j = i, #queue do
+					table.insert(held, queue[j])
+				end
+				return
+			end
+			Toast.show(entry.kind, entry.text, entry.seconds)
+			if i < #queue then
+				task.wait(math.min(entry.seconds or 3, 3))
+			end
+		end
+	end)
+end
+
+function Toast.isHeld(): boolean
+	return holding
 end
 
 return Toast

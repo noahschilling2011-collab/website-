@@ -30,6 +30,9 @@ local ModelsUI = require(UI.Apps.ModelsUI)
 local Parts = require(script.Parent.StudioParts)
 local LabPreview = require(script.Parent.LabPreview)
 local LabState = require(script.Parent.LabState)
+local ShopCore = require(UI.Shop.ShopCore) -- shop package: Last Epoch (SHOP_SPEC 5.2.5), Stage Lights (3.7)
+local ShopMath = require(Shared.ShopMath)
+local GuiService = game:GetService("GuiService")
 
 local C = Theme.colors
 local F = Theme.font
@@ -125,7 +128,11 @@ function Stages.buildTraining(Studio: any): any
 	local expectedText = Parts.label(preview, "", 22, F.medium, C.muted, UDim2.fromOffset(276, 180), UDim2.new(1, -276, 0, 56))
 	expectedText.TextWrapped = true
 	expectedText.TextYAlignment = Enum.TextYAlignment.Top
-	local paid = Parts.label(preview, "", 22, F.medium, C.muted, UDim2.fromOffset(276, 240), UDim2.new(1, -276, 0, 28))
+	local paid = Parts.label(preview, "", 22, F.medium, C.muted, UDim2.fromOffset(276, 240), UDim2.new(1, -276, 0, 56))
+	-- shop package: "Last Epoch saves 0:16" wraps to a second line in the narrower desktop column instead of "…"
+	paid.TextWrapped = true
+	paid.TextTruncate = Enum.TextTruncate.None
+	paid.TextYAlignment = Enum.TextYAlignment.Top
 	local bar = Kit.bar(preview, 18, 0)
 	bar.frame.Position = UDim2.new(0, 0, 1, -18)
 	bar.frame.Size = UDim2.new(1, 0, 0, 18)
@@ -195,7 +202,31 @@ function Stages.buildTraining(Studio: any): any
 	countdown.frame.Size = UDim2.new(1, -36, 0, 10)
 	local stroke = panel:FindFirstChildOfClass("UIStroke")
 
-	Parts.label(bottom, "Runs on the server · close any time", 22, F.medium, C.muted, UDim2.fromOffset(16, 0), UDim2.new(1, -750, 1, 0))
+	local serverNote = Parts.label(bottom, "Runs on the server · close any time", 22, F.medium, C.muted, UDim2.fromOffset(16, 0), UDim2.new(1, -750, 1, 0))
+	-- shop package (SHOP_SPEC 5.2.5): FINISH NOW · LAST EPOCH in its place while it would work (never during the
+	-- first training: the Shop opens at the first launch); the Robux state needs >= 20 s left, an owned one any time
+	-- fix round 1 (review): plain secondary and narrower than CLOSE, so it is never the most prominent button there
+	local epochOffer = ShopCore.offerButton(bottom, "FINISH NOW · LAST EPOCH", UDim2.fromOffset(350, 74), 20, true)
+	epochOffer.button.Name = "LastEpoch"
+	epochOffer.button.Position = UDim2.fromOffset(16, 0)
+	epochOffer.set(nil, "")
+	Kit.onClick(epochOffer.button, function()
+		if epochOffer.button:GetAttribute("OfferState") == "owned" then
+			ShopCore.use("lastEpoch", nil)
+		else
+			ShopCore.buy("lastEpoch", nil)
+		end
+	end)
+	local function paintEpoch()
+		local snapshot = StateController.snapshot
+		local state, eta, right = nil, 0, ""
+		if snapshot then
+			state, eta, right = ShopCore.lastEpochOffer(snapshot)
+		end
+		epochOffer.set(state, right)
+		serverNote.Visible = state == nil
+		return state, eta
+	end
 	local labBack = Parts.button(bottom, "‹ LAB", "secondary", UDim2.new(1, -702, 0, 0), UDim2.fromOffset(180, 74), 26)
 	local closeAll = Parts.button(bottom, "CLOSE · it keeps training", "ghost", UDim2.new(1, -510, 0, 0), UDim2.fromOffset(494, 74), 26)
 	closeAll.Name = "CloseKeepTraining"
@@ -264,6 +295,10 @@ function Stages.buildTraining(Studio: any): any
 			metrics[3].value.Text = Format.tokens(model.dataUsed.total)
 		end
 		paid.Text = `{Parts.money(training.cost)} paid`
+		local epochState, epochEta = paintEpoch()
+		if epochState then
+			paid.Text = `Last Epoch saves {Format.duration(epochEta)}` -- SHOP_SPEC 5.2.5 note
+		end
 		local fleet = ModelMath.fleet(data.gpus)
 		metrics[1].value.Text = `{string.format("%g", math.round(fleet.throughput * 10) / 10)} u/s`
 		metrics[2].value.Text = Parts.money(training.cost)
@@ -365,6 +400,10 @@ function Stages.buildTraining(Studio: any): any
 				lastEta = secs
 				eta.Text = "ETA " .. Format.duration(secs)
 				eta.TextColor3 = C.muted
+				local epochState = paintEpoch()
+				if epochState then
+					paid.Text = `Last Epoch saves {Format.duration(secs)}`
+				end
 			end
 		end
 	end
@@ -480,6 +519,39 @@ function Stages.buildReveal(Studio: any): any
 	refine.Name = "Refine"
 	local launch = Parts.button(bottom, "LAUNCH ›", "primary", UDim2.new(1, -412, 0, 0), UDim2.fromOffset(396, 74), 28)
 	launch.Name = "Launch"
+
+	-- shop package (SHOP_SPEC 3.7): Stage Lights pass - two light sweeps in the company colour during the count-up, a
+	-- confetti burst and a gold frame on the reveal card. UI only, only the buyer sees it; reduced motion: no sweeps
+	local sweeps: { Frame } = {}
+	for i = 1, 2 do
+		local sweep = Kit.frame(main, UDim2.new(0, 90, 1, 0), UDim2.new(-0.2, 0, 0, 0))
+		sweep.Name = "StageSweep" .. i
+		sweep.BackgroundTransparency = 0
+		Theme.bindAccent(sweep, "BackgroundColor3")
+		sweep.ZIndex = 4
+		sweep.Visible = false
+		local g = Instance.new("UIGradient")
+		g.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.55),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		g.Parent = sweep
+		sweeps[i] = sweep
+	end
+	local goldFrame = Kit.stroke(card.frame, 1, C.warn, 4)
+	goldFrame.Name = "StageLightsFrame"
+	local function stageLights(): boolean
+		local snapshot = StateController.snapshot
+		local shop = if snapshot then (snapshot.live :: any).shop else nil
+		return ShopMath.ownsPass(if typeof(shop) == "table" then shop.passes else nil, "stageLights")
+	end
+	local function reducedMotion(): boolean
+		local ok, value = pcall(function(): any
+			return (GuiService :: any).ReducedMotionEnabled
+		end)
+		return ok and value == true
+	end
 
 	local skip = Instance.new("TextButton")
 	skip.Name = "SkipCeremony"
@@ -674,6 +746,18 @@ function Stages.buildReveal(Studio: any): any
 			end
 			cancelCount = Parts.countUp(overall, from, model.overall, 1.1)
 			scoreShown()
+			if stageLights() and not reducedMotion() then
+				for i, sweep in sweeps do
+					sweep.Position = UDim2.new(if i == 1 then -0.2 else 1.1, 0, 0, 0)
+					sweep.Visible = true
+					Kit.tween(sweep, 1.1, { Position = UDim2.new(if i == 1 then 1.1 else -0.2, 0, 0, 0) })
+				end
+				task.delay(1.15, function()
+					for _, sweep in sweeps do
+						sweep.Visible = false
+					end
+				end)
+			end
 			task.wait(1.15)
 			if mine ~= sequence then
 				return
@@ -689,7 +773,7 @@ function Stages.buildReveal(Studio: any): any
 			for _, chip in chips do
 				chip.frame.Visible = true
 			end
-			if pill.Visible then
+			if pill.Visible or stageLights() then
 				stage.burst(36)
 			end
 			skip.Visible = false
@@ -724,6 +808,7 @@ function Stages.buildReveal(Studio: any): any
 		local id0 = modelId
 		shownPayload = if id0 and LabState.reveals[id0] then LabState.reveals[id0] else {}
 		benchmark = opts.benchmark == true
+		goldFrame.Transparency = if stageLights() then 0.1 else 1 -- Stage Lights: the gold frame on the reveal card
 		benchCaption.Text = "BENCHMARKS"
 		overallCaption.Text = "OVERALL"
 		if benchmark or opts.instant == true then

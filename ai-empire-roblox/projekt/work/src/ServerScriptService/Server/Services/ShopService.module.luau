@@ -17,16 +17,27 @@
 -- data.shop.passes is only a fallback cache while Roblox can't be asked. Clients see the flags in
 -- live.shop (written on change; MarketService merges session.live instead of replacing it).
 --
+-- Shop package (SHOP_SPEC): redeem(session, key, target) with the generic daily caps (ShopConfig.DAILY), the timed
+-- boosts Keynote Boost / Overclock (startBoost, end times in company play seconds, at most 60 min left), Rooftop
+-- Fireworks, bundles (a pass that `includes` others), passes with ready = false never sold, cash packs once per office
+-- (S1, enforced here: a second receipt of the same size in one office is never refused but becomes a credit,
+-- data.shop.packCredit, paid at the next office by payPackCredits), the ServerGlow office attribute.
+--
 -- Public API for other systems:
---   ShopService.owns(player|session, passKey) -> boolean        (VehicleService: limo)
---   ShopService.revenueMultiplier(session) -> number             (MarketService: investor pass)
---   ShopService.setRedeemHandler(voucherKey, fn(session) -> (ok, errCode?))   (RecruitingService: headhunter)
+--   ShopService.owns(player|session, passKey) -> boolean        (VehicleService: limo; honours bundles)
+--   ShopService.revenueMultiplier(session) -> number             (MarketService: investor pass + Keynote Boost)
+--   ShopService.trainingMultiplier(session) -> number            (Overclock; AIModelService uses ShopMath.boostRate)
+--   ShopService.setRedeemHandler(voucherKey, fn(session, target?) -> (ok, errCode?))
+--       (RecruitingService: headhunter, EmpireService: eureka, AIModelService: lastEpoch)
 --   ShopService.onPassChanged(fn(session, passKey, owned))
+--   ShopService.payPackCredits(session) -> number                (EmpireService.upgrade: saved cash-pack credits, S1)
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ShopConfig = require(ReplicatedStorage.Shared.Config.ShopConfig)
+local ShopMath = require(ReplicatedStorage.Shared.ShopMath)
+local CompanyConfig = require(ReplicatedStorage.Shared.Config.CompanyConfig)
 local ServerTypes = require(script.Parent.Parent.Lib.ServerTypes)
 local Guard = require(script.Parent.Parent.Lib.Guard)
 local Remote = require(script.Parent.Parent.Lib.Remote)
@@ -37,7 +48,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local ShopDecor = require(script.Parent.ShopDecor)
 
 type Session = ServerTypes.Session
-type Redeemer = (Session) -> (boolean, string?)
+type Redeemer = (Session, string?) -> (boolean, string?)
 type PassListener = (Session, string, boolean) -> ()
 
 local Shop = {}
@@ -73,6 +84,7 @@ local passStates: { [Session]: PassState } = setmetatable({}, { __mode = "k" }) 
 -- ownership answer can lag behind a fresh purchase, e.g. Studio test purchases) never takes them away
 local boughtNow: { [Session]: { [string]: boolean } } = setmetatable({}, { __mode = "k" }) :: any
 local parties: { [Session]: Model } = setmetatable({}, { __mode = "k" }) :: any
+local fireworksKits: { [Session]: Model } = setmetatable({}, { __mode = "k" }) :: any
 local redeeming: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local redeemers: { [string]: Redeemer } = {}
 local passListeners: { PassListener } = {}
@@ -92,6 +104,11 @@ local function shopOf(session: Session): any
 		or typeof(shop.vouchers) ~= "table"
 		or typeof(shop.passes) ~= "table"
 		or typeof(shop.tips) ~= "number"
+		or typeof(shop.boosts) ~= "table" -- shop package: an old save gets the new fields once (SHOP_SPEC 7)
+		or typeof(shop.daily) ~= "table"
+		or typeof(shop.daily.used) ~= "table"
+		or typeof(shop.packs) ~= "table"
+		or typeof(shop.packCredit) ~= "table" -- fix round 1: cash packs bought twice in one office (S1)
 	then
 		shop = Template.cleanShop(shop)
 		data.shop = shop
@@ -120,8 +137,15 @@ function Shop.available(): { [string]: boolean }
 	for _, def in ShopConfig.PRODUCTS do
 		out[def.key] = if def.kind == "voucher" then def.voucher ~= nil and redeemers[def.voucher] ~= nil else true
 	end
+	for _, def in ShopConfig.PRODUCTS do
+		if def.ready == false then
+			out[def.key] = false
+		end
+	end
 	for _, def in ShopConfig.PASSES do
-		if def.key == "limo" then
+		if def.ready == false then
+			out[def.key] = false -- its feature is not in the game yet (phase 2/3): never sold
+		elseif def.key == "limo" then
 			out[def.key] = ShopConfig.limoCarExists()
 		elseif def.key == "investor" then
 			out[def.key] = investorWired
@@ -172,10 +196,14 @@ local function refreshOffice(session: Session)
 		end
 		local owned = Shop.owns(session, "founderSuite")
 		office:SetAttribute("FounderSuite", if owned then true else nil)
+		-- Server Glow pass (SHOP_SPEC 3.6): PropFxController runs the rack light wave while this is set
+		office:SetAttribute("ServerGlow", if Shop.owns(session, "serverGlow") then true else nil)
 		local existing = office:FindFirstChild(ShopDecor.SUITE_NAME)
 		if owned and not existing then
 			local tier = office:GetAttribute("OfficeTier")
-			ShopDecor.founderSuite(office, plot.cframe, if typeof(tier) == "number" then tier else (session.data.empire.office :: number))
+			-- ONBOARDING_SPEC C4: the fallback is a plan tier (BuildingPlan.tierForOffice), never the office index
+			local Plan = require(ReplicatedStorage.Shared.Config.BuildingPlan) :: any
+			ShopDecor.founderSuite(office, plot.cframe, if typeof(tier) == "number" then tier else Plan.tierForOffice(session.data.empire.office))
 		elseif not owned and existing then
 			existing:Destroy()
 		end
@@ -242,7 +270,7 @@ local function setPass(session: Session, key: string, owned: boolean, persist: b
 	publish(session)
 	if key == "vip" then
 		refreshTag(session.player)
-	elseif key == "founderSuite" then
+	elseif key == "founderSuite" or key == "serverGlow" or key == "styleCollection" then
 		refreshOffice(session)
 	end
 	for _, listener in passListeners do
@@ -304,13 +332,14 @@ local function onPassPurchaseFinished(player: Player, passId: number, purchased:
 	Remote.fire(player, "Notify", "SHOP_GRANTED", { key = def.key, kind = "pass" })
 end
 
+-- the pass's own flag, or a bundle that includes it (Style Collection: SHOP_SPEC 3.11)
 function Shop.owns(target: Player | Session, key: string): boolean
 	local session: Session? = if isSession(target) then target :: any else deps.getSession(target)
 	if not session then
 		return false
 	end
 	local flags = passFlags[session]
-	return flags ~= nil and flags[key] == true
+	return flags ~= nil and ShopMath.ownsPass(flags, key)
 end
 
 -- MarketService multiplies the player's own market revenue with this (after market shares are
@@ -321,7 +350,43 @@ function Shop.revenueMultiplier(session: Session): number
 		investorWired = true
 		publishAll()
 	end
-	return if Shop.owns(session, "investor") then ShopConfig.INVESTOR_MULTIPLIER else 1
+	local factor = if Shop.owns(session, "investor") then ShopConfig.INVESTOR_MULTIPLIER else 1
+	-- Keynote Boost: +0.20 added (S6: with Investor 1.30), own market revenue only, after shares
+	return factor + ShopMath.revenueBonus(session.data)
+end
+
+-- seconds of company play time left on a boost ("keynote" | "overclock")
+function Shop.boostLeft(session: Session, key: string): number
+	return ShopMath.boostLeft(session.data, key)
+end
+
+-- Overclock: training x1.5 (callers keep the 12 s floor: ShopMath.boostRate)
+function Shop.trainingMultiplier(session: Session): number
+	return ShopMath.trainingFactor(session.data)
+end
+
+-- Redeem handler of the boost vouchers (SHOP_SPEC 3.3). Another start adds 15 min; refused while more than
+-- BOOST_MAX_LEFT - 15 min are left. The daily cap is checked by redeem before this runs.
+function Shop.startBoost(session: Session, key: string): (boolean, string?)
+	local def = ShopConfig.BOOSTS[key]
+	if not def then
+		return false, "BAD_INPUT"
+	end
+	local data = session.data
+	if not data.company then
+		return false, "NO_COMPANY"
+	end
+	if key == "keynote" and not ShopMath.liveModel(data) then
+		return false, "NO_LIVE_MODEL" -- +20 % of nothing
+	end
+	local left = ShopMath.boostLeft(data, key)
+	if left + def.seconds > ShopConfig.BOOST_MAX_LEFT then
+		return false, "BOOST_FULL"
+	end
+	local now = tonumber(data.empire.seconds) or 0
+	shopOf(session).boosts[key] = now + left + def.seconds
+	SessionService.markDirty(session, true)
+	return true, nil
 end
 
 function Shop.onPassChanged(listener: PassListener)
@@ -375,8 +440,18 @@ end
 local function grant(session: Session, def: ShopConfig.Product): { [string]: any }
 	local shop = shopOf(session)
 	if def.kind == "cash" then
-		local amount = ShopConfig.cashFor(def, session.data.empire.office)
+		local office = ShopMath.office(session.data)
+		if shop.packs[def.key] == office then
+			-- S1 on the server: this office already got its pack of this size (a purchase outside our UI, a double tap
+			-- before the snapshot hid the chip). The receipt is never refused; the cash waits as a credit and is paid at
+			-- the next office, at that office's amount (payPackCredits). So no office ever gets two packs of one size.
+			local credit = math.min(ShopConfig.VOUCHER_MAX, math.max(0, math.floor(tonumber(shop.packCredit[def.key]) or 0)) + 1)
+			shop.packCredit[def.key] = credit
+			return { key = def.key, kind = "cash", amount = 0, credit = credit }
+		end
+		local amount = ShopConfig.cashFor(def, office)
 		EconomyService.grant(session, amount, "shop") -- P&L line "shop" (corefix request 8)
+		shop.packs[def.key] = office -- S1: one of each size per office
 		return { key = def.key, kind = "cash", amount = amount }
 	elseif def.kind == "voucher" and def.voucher then
 		local count = (tonumber(shop.vouchers[def.voucher]) or 0) + 1
@@ -385,6 +460,30 @@ local function grant(session: Session, def: ShopConfig.Product): { [string]: any
 	end
 	shop.tips += 1
 	return { key = def.key, kind = "tip", tips = shop.tips }
+end
+
+-- S1 credits (see grant): after an office move, one saved credit per pack size is paid at the new office's amount and
+-- counts as that office's pack (packs[key] = office), so the buy chip stays hidden there. EmpireService.upgrade calls
+-- this right after the move; no yield. Returns the cash paid.
+function Shop.payPackCredits(session: Session): number
+	local shop = shopOf(session)
+	local office = ShopMath.office(session.data)
+	local total = 0
+	for _, def in ShopConfig.PRODUCTS do
+		local n = math.floor(tonumber(shop.packCredit[def.key]) or 0)
+		if def.kind == "cash" and n >= 1 and shop.packs[def.key] ~= office then
+			local amount = ShopConfig.cashFor(def, office)
+			EconomyService.grant(session, amount, "shop")
+			shop.packs[def.key] = office
+			shop.packCredit[def.key] = if n > 1 then n - 1 else nil
+			total += amount
+			Remote.fire(session.player, "Notify", "SHOP_GRANTED", { key = def.key, kind = "cash", amount = amount, fromCredit = true })
+		end
+	end
+	if total > 0 then
+		SessionService.markDirty(session, true)
+	end
+	return total
 end
 
 local function trimReceipts(shop: any)
@@ -475,9 +574,46 @@ local function throwParty(session: Session): (boolean, string?)
 	return true, nil
 end
 
-local function redeem(session: Session, key: string): ServerTypes.Result
+-- Built-in voucher (SHOP_SPEC 3.4): 45 s of fireworks in the company colour above the headquarters.
+local function fireworks(session: Session): (boolean, string?)
+	local Plot = deps.plot()
+	local plot = Plot.get(session.player)
+	local office: Instance? = if plot then plot.office else nil
+	if not plot or not office or not office.Parent then
+		return false, "NO_PLOT"
+	end
+	local running = fireworksKits[session]
+	if running and running.Parent then
+		return false, "FIREWORKS_ACTIVE"
+	end
+	local company = session.data.company
+	local def = if company then CompanyConfig.getColor(company.color) else nil
+	local rgb = if def then def.rgb else { 120, 200, 174 }
+	local kit = ShopDecor.fireworks(office, plot.cframe, Color3.fromRGB(rgb[1], rgb[2], rgb[3]), ShopConfig.FIREWORKS_SECONDS)
+	fireworksKits[session] = kit
+	task.delay(ShopConfig.FIREWORKS_SECONDS, function()
+		if kit.Parent then
+			kit:Destroy()
+		end
+		if fireworksKits[session] == kit then
+			fireworksKits[session] = nil
+		end
+	end)
+	return true, nil
+end
+
+-- SHOP_SPEC 6.3: every voucher redeem. Any refusal keeps the voucher; the daily counter rolls at 00:00 UTC and counts
+-- successful redeems only.
+local function redeem(session: Session, key: string, target: any): ServerTypes.Result
 	if not ShopConfig.voucher(key) then
 		return { ok = false, err = "BAD_INPUT" }
+	end
+	local want: string? = nil
+	if target ~= nil then
+		want = Guard.id(target)
+		if not want then
+			return { ok = false, err = "BAD_INPUT" }
+		end
 	end
 	if (tonumber(shopOf(session).vouchers[key]) or 0) < 1 then
 		return { ok = false, err = "NO_VOUCHER" }
@@ -489,8 +625,18 @@ local function redeem(session: Session, key: string): ServerTypes.Result
 	if redeeming[session] then
 		return { ok = false, err = "BUSY" }
 	end
+	local cap = ShopConfig.DAILY[key]
+	local daily = shopOf(session).daily
+	local today = ShopMath.utcDay(deps.now())
+	if daily.day ~= today then
+		daily.day = today
+		daily.used = {}
+	end
+	if cap and (tonumber(daily.used[key]) or 0) >= cap then
+		return { ok = false, err = "DAILY_LIMIT" }
+	end
 	redeeming[session] = true
-	local ok, done, err = pcall(handler, session)
+	local ok, done, err = pcall(handler, session, want)
 	redeeming[session] = nil
 	if not ok then
 		warn(`[Shop] redeem {key} failed: {done}`)
@@ -500,9 +646,14 @@ local function redeem(session: Session, key: string): ServerTypes.Result
 		return { ok = false, err = if typeof(err) == "string" then err else "NOT_AVAILABLE" }
 	end
 	-- re-read after the handler (it may yield)
-	local vouchers = shopOf(session).vouchers
+	local shop = shopOf(session)
+	local vouchers = shop.vouchers
 	local left = math.max(0, (tonumber(vouchers[key]) or 0) - 1)
 	vouchers[key] = if left > 0 then left else nil
+	if cap then
+		local used = shop.daily.used
+		used[key] = math.min(cap, (tonumber(used[key]) or 0) + 1)
+	end
 	SessionService.markDirty(session, true)
 	return { ok = true, key = key, left = left }
 end
@@ -523,13 +674,15 @@ local function action(session: Session, payload: ServerTypes.Payload): ServerTyp
 				passes[def.key] = true
 			end
 		end
-		return { ok = true, passes = passes, vouchers = table.clone(shopOf(session).vouchers), available = Shop.available() }
+		local shop = shopOf(session)
+		return { ok = true, passes = passes, vouchers = table.clone(shop.vouchers), available = Shop.available(),
+			daily = table.clone(shop.daily), boosts = table.clone(shop.boosts) }
 	elseif act == "redeem" then
 		local key = Guard.id(payload.key)
 		if not key then
 			return { ok = false, err = "BAD_INPUT" }
 		end
-		return redeem(session, key)
+		return redeem(session, key, payload.target)
 	end
 	return { ok = false, err = "BAD_INPUT" }
 end
@@ -562,6 +715,7 @@ function Shop._setDeps(patch: { [string]: any })
 end
 
 Shop._action = action
+Shop._grant = grant -- the economy simulator buys cash packs through the real grant (fix round 1, S1 credits)
 
 ------------------------------------------------------------------------------------------- start
 
@@ -581,6 +735,13 @@ function Shop.init()
 	assert(not initialised, "ShopService.init called twice")
 	initialised = true
 	redeemers.party = throwParty
+	redeemers.fireworks = fireworks
+	redeemers.keynote = function(session: Session): (boolean, string?)
+		return Shop.startBoost(session, "keynote")
+	end
+	redeemers.overclock = function(session: Session): (boolean, string?)
+		return Shop.startBoost(session, "overclock")
+	end
 	deps.market.ProcessReceipt = Shop.processReceipt
 	deps.market.PromptGamePassPurchaseFinished:Connect(onPassPurchaseFinished)
 	Remote.bind("ShopAction", { burst = 4, perSecond = 1 }, action)
@@ -591,6 +752,7 @@ function Shop.init()
 		boughtNow[session] = nil
 		redeeming[session] = nil
 		parties[session] = nil -- the kit lives in the office and goes with it
+		fireworksKits[session] = nil
 	end)
 	deps.players.PlayerAdded:Connect(watchCharacter)
 	for _, player in deps.players:GetPlayers() do

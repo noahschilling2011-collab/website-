@@ -28,8 +28,9 @@
 -- INTERVIEW_OPEN); hire sends the visitor to the speed gates, where the new employee's staff rig takes over
 -- (StaffService.expectArrival / handoverArrival: first day through reception); reject sends the visitor back
 -- to the plaza, where the rig is removed.
--- Shop: the "headhunter" voucher (ShopService.setRedeemHandler) adds one top candidate (hidden skill >= 4) to
--- the applications; it is refused (voucher kept) while the company has no desk or application slot free.
+-- Shop: the "headhunter" voucher (ShopService.setRedeemHandler) adds one applicant with hidden skill exactly 4 for
+-- the smallest team, with a fixed salary ask (SHOP_SPEC 3.12: deterministic, no paid random result); it is refused
+-- (voucher kept) while the company has no desk or application slot free.
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Prompts=game:GetService("ProximityPromptService")
 local EmpireConfig=require(ReplicatedStorage.Shared.Config.EmpireConfig)
@@ -37,6 +38,7 @@ local EmployeeConfig=require(ReplicatedStorage.Shared.Config.EmployeeConfig)
 local GameConfig=require(ReplicatedStorage.Shared.Config.GameConfig)
 local Plan=require(ReplicatedStorage.Shared.Config.BuildingPlan)
 local EmpireMath=require(ReplicatedStorage.Shared.EmpireMath)
+local ShopMath=require(ReplicatedStorage.Shared.ShopMath) -- shop package: headhunter role (SHOP_SPEC 3.12)
 local Format=require(ReplicatedStorage.Shared.Format)
 local Remote=require(script.Parent.Parent.Lib.Remote)
 local Guard=require(script.Parent.Parent.Lib.Guard)
@@ -865,16 +867,27 @@ function Recruiting.campusTick(_dt: number)
  end
 end
 
--- Headhunter voucher (shop, CORE_SPEC 11.7): one applicant whose hidden skill is 4 or 5. Deterministic: the
--- serial stream is walked until such a candidate comes up (each generate() takes the next serial).
+-- Headhunter voucher (shop, SHOP_SPEC 3.12): one applicant with hidden skill EXACTLY 4 (the serial stream is walked
+-- until such a candidate comes up; each generate() takes the next serial) for the department with the fewest people
+-- (team + open applications, ties in ROLES order: ShopMath.headhuntRole), the first specialty of that role and a
+-- fixed salary ask of 1.25 (the k = 4 base 0.8 + 3 x 0.15). Name, previous employer and temperament stay as
+-- generated (flavour). The result is known before redeeming (Recruiting.headhuntPreview), so it is not random.
+Recruiting.HEADHUNT_ASK=roundAsk(0.8+3*0.15)
+function Recruiting.headhuntPreview(e: any): string
+ return roleDef(ShopMath.headhuntRole(e)).name
+end
 function Recruiting.headhunt(s: any): (boolean,string?)
  if not s.data.company then return false,"NO_COMPANY" end
  local e=s.data.empire
  if #e.applicants>=EmpireMath.MAX_APPLICANTS then return false,"APPLICANTS_FULL" end
  if EmpireMath.staff(e)>=EmpireConfig.OFFICES[e.office].staff then return false,"STAFF_FULL" end
- for _=1,60 do
+ local role=ShopMath.headhuntRole(e)
+ for _=1,160 do
   local a=Recruiting.generate(e,s.userId,e.seconds)
-  if Recruiting.traits(s.userId,a.serial).k>=4 then
+  if Recruiting.traits(s.userId,a.serial).k==4 then
+   a.role=role
+   a.spec=SPECIALTIES[role][1]
+   a.ask=Recruiting.HEADHUNT_ASK
    table.insert(e.applicants,a)
    Session.markDirty(s,true)
    notify(s,"Headhunter: "..a.n.." · "..roleDef(a.role).name.." applied (top candidate)")

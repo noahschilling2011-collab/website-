@@ -18,11 +18,12 @@ function App.mount(parent: Frame,nav: any)
 	local config=Kit.card(left,1,12);Kit.caption(config,"Checkpoint under test",1)
 	local name=Kit.text(config,"No trained model",21,F.bold,C.text);name.LayoutOrder=2
 	local detail=Kit.para(config,"",13,C.muted,3)
-	local controls=Kit.row(config,32,8,4)
-	local previous=Kit.button(controls,"Previous","secondary",UDim2.fromOffset(100,30))
-	local nextButton=Kit.button(controls,"Next model","secondary",UDim2.fromOffset(110,30));nextButton.LayoutOrder=2
+	-- fix round 1 (review B3): touch targets >= 56 px on touch (44.8 pt in the Menu's legacy x 0.80)
+	local controls=Kit.row(config,Kit.tap(32,58),8,4)
+	local previous=Kit.button(controls,"Previous","secondary",UDim2.fromOffset(100,Kit.tap(30,56)))
+	local nextButton=Kit.button(controls,"Next model","secondary",UDim2.fromOffset(110,Kit.tap(30,56)));nextButton.LayoutOrder=2
 	local index=1;local ids={}
-	local start=Kit.button(config,"RUN COURIER TEST","primary",UDim2.new(1,0,0,42));start.LayoutOrder=5
+	local start=Kit.button(config,"RUN COURIER TEST","primary",UDim2.new(1,0,0,Kit.tap(42,56)));start.LayoutOrder=5
 	Kit.onClick(previous,function() index=math.max(1,index-1);if State.snapshot then refresh(State.snapshot) end end)
 	Kit.onClick(nextButton,function() index=math.min(#ids,index+1);if State.snapshot then refresh(State.snapshot) end end)
 	Kit.onClick(start,function() if ids[index] then Action.call("RunArena",{modelId=ids[index]}) end end)

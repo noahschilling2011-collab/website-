@@ -16,6 +16,9 @@ local Remote = require(script.Parent.Parent.Lib.Remote)
 local SessionService = require(script.Parent.SessionService)
 local Economy = require(script.Parent.EconomyService)
 local PlotService = require(script.Parent.PlotService)
+local TutorialMath = require(Shared.TutorialMath)
+local Funnel = require(script.Parent.Parent.Lib.Funnel)
+local ShopService = require(script.Parent.ShopService) -- shop package: the Eureka voucher (ShopService never requires this module)
 local Empire = {}
 local function success(session: any): any
 	SessionService.markDirty(session)
@@ -105,12 +108,40 @@ local function upgrade(session: any, _payload: any): any
 	if not Economy.spend(session, def.price, "office") then return {ok=false, err="NO_MONEY"} end
 	e.office += 1
 	e.xp += 100
+	-- S1 (shop fix round 1): a cash pack bought twice in the last office was saved as a credit; one per size is paid
+	-- now, at the new office's amount. The guard keeps ShopService test doubles without the hook working.
+	if typeof((ShopService :: any).payPackCredits) == "function" then
+		ShopService.payPackCredits(session)
+	end
 	PlotService.refresh(session)
 	Ops.post(e, "moved into the " .. def.name)
 	Remote.fire(session.player, "Notify", "EMPIRE_NOTICE", { text = "New office unlocked: " .. def.name })
 	return success(session)
 end
+-- ClaimQuest {all = true} (ONBOARDING_SPEC B11, menu package): every finished goal at once, no yield between the
+-- checks and the grants (one reward per quest). Returns {ok, claimed = {ids}, total}; nothing claimable = ok, total 0.
+local function claimAll(session: any): any
+	local data = session.data
+	local claimed, total = {}, 0
+	for _, def in Config.QUESTS do
+		if not data.empire.quests[def.id] and Math.progress(data, def) >= def.target then
+			data.empire.quests[def.id] = true
+			data.empire.xp += def.xp
+			total += def.reward
+			table.insert(claimed, def.id)
+		end
+	end
+	if total > 0 then
+		Economy.grant(session, total, "quest")
+		SessionService.markDirty(session)
+	end
+	return { ok = true, claimed = claimed, total = total }
+end
 local function quest(session: any, payload: any): any
+	if payload.all ~= nil then
+		if payload.all ~= true then return {ok=false, err="BAD_INPUT"} end
+		return claimAll(session)
+	end
 	local def = Config.find(Config.QUESTS, payload.questId)
 	if not def then return {ok=false, err="BAD_INPUT"} end
 	local data = session.data
@@ -241,6 +272,57 @@ local function officeAttributes(session: any)
 	set("RackFaults", table.concat(slots, ","))
 	set("ServerFaults", #slots)
 end
+-- A research project is done: the same effects for the timer (tick) and the Eureka voucher (SHOP_SPEC 3.1), so goals,
+-- the HUD, the 7B unlock and the Studio lock update the same way. The player sees the same notice either way.
+local function completeResearch(session: any, id: string)
+	local e = session.data.empire
+	e.research[id] = true
+	e.researchJob = nil
+	e.xp += 150
+	local def = Config.find(Config.RESEARCH, id)
+	Remote.fire(session.player, "Notify", "EMPIRE_NOTICE", {text = "Research complete: " .. (if def then def.name else id)})
+end
+-- Eureka voucher (shop package, SHOP_SPEC 3.1; redeemed through ShopAction {action = "redeem", key = "eureka", target}):
+-- finishes ONE research project or ONE Lab level now. Its research points and its timer are covered; its $ price is
+-- still paid. Deterministic, no yield between the checks and the effect; any error keeps the voucher (ShopService).
+--   target = "lab"          -> the next Lab level (tree complete, level < 10, cash for the level); no RP taken
+--   a project is running    -> it finishes now and its research points come back (target nil or its id); no cash
+--   target = a research id  -> start + finish it now (known, not done, prerequisite done, cash); no RP taken
+function Empire.eureka(session: any, target: any): (boolean, string?)
+	local data = session.data
+	if not data.company then return false, "NO_COMPANY" end
+	local e = data.empire
+	local want = if target == nil then nil else Guard.id(target)
+	if target ~= nil and not want then return false, "BAD_INPUT" end
+	if want == "lab" then
+		local L = math.floor(tonumber(e.labLevel) or 0)
+		if L >= Ops.LAB_MAX then return false, "MAX_LEVEL" end
+		for _, def in Config.RESEARCH do if not e.research[def.id] then return false, "PREREQUISITE" end end
+		local _, cost = Empire.labCost(L)
+		if not Economy.spend(session, cost, "lab") then return false, "NO_MONEY" end
+		e.labLevel = L + 1
+		Ops.post(e, "Lab level " .. e.labLevel .. " (Eureka): +1 core stat on future models")
+		SessionService.markDirty(session)
+		return true, nil
+	end
+	local job = e.researchJob
+	if job then
+		if want ~= nil and want ~= job.id then return false, "RESEARCH_ACTIVE" end
+		local def = Config.find(Config.RESEARCH, job.id)
+		e.points = math.min(100000, e.points + (if def then def.points else 0))
+		completeResearch(session, job.id)
+		SessionService.markDirty(session)
+		return true, nil
+	end
+	local def = Config.find(Config.RESEARCH, want)
+	if not def then return false, "BAD_INPUT" end
+	if e.research[def.id] then return false, "ALREADY_DONE" end
+	if def.prereq and not e.research[def.prereq] then return false, "PREREQUISITE" end
+	if not Economy.spend(session, def.cost, "research") then return false, "NO_MONEY" end
+	completeResearch(session, def.id)
+	SessionService.markDirty(session)
+	return true, nil
+end
 function Empire.tick(session: any, dt: number)
 	local data = session.data
 	if not data.company then return end
@@ -259,11 +341,7 @@ function Empire.tick(session: any, dt: number)
 	if job then
 		job.elapsed = math.min(job.seconds, job.elapsed + dt)
 		if job.elapsed >= job.seconds then
-			e.research[job.id] = true
-			e.researchJob = nil
-			e.xp += 150
-			local def = Config.find(Config.RESEARCH, job.id)
-			Remote.fire(session.player, "Notify", "EMPIRE_NOTICE", {text = "Research complete: " .. (if def then def.name else job.id)})
+			completeResearch(session, job.id)
 		end
 	end
 	local curators = Workforce.count(e,"curator")
@@ -337,10 +415,94 @@ end
 local function setFlag(session: any): any
 	return success(session)
 end
+-- EmpireAction {action = "tutorial", op = ...} (ONBOARDING_SPEC A6, menu package): the guide's flags only. No op
+-- changes money, items or unlocks; a forged `step` can only distort analytics. Funnel steps (A11): op step n = 2..6
+-- sends funnel step n + 1 for a new maximum, op done sends 8, a skip is the custom event "TutorialSkipped".
+Empire.TUTORIAL_SEEN_MAX = 8
+local function tutorialOf(e: any): any
+	local t = e.tutorial
+	if typeof(t) ~= "table" then
+		t = { v = 1, step = 0, done = false, skipped = false, tipsOff = false, seen = {}, tips = {} }
+		e.tutorial = t
+	end
+	if typeof(t.seen) ~= "table" then t.seen = {} end
+	if typeof(t.tips) ~= "table" then t.tips = {} end
+	if typeof(t.step) ~= "number" or t.step ~= t.step then t.step = 0 end
+	return t
+end
+local function tutorialAction(session: any, p: any): any
+	local data = session.data
+	local t = tutorialOf(data.empire)
+	local op = p.op
+	if op == "skip" then
+		if t.done == true then return {ok=false, err="ALREADY_DONE"} end
+		if t.skipped ~= true then
+			t.skipped = true
+			Funnel.custom(session.player, "TutorialSkipped", math.clamp(math.floor(t.step), 0, TutorialMath.STEPS))
+		end
+		return setFlag(session)
+	elseif op == "done" then
+		if (tonumber(data.stats.modelsReleased) or 0) < 1 then return {ok=false, err="NOT_READY"} end
+		if t.done ~= true then
+			t.done = true
+			Funnel.step(session.player, 8)
+		end
+		return setFlag(session)
+	elseif op == "restart" then
+		if (tonumber(data.stats.modelsReleased) or 0) ~= 0 then return {ok=false, err="NOT_AVAILABLE"} end
+		t.skipped = false
+		t.done = false
+		t.step = 0
+		return setFlag(session)
+	elseif op == "step" then
+		local n = Guard.integer(p.n, 1, 6)
+		if not n then return {ok=false, err="BAD_INPUT"} end
+		if t.done == true or t.skipped == true then return {ok=false, err="NOT_AVAILABLE"} end
+		if n > TutorialMath.reachable(data) + 1 then return {ok=false, err="BAD_INPUT"} end
+		local before = t.step
+		t.step = math.max(before, math.min(n, TutorialMath.STEPS))
+		if n >= 2 then Funnel.step(session.player, n + 1) end
+		return setFlag(session)
+	elseif op == "seen" then
+		local keys = p.keys
+		if typeof(keys) ~= "table" then return {ok=false, err="BAD_INPUT"} end
+		local list = {}
+		for i, key in keys do
+			if typeof(i) ~= "number" or #list >= Empire.TUTORIAL_SEEN_MAX or typeof(key) ~= "string" or not table.find(TutorialMath.SEEN_KEYS, key) then
+				return {ok=false, err="BAD_INPUT"}
+			end
+			table.insert(list, key)
+		end
+		if #list == 0 then return {ok=false, err="BAD_INPUT"} end
+		for _, key in list do t.seen[key] = true end
+		return setFlag(session)
+	elseif op == "tip" then
+		local key = p.key
+		if typeof(key) ~= "string" or not table.find(TutorialMath.TIP_KEYS, key) then return {ok=false, err="BAD_INPUT"} end
+		t.tips[key] = true
+		return setFlag(session)
+	elseif op == "tips" then
+		if typeof(p.on) ~= "boolean" then return {ok=false, err="BAD_INPUT"} end
+		t.tipsOff = not p.on
+		return setFlag(session)
+	elseif op == "replayTips" then
+		t.tips = {}
+		return setFlag(session)
+	end
+	return {ok=false, err="BAD_INPUT"}
+end
+Empire.tutorialAction = tutorialAction
 local function empireAction(session: any, p: any): any
 	local e = session.data.empire
 	local action = p.action
+	if action == "tutorial" then return tutorialAction(session, p) end -- menu package (ONBOARDING_SPEC A6)
 	if action == "labLevel" then return Empire.labLevel(session) end
+	if action == "rebrand" then -- shop package (SHOP_SPEC 3.5, S4): free colour & logo change for everyone
+		local module = script.Parent:FindFirstChild("CompanyService")
+		local company = if module then (require :: any)(module) else nil
+		if not company or typeof(company.rebrand) ~= "function" then return {ok=false, err="NOT_AVAILABLE"} end
+		return company.rebrand(session, p.color, p.logo)
+	end
 	if action == "buyJet" then
 		local result = Ops.buyJet(session, Economy)
 		if result.ok then Ops.post(e, "bought the company jet (2 pilots, " .. Ops.money(Ops.JET.pilots * Ops.JET.pilotWage + Ops.JET.upkeep) .. "/day)"); SessionService.markDirty(session) end
@@ -466,6 +628,11 @@ function Empire.init()
 	local actions = {burst=4, perSecond=2, company=true}
 	Remote.bind("EmpireAction", actions, empireAction)
 	Remote.bind("DealAction", actions, dealAction)
+	-- shop package (SHOP_SPEC 3.1): the Eureka voucher. The real ShopService always has the hook; the guard keeps test
+	-- doubles of ShopService without it (tests/world/stubs.luau, used by tests/itinerary) working unchanged.
+	if typeof((ShopService :: any).setRedeemHandler) == "function" then
+		ShopService.setRedeemHandler("eureka", Empire.eureka)
+	end
 	-- CityService "Start meeting" prompts in the client offices (prompt range checked there)
 	local city = script.Parent:FindFirstChild("CityService")
 	local plan = ReplicatedStorage.Shared.Config:FindFirstChild("CityPlan")

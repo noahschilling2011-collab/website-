@@ -20,6 +20,7 @@ local DepartmentConfig=require(ReplicatedStorage.Shared.Config.DepartmentConfig)
 local CompanyOps=require(ReplicatedStorage.Shared.CompanyOps)
 local ModelMath=require(ReplicatedStorage.Shared.ModelMath)
 local ModelConfig=require(ReplicatedStorage.Shared.Config.ModelConfig)
+local TutorialMath=require(ReplicatedStorage.Shared.TutorialMath)
 local Template = {}
 
 local function finiteNumber(v: any): boolean
@@ -110,8 +111,12 @@ end
 -- receipts[PurchaseId] = os.time() of the grant, order = the same ids oldest first (trimmed to
 -- ShopConfig.RECEIPTS_KEPT). vouchers[key] = unredeemed count. passes = fallback cache of game-pass
 -- ownership, used only while Roblox can't be asked. tips = supporter tips received.
+-- Shop package (SHOP_SPEC 7, pure additions, DATA_VERSION stays 6): boosts[key] = empire.seconds when the boost ends,
+-- daily = {day = UTC day, used = {key = redeems that day}}, packs[key] = office of the last cash pack of that size,
+-- packCredit[key] = cash packs of that size bought again in an office that already had one (fix round 1: paid one per
+-- office move by ShopService.payPackCredits).
 function Template.newShop(): any
-	return { receipts = {}, order = {}, vouchers = {}, passes = {}, tips = 0 }
+	return { receipts = {}, order = {}, vouchers = {}, passes = {}, tips = 0, boosts = {}, daily = { used = {} }, packs = {}, packCredit = {} }
 end
 
 function Template.new(): Types.PlayerData
@@ -267,7 +272,73 @@ function Template.cleanShop(raw: any): any
 		end
 	end
 	shop.tips = if finite(raw.tips) then math.max(0, math.floor(raw.tips)) else 0
+	-- shop package (SHOP_SPEC 7): known keys and finite values only
+	if typeof(raw.boosts) == "table" then
+		for key in ShopConfig.BOOSTS do
+			local v = raw.boosts[key]
+			if finite(v) and v > 0 then
+				shop.boosts[key] = v
+			end
+		end
+	end
+	if typeof(raw.daily) == "table" then
+		local day = raw.daily.day
+		if finite(day) and day >= 0 and day % 1 == 0 then
+			shop.daily.day = day
+		end
+		if typeof(raw.daily.used) == "table" then
+			for key, cap in ShopConfig.DAILY do
+				local n = raw.daily.used[key]
+				if finite(n) then
+					local c = math.clamp(math.floor(n), 0, cap)
+					if c > 0 then
+						shop.daily.used[key] = c
+					end
+				end
+			end
+		end
+	end
+	if typeof(raw.packs) == "table" then
+		for _, def in ShopConfig.PRODUCTS do
+			local office = raw.packs[def.key]
+			if def.kind == "cash" and finite(office) and office % 1 == 0 and office >= 1 and office <= #EmpireConfig.OFFICES then
+				shop.packs[def.key] = office
+			end
+		end
+	end
+	-- pack credits are paid for: kept like vouchers (any valid key, counts clamped, never dropped for being unknown)
+	if typeof(raw.packCredit) == "table" then
+		local n = 0
+		for key, count in raw.packCredit do
+			if shopKey(key) and finite(count) and n < SHOP_LIST_MAX then
+				local c = math.clamp(math.floor(count), 0, ShopConfig.VOUCHER_MAX)
+				if c > 0 then
+					shop.packCredit[key] = c
+					n += 1
+				end
+			end
+		end
+	end
 	return shop
+end
+
+-- A boost never has more than BOOST_MAX_LEFT of play time left (fix round 1): a corrupt end time far in the future is cut
+-- back to "60 min from now". Runs after cleanShop and the empire cleaners (empire.seconds is a finite number >= 0 then).
+function Template.clampBoosts(raw: any)
+	local shop = raw.shop
+	local e = raw.empire
+	if typeof(shop) ~= "table" or typeof(shop.boosts) ~= "table" or typeof(e) ~= "table" then
+		return
+	end
+	local now = tonumber(e.seconds) or 0
+	if now ~= now or now == math.huge then
+		now = 0
+	end
+	for key, v in shop.boosts do
+		if typeof(v) == "number" and v > now + ShopConfig.BOOST_MAX_LEFT then
+			shop.boosts[key] = now + ShopConfig.BOOST_MAX_LEFT
+		end
+	end
 end
 
 -- CORE_SPEC Appendix A cleaners (DATA_VERSION 6 fields). Runs after the nested defaults, so every field
@@ -401,6 +472,31 @@ function Template.cleanCompany(raw: any)
 	end
 end
 
+-- "First steps" guide (ONBOARDING_SPEC A6, menu package): empire.tutorial = {v, step 0..5, done, skipped, tipsOff,
+-- seen = {[SEEN_KEY] = true}, tips = {[TIP_KEY] = true}}. Idempotent; unknown keys and junk types are dropped.
+-- Old saves that already launched a model never see the guide and get no NEW-badge flood.
+function Template.cleanTutorial(raw: any)
+	local e = raw.empire
+	local t = if typeof(e.tutorial) == "table" then e.tutorial else {}
+	-- `finite` returns a boolean (local helper above), never the number
+	local step = if finite(t.step) then math.clamp(math.floor(t.step), 0, TutorialMath.STEPS) else 0
+	local out = { v = 1, step = step, done = t.done == true, skipped = t.skipped == true, tipsOff = t.tipsOff == true, seen = {}, tips = {} }
+	for k, v in (if typeof(t.seen) == "table" then t.seen else {}) do
+		if v == true and typeof(k) == "string" and table.find(TutorialMath.SEEN_KEYS, k) then out.seen[k] = true end
+	end
+	for k, v in (if typeof(t.tips) == "table" then t.tips else {}) do
+		if v == true and typeof(k) == "string" and table.find(TutorialMath.TIP_KEYS, k) then out.tips[k] = true end
+	end
+	local released = if typeof(raw.stats) == "table" then tonumber(raw.stats.modelsReleased) or 0 else 0
+	if out.step == 0 and not out.done and not out.skipped and released > 0 then
+		out.done = true
+		for _, key in TutorialMath.unlockedKeys(raw) do
+			if table.find(TutorialMath.SEEN_KEYS, key) then out.seen[key] = true end
+		end
+	end
+	e.tutorial = out
+end
+
 -- Gibt (Daten, nil) oder (nil, Grund) zurück. Ein Grund bedeutet: NICHT überschreiben, Spieler kicken.
 function Template.migrate(raw: any): (Types.PlayerData?, string?)
 	if typeof(raw) ~= "table" then
@@ -492,9 +588,11 @@ function Template.migrate(raw: any): (Types.PlayerData?, string?)
 		e[key] = math.max(0, tonumber(e[key]) or 0)
 	end
 	Template.cleanCompany(raw)
+	Template.cleanTutorial(raw) -- menu package (ONBOARDING_SPEC A6)
 	-- Robux records: old saves get an empty shop (filled above), malformed ones are repaired. No
 	-- DATA_VERSION bump needed: a pure addition, like staffProfiles.
 	raw.shop = Template.cleanShop(raw.shop)
+	Template.clampBoosts(raw) -- fix round 1: at most 60 min of a boost left
 	return raw :: Types.PlayerData, nil
 end
 

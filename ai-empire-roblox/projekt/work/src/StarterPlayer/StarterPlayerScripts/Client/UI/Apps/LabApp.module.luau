@@ -33,6 +33,8 @@ local LabState = require(Lab.LabState)
 local DesignSteps = require(Lab.DesignSteps)
 local Stages = require(Lab.Stages)
 local LaunchDay = require(Lab.LaunchDay)
+local ShopCore = require(UI.Shop.ShopCore) -- shop package: LEVEL UP · EUREKA (SHOP_SPEC 5.2.3)
+local ShopMath = require(Shared.ShopMath) -- fix round 1: "Eureka saves about …"
 
 local C = Theme.colors
 local F = Theme.font
@@ -321,9 +323,30 @@ local function buildHome(parent: Frame, T: Tokens)
 	para(labCard, "Every level adds +1 to every core stat of the models you train next. Your researchers unlock levels after the whole research tree.", T.body, C.dim, 3)
 	local capNote = para(labCard, "", T.body, C.muted, 4)
 	local labCost = para(labCard, "", T.body, C.muted, 5)
-	local labBuy = Kit.button(labCard, "UPGRADE LAB", "secondary", UDim2.new(1, 0, 0, T.button))
-	labBuy.LayoutOrder = 6
+	-- the button row: UPGRADE LAB (free) and, when a Eureka would work right now, LEVEL UP · EUREKA (shop package)
+	local labRow = Kit.frame(labCard, UDim2.new(1, 0, 0, T.button))
+	labRow.Name = "LabButtons"
+	labRow.LayoutOrder = 6
+	Kit.list(labRow, 12, true)
+	local labBuy = Kit.button(labRow, "UPGRADE LAB", "secondary", UDim2.new(1, 0, 0, T.button))
+	labBuy.Name = "UpgradeLab"
+	labBuy.LayoutOrder = 1
 	labBuy.TextSize = if T == COMPACT then 30 else 15
+	labBuy.TextWrapped = true
+	local labOffer = ShopCore.offerButton(labRow, "LEVEL UP · EUREKA", UDim2.new(0.5, -6, 1, 0), if T == COMPACT then 28 else 15)
+	labOffer.button.Name = "LabEureka"
+	labOffer.button.LayoutOrder = 2
+	labOffer.set(nil, "")
+	local labNote = para(labCard, "", T.body, C.muted, 7)
+	labNote.Name = "LabEurekaNote"
+	labNote.Visible = false
+	Kit.onClick(labOffer.button, function()
+		if labOffer.button:GetAttribute("OfferState") == "owned" then
+			ShopCore.use("eureka", "lab")
+		else
+			ShopCore.buy("eureka", "lab")
+		end
+	end)
 	local labCanBuy = false
 	Kit.onClick(labBuy, function()
 		if not labCanBuy then
@@ -617,6 +640,17 @@ local function buildHome(parent: Frame, T: Tokens)
 		labCanBuy = lab.canBuy
 		labBuy.Text = if lab.level >= lab.max then "LAB AT MAX LEVEL" else `UPGRADE LAB · {Format.int(lab.points)} RP + {Format.money(lab.cash)}`
 		Kit.setDisabled(labBuy, not lab.canBuy)
+		-- shop package (SHOP_SPEC 5.2.3): the Robux state only while research points are short of the level (a Lab
+		-- level has no timer); an owned Eureka shows either way, so it is never stranded
+		local offerState, offerCheck, offerRight = ShopCore.eurekaOffer(snapshot, "lab", money)
+		labOffer.set(offerState, offerRight)
+		labBuy.Size = UDim2.new(if offerState then 0.5 else 1, if offerState then -6 else 0, 1, 0)
+		labNote.Visible = offerState ~= nil
+		if offerState and offerCheck then
+			labNote.Text = if offerCheck.have >= offerCheck.points
+				then `No time saved: your {Format.int(offerCheck.points)} RP stay yours for the next level. You still pay {Format.money(offerCheck.cost)}.`
+				else `Eureka saves {ShopMath.savingText(offerCheck.seconds)}: covers the {Format.int(offerCheck.points)} RP. You still pay {Format.money(offerCheck.cost)}.`
+		end
 
 		rebuildReady(snapshot)
 		rebuildFame(snapshot)

@@ -11,6 +11,7 @@ local ModelMath = require(ReplicatedStorage.Shared.ModelMath)
 local EmpireMath = require(ReplicatedStorage.Shared.EmpireMath)
 local Workforce=require(ReplicatedStorage.Shared.WorkforceMath)
 local StatePatch = require(ReplicatedStorage.Shared.StatePatch)
+local ShopMath = require(ReplicatedStorage.Shared.ShopMath) -- shop package: Overclock in the training estimate
 
 local StateController = {}
 
@@ -210,8 +211,19 @@ function StateController.trainingWork(): (number, number)
 	if event and event.pending then
 		return training.workDone, training.workTotal
 	end
-	local rate = EmpireMath.trainingRate(snapshot.data.gpus, training.workTotal, snapshot.data.empire)
+	local rate = StateController.trainingRate(snapshot)
 	return math.min(training.workTotal, training.workDone + rate * StateController.elapsed()), training.workTotal
+end
+
+-- the running training's rate with Overclock (SHOP_SPEC 5.2.5: x ShopMath.trainingFactor, the 12 s floor kept)
+function StateController.trainingRate(snapshot: Types.Snapshot): number
+	local training = snapshot.data.training
+	if not training then
+		return 0
+	end
+	local rate = EmpireMath.trainingRate(snapshot.data.gpus, training.workTotal, snapshot.data.empire)
+	local seconds = (tonumber(snapshot.data.empire.seconds) or 0) + StateController.elapsed()
+	return ShopMath.boostRate(snapshot.data, training.workTotal, rate, seconds)
 end
 
 -- Restsekunden des laufenden Trainings
@@ -222,7 +234,7 @@ function StateController.trainingEta(): number
 		return 0
 	end
 	local done, total = StateController.trainingWork()
-	local rate = EmpireMath.trainingRate(snapshot.data.gpus, training.workTotal, snapshot.data.empire)
+	local rate = StateController.trainingRate(snapshot)
 	return if rate > 0 then (total - done) / rate else 0
 end
 

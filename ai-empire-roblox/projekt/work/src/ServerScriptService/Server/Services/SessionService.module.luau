@@ -12,6 +12,7 @@ local ServerTypes = require(script.Parent.Parent.Lib.ServerTypes)
 local StatePatch = require(ReplicatedStorage.Shared.StatePatch)
 local CompanyOps = require(ReplicatedStorage.Shared.CompanyOps)
 local Remote = require(script.Parent.Parent.Lib.Remote)
+local Funnel = require(script.Parent.Parent.Lib.Funnel)
 local SaveService = require(script.Parent.SaveService)
 
 type Session = ServerTypes.Session
@@ -324,6 +325,9 @@ local function onPlayerAdded(player: Player)
 		rng = Random.new(),
 	}
 	sessions[player] = session
+	if data.company == nil then
+		Funnel.step(player, 1) -- onboarding funnel "Joined" (ONBOARDING_SPEC A11)
+	end
 	for _, callback in loadedCallbacks do
 		task.spawn(callback, session)
 	end
